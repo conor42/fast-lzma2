@@ -93,7 +93,7 @@ void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* c
     cParams->strategy = params->strategy;
     cParams->second_dict_bits = params->chainLog;
     cParams->random_filter = 0;
-    rParams->dictionary_log = params->windowLog;
+    rParams->dictionary_log = MIN(params->windowLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
     rParams->match_buffer_log = params->bufferLog;
     rParams->overlap_fraction = params->overlapFraction;
     rParams->divide_and_conquer = params->divideAndConquer;
@@ -176,7 +176,6 @@ static void FL2_buildRadixTable(void* jobDescription)
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* cctx = job->cctx;
 
-    /* build */
     RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
 }
 
@@ -267,7 +266,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* cctx)
     POOL_waitAll(cctx->factory);
 
 #ifdef RMF_CHECK_INTEGRITY
-    {   size_t err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
+    {   int err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
         if (err)
             return FL2_ERROR(internal);
     }
@@ -282,7 +281,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* cctx)
 #else /* FL2_MULTITHREAD */
 
 #ifdef RMF_CHECK_INTEGRITY
-    {   size_t err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
+    {   int err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
         if (err)
             return FL2_ERROR(internal);
     }
@@ -315,10 +314,13 @@ static size_t FL2_compressBlock(FL2_CCtx* cctx,
     cctx->curBlock.start = srcStart;
     while (srcSize > 0) {
         size_t nbThreads;
+
         cctx->curBlock.end = cctx->curBlock.start + MIN(srcSize, dictionary_size - cctx->curBlock.start);
+
         nbThreads = FL2_compressCurBlock(cctx);
         if (FL2_isError(nbThreads))
             return nbThreads;
+
         for (size_t u = 0; u < nbThreads; ++u) {
             const BYTE* const outBuf = RMF_getTableAsOutputBuffer(cctx->matchTable, cctx->jobs[u].block.start);
 
@@ -361,10 +363,8 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
     BYTE* end = dstBuf + dstCapacity;
     size_t cSize = 0;
 
-    if (compressionLevel > FL2_MAX_CLEVEL) compressionLevel = FL2_MAX_CLEVEL;
-    if (compressionLevel > 0) {
-        FL2_fillParameters(cctx, &FL2_defaultCParameters[compressionLevel]);
-    }
+    if (compressionLevel > 0)
+        FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, compressionLevel);
 
     DEBUGLOG(4, "FL2_compressCCtx : level %u, %u src => %u avail", cctx->params.compressionLevel, (U32)srcSize, (U32)dstCapacity);
 
@@ -372,16 +372,20 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
         return FL2_ERROR(dstSize_tooSmall);
 
     FL2_beginFrame(cctx);
+
     dstBuf += !cctx->params.omitProp;
     cSize = FL2_compressBlock(cctx, src, 0, srcSize, dstBuf, end - dstBuf, NULL, NULL);
     if(!cctx->params.omitProp)
         dstBuf[-1] = FL2_getProp(cctx, cctx->dictMax);
+
     if (FL2_isError(cSize))
         return cSize;
+
     dstBuf += cSize;
     if(dstBuf >= end)
         return FL2_ERROR(dstSize_tooSmall);
     *dstBuf++ = LZMA2_END_MARKER;
+
     if (cctx->params.doXXH && !cctx->params.omitProp) {
         XXH32_canonical_t canonical;
         DEBUGLOG(5, "Writing hash");
@@ -485,7 +489,7 @@ FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, un
 
     case FL2_p_dictionaryLog:
         if (value) {  /* 0 : does not change current dictionaryLog */
-            CLAMPCHECK(value, FL2_WINDOWLOG_MIN, FL2_WINDOWLOG_MAX);
+            CLAMPCHECK(value, FL2_WINDOWLOG_MIN, FL2_DICTLOG_MAX);
             cctx->params.rParams.dictionary_log = value;
         }
         return cctx->params.rParams.dictionary_log;
@@ -654,8 +658,10 @@ static size_t FL2_compressStream_internal(FL2_CStream* fcs,
 {
     FL2_CCtx* cctx = fcs->cctx;
     size_t out_start = output->pos;
+
     if (output->pos >= output->size)
         return 0;
+
     if (fcs->out_thread == fcs->thread_count) {
         if (fcs->inBuff.start < fcs->inBuff.end) {
             if (fcs->cctx->params.doXXH && !cctx->params.omitProp) {
@@ -664,10 +670,12 @@ static size_t FL2_compressStream_internal(FL2_CStream* fcs,
             cctx->curBlock.data = fcs->inBuff.data;
             cctx->curBlock.start = fcs->inBuff.start;
             cctx->curBlock.end = fcs->inBuff.end;
+
             fcs->out_thread = 0;
             fcs->thread_count = FL2_compressCurBlock(cctx);
             if (FL2_isError(fcs->thread_count))
                 return fcs->thread_count;
+
             fcs->inBuff.start = fcs->inBuff.end;
         }
         if (!fcs->wrote_prop && !cctx->params.omitProp) {
@@ -683,15 +691,19 @@ static size_t FL2_compressStream_internal(FL2_CStream* fcs,
         BYTE* dstBuf = (BYTE*)output->dst + output->pos;
         size_t dstCapacity = output->size - output->pos;
         size_t to_write = cctx->jobs[fcs->out_thread].cSize;
+
         if (FL2_isError(to_write))
             return to_write;
+
         to_write = MIN(to_write - fcs->out_pos, dstCapacity);
         DEBUGLOG(5, "CStream : writing %u bytes", (U32)to_write);
         memcpy(dstBuf, outBuf, to_write);
         fcs->out_pos += to_write;
         output->pos += to_write;
+
         if (fcs->out_pos < cctx->jobs[fcs->out_thread].cSize)
             break;
+
         fcs->out_pos = 0;
     }
     return 0;
@@ -716,15 +728,19 @@ FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL
     FL2_blockBuffer* inBuff = &fcs->inBuff;
     FL2_CCtx* cctx = fcs->cctx;
     size_t block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+
     if (FL2_isError(fcs->thread_count))
         return fcs->thread_count;
+
     if (output->pos < output->size) while (input->pos < input->size) {
         if (inBuff->data == NULL) {
             inBuff->bufSize = (size_t)1 << cctx->params.rParams.dictionary_log;
             DEBUGLOG(3, "Allocating input buffer : %u bytes", (U32)inBuff->bufSize);
             inBuff->data = malloc(inBuff->bufSize);
+
             if (inBuff->data == NULL)
                 return FL2_ERROR(memory_allocation);
+
             inBuff->start = 0;
             inBuff->end = 0;
         }
@@ -750,8 +766,7 @@ FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL
             inBuff->end += toRead;
         }
         if (inBuff->end == inBuff->bufSize || fcs->out_thread < fcs->thread_count) {
-            CHECK_F(FL2_compressStream_internal(fcs,
-                output, 0));
+            CHECK_F(FL2_compressStream_internal(fcs, output, 0));
         }
         if (fcs->out_thread < fcs->thread_count)
             break;
@@ -763,11 +778,13 @@ FL2LIB_API size_t FL2_flushStream_internal(FL2_CStream* fcs, FL2_outBuffer* outp
 {
     if (FL2_isError(fcs->thread_count))
         return fcs->thread_count;
+
     DEBUGLOG(4, "FL2_flushStream_internal : %u to compress, %u to write",
         (U32)(fcs->inBuff.end - fcs->inBuff.start),
         (U32)FL2_remainingOutputSize(fcs));
-    CHECK_F(FL2_compressStream_internal(fcs,
-        output, ending));
+
+    CHECK_F(FL2_compressStream_internal(fcs, output, ending));
+
     return FL2_remainingOutputSize(fcs);
 }
 
@@ -798,6 +815,7 @@ FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output)
 
         if (output->pos >= output->size)
             return 1;
+
         XXH32_canonicalFromHash(&canonical, XXH32_digest(fcs->xxh));
         DEBUGLOG(4, "Writing XXH32 : %u bytes", (U32)to_write);
         memcpy((BYTE*)output->dst + output->pos, canonical.digest + fcs->hash_pos, to_write);
@@ -805,7 +823,6 @@ FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output)
         fcs->hash_pos += to_write;
         return fcs->hash_pos < XXHASH_SIZEOF;
     }
-
     return 0;
 }
 

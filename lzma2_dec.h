@@ -24,8 +24,6 @@ extern "C" {
 
 /* ---------- LZMA Properties ---------- */
 
-#define LZMA_PROPS_SIZE 5
-
 typedef struct _CLzmaProps
 {
   unsigned lc, lp, pb;
@@ -38,8 +36,6 @@ Returns:
   SZ_ERROR_UNSUPPORTED - Unsupported properties
 */
 
-size_t LzmaProps_Decode(CLzmaProps *p, const BYTE *data, unsigned size);
-
 
 /* ---------- LZMA Decoder state ---------- */
 
@@ -48,41 +44,41 @@ size_t LzmaProps_Decode(CLzmaProps *p, const BYTE *data, unsigned size);
 
 #define LZMA_REQUIRED_INPUT_MAX 20
 
-#define kNumPosBitsMax 4
-#define kNumPosStatesMax (1 << kNumPosBitsMax)
+#define kNumPosBitsMax 4U
+#define kNumPosStatesMax (1U << kNumPosBitsMax)
 
-#define kLenNumLowBits 3
-#define kLenNumLowSymbols (1 << kLenNumLowBits)
-#define kLenNumMidBits 3
-#define kLenNumMidSymbols (1 << kLenNumMidBits)
-#define kLenNumHighBits 8
-#define kLenNumHighSymbols (1 << kLenNumHighBits)
+#define kLenNumLowBits 3U
+#define kLenNumLowSymbols (1U << kLenNumLowBits)
+#define kLenNumMidBits 3U
+#define kLenNumMidSymbols (1U << kLenNumMidBits)
+#define kLenNumHighBits 8U
+#define kLenNumHighSymbols (1U << kLenNumHighBits)
 
-#define LenChoice 0
-#define LenChoice2 (LenChoice + 1)
-#define LenLow (LenChoice2 + 1)
+#define LenChoice 0U
+#define LenChoice2 (LenChoice + 1U)
+#define LenLow (LenChoice2 + 1U)
 #define LenMid (LenLow + (kNumPosStatesMax << kLenNumLowBits))
 #define LenHigh (LenMid + (kNumPosStatesMax << kLenNumMidBits))
 #define kNumLenProbs (LenHigh + kLenNumHighSymbols)
 
 
-#define kNumStates 12
-#define kNumLitStates 7
+#define kNumStates 12U
+#define kNumLitStates 7U
 
-#define kStartPosModelIndex 4
-#define kEndPosModelIndex 14
-#define kNumFullDistances (1 << (kEndPosModelIndex >> 1))
+#define kStartPosModelIndex 4U
+#define kEndPosModelIndex 14U
+#define kNumFullDistances (1U << (kEndPosModelIndex >> 1))
 
-#define kNumPosSlotBits 6
-#define kNumLenToPosStates 4
+#define kNumPosSlotBits 6U
+#define kNumLenToPosStates 4U
 
-#define kNumAlignBits 4
-#define kAlignTableSize (1 << kNumAlignBits)
+#define kNumAlignBits 4U
+#define kAlignTableSize (1U << kNumAlignBits)
 
-#define kMatchMinLen 2
+#define kMatchMinLen 2U
 #define kMatchSpecLenStart (kMatchMinLen + kLenNumLowSymbols + kLenNumMidSymbols + kLenNumHighSymbols)
 
-#define IsMatch 0
+#define IsMatch 0U
 #define IsRep (IsMatch + (kNumStates << kNumPosBitsMax))
 #define IsRepG0 (IsRep + kNumStates)
 #define IsRepG1 (IsRepG0 + kNumStates)
@@ -95,14 +91,14 @@ size_t LzmaProps_Decode(CLzmaProps *p, const BYTE *data, unsigned size);
 #define RepLenCoder (LenCoder + kNumLenProbs)
 #define Literal (RepLenCoder + kNumLenProbs)
 
-#define LZMA_BASE_SIZE 1846
+#define LZMA_BASE_SIZE 1846U
 #define LZMA_LIT_SIZE 0x300
 
 #if Literal != LZMA_BASE_SIZE
 StopCompilingDueBUG
 #endif
 
-#define LZMA2_LCLP_MAX 4
+#define LZMA2_LCLP_MAX 4U
 
 typedef struct CLzma2Dec_s
 {
@@ -201,9 +197,6 @@ LzmaDec_Allocate* can return:
   SZ_ERROR_UNSUPPORTED - Unsupported properties
 */
    
-size_t LzmaDec_AllocateProbs(CLzma2Dec *p, const BYTE *props, unsigned propsSize);
-
-size_t LzmaDec_Allocate(CLzma2Dec *state, const BYTE *prop, unsigned propsSize);
 void LzmaDec_Free(CLzma2Dec *state);
 
 /* ---------- Dictionary Interface ---------- */
@@ -267,34 +260,9 @@ finishMode:
 size_t LzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-#define LZMA2_CONTENTSIZE_UNKNOWN (size_t)-1
-#define LZMA2_CONTENTSIZE_ERROR   (size_t)-2
+#define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
 size_t Lzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
-
-/* ---------- One Call Interface ---------- */
-
-/* LzmaDecode
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (*destLen).
-  LZMA_FINISH_ANY - Decode just destLen bytes.
-  LZMA_FINISH_END - Stream must be finished after (*destLen).
-
-Returns:
-  SZ_OK
-    status:
-      LZMA_STATUS_FINISHED_WITH_MARK
-      LZMA_STATUS_NOT_FINISHED
-      LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
-  SZ_ERROR_DATA - Data error
-  SZ_ERROR_MEM  - Memory allocation error
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-  SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
-*/
-
-size_t LzmaDecode(BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen,
-    const BYTE *propData, unsigned propSize, ELzmaFinishMode finishMode);
 
 /* ---------- State Interface ---------- */
 
@@ -322,28 +290,6 @@ size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
 size_t Lzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-
-/* ---------- One Call Interface ---------- */
-
-/*
-finishMode:
-It has meaning only if the decoding reaches output limit (*destLen).
-LZMA_FINISH_ANY - use smallest number of input bytes
-LZMA_FINISH_END - read EndOfStream marker after decoding
-
-Returns:
-SZ_OK
-status:
-LZMA_STATUS_FINISHED_WITH_MARK
-LZMA_STATUS_NOT_FINISHED
-SZ_ERROR_DATA - Data error
-SZ_ERROR_MEM  - Memory allocation error
-SZ_ERROR_UNSUPPORTED - Unsupported properties
-SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
-*/
-
-size_t Lzma2Decode(BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen,
-    BYTE prop, ELzmaFinishMode finishMode);
 
 #if defined (__cplusplus)
 }

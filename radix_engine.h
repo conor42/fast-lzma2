@@ -23,7 +23,6 @@ static size_t HandleRepeat(FL2_matchTable* tbl, const BYTE* const data_block, si
     tbl->list_heads[radix_16].count -= MAX_REPEAT / 2 - 2;
     /* Find the end */
     i += ZSTD_count(data_block + i + 2, data_block + i + 1, data_block + block_size);
-/*    for (; i < block_size && data_block[i + 2] == (BYTE)radix_16; ++i); */
     /* Start processing again at the last 4 bytes */
     rpt_end = i;
     /* No point if it's in the overlap region */

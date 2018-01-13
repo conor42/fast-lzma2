@@ -14,8 +14,12 @@
 #if defined (__cplusplus)
 extern "C" {
 #endif
-    
+
+#ifdef _LZMA_PROB32
+typedef U32 Probability;
+#else
 typedef U16 Probability;
+#endif
 
 #define kNumTopBits 24U
 #define kTopValue (1UL << kNumTopBits)

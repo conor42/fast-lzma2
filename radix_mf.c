@@ -54,7 +54,7 @@ static RMF_builder* RMF_createBuilder(U32* matchTable, size_t match_buffer_size)
 
 static void RMF_freeBuilderTable(RMF_builder** builders, unsigned size)
 {
-    if (!builders)
+    if (builders == NULL)
         return;
     for (unsigned i = 0; i < size; ++i) {
         free(builders[i]);
@@ -66,11 +66,11 @@ static RMF_builder** RMF_createBuilderTable(U32* matchTable, size_t match_buffer
 {
     DEBUGLOG(3, "RMF_createBuilderTable : match_buffer_size %u, builders %u", (U32)match_buffer_size, size);
     RMF_builder** builders = (RMF_builder**)malloc(size * sizeof(RMF_builder*));
-    if (!builders)
+    if (builders == NULL)
         return NULL;
     for (unsigned i = 0; i < size; ++i) {
         builders[i] = RMF_createBuilder(matchTable, match_buffer_size);
-        if (!builders[i]) {
+        if (builders[i] == NULL) {
             RMF_freeBuilderTable(builders, i);
             return NULL;
         }
@@ -118,7 +118,7 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* tbl, RMF_parameters* 
         {
             RMF_freeBuilderTable(tbl->builders, tbl->thread_count);
             tbl->builders = RMF_createBuilderTable(tbl->table, match_buffer_size, tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH, tbl->thread_count);
-            if (!tbl->builders) {
+            if (tbl->builders == NULL) {
                 free(tbl);
                 return FL2_ERROR(memory_allocation);
             }
@@ -144,21 +144,29 @@ static void RMF_reduceDict(RMF_parameters* params, size_t dict_reduce)
 
 FL2_matchTable* RMF_createMatchTable(RMF_parameters* p, size_t dict_reduce, unsigned thread_count)
 {
+    int isStruct;
+    size_t dictionary_size;
     RMF_parameters params = RMF_clampParams(*p);
+
     RMF_reduceDict(&params, dict_reduce);
-    int isStruct = RMF_isStruct(&params);
-    size_t dictionary_size = (size_t)1 << params.dictionary_log;
+    isStruct = RMF_isStruct(&params);
+    dictionary_size = (size_t)1 << params.dictionary_log;
+
     DEBUGLOG(3, "RMF_createMatchTable : isStruct %d, dict %u", isStruct, (U32)dictionary_size);
+
     FL2_matchTable* const tbl = (FL2_matchTable*)malloc(
         sizeof(FL2_matchTable) + (isStruct ? dictionary_size * sizeof(RMF_unit) : dictionary_size * sizeof(U32)) - sizeof(U32));
     if (!tbl) return NULL;
+
     tbl->isStruct = isStruct;
     tbl->allocStruct = isStruct;
     tbl->thread_count = thread_count;
     tbl->params = params;
     tbl->params.match_buffer_log = 0;
     tbl->builders = NULL;
+
     RMF_applyParameters_internal(tbl, &params);
+
     for (size_t i = 0; i < RADIX16_TABLE_SIZE; i += 2) {
         tbl->list_heads[i].head = RADIX_NULL_LINK;
         tbl->list_heads[i].count = 0;
@@ -170,7 +178,7 @@ FL2_matchTable* RMF_createMatchTable(RMF_parameters* p, size_t dict_reduce, unsi
 
 void RMF_freeMatchTable(FL2_matchTable* tbl)
 {
-    if (!tbl)
+    if (tbl == NULL)
         return;
     DEBUGLOG(3, "RMF_freeMatchTable");
     RMF_freeBuilderTable(tbl->builders, tbl->thread_count);

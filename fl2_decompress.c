@@ -69,15 +69,21 @@ FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* dctx,
     ++srcBuf;
     --srcSize;
     prop &= FL2_LZMA_PROP_MASK;
+
     DEBUGLOG(4, "FL2_decompressDCtx : dict prop 0x%X, do hash %u", prop, do_hash);
+
     CHECK_F(Lzma2Dec_Init(dctx, prop, dst, dstCapacity));
+
     dicPos = dctx->dicPos;
+
     res = Lzma2Dec_DecodeToDic(dctx, dstCapacity, srcBuf, &srcSize, LZMA_FINISH_END);
     if (FL2_isError(res))
         return res;
     if (res == LZMA_STATUS_NEEDS_MORE_INPUT)
         return FL2_ERROR(srcSize_wrong);
+
     dicPos = dctx->dicPos - dicPos;
+
     if (do_hash) {
         DEBUGLOG(4, "Checking hash");
         XXH32_canonical_t canonical;
@@ -148,7 +154,9 @@ FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, 
             ++input->pos;
             fds->do_hash = prop >> FL2_PROP_HASH_BIT;
             prop &= FL2_LZMA_PROP_MASK;
+
             CHECK_F(Lzma2Dec_Init(&fds->dec, prop, NULL, 0));
+
             if (fds->do_hash) {
                 if (fds->xxh == NULL) {
                     DEBUGLOG(3, "Creating hash state");
@@ -164,11 +172,15 @@ FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, 
             size_t destSize = output->size - output->pos;
             size_t srcSize = input->size - input->pos;
             size_t res = Lzma2Dec_DecodeToBuf(&fds->dec, (BYTE*)output->dst + output->pos, &destSize, (const BYTE*)input->src + input->pos, &srcSize, LZMA_FINISH_ANY);
+
             DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
+
             if(fds->do_hash)
                 XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, destSize);
+
             output->pos += destSize;
             input->pos += srcSize;
+
             if (FL2_isError(res))
                 return res;
             if (res == LZMA_STATUS_FINISHED_WITH_MARK) {

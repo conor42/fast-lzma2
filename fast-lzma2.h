@@ -80,29 +80,19 @@ FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
 FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize);
 
-/*! FL2_findDecompressedSize() : v1.3.0
-*  `src` should point to the start of a FL2 encoded frame.
-*  `srcSize` must be at least as large as the frame header.
-*            hint : any size >= `FL2_frameHeaderSize_max` is large enough.
-*  @return : - decompressed size of the frame in `src`, if known
-*            - FL2_CONTENTSIZE_UNKNOWN if the size cannot be determined
-*            - FL2_CONTENTSIZE_ERROR if an error occurred (e.g. invalid magic number, srcSize too small)
+/*! FL2_findDecompressedSize()
+*  `src` should point to the start of a LZMA2 encoded stream.
+*  `srcSize` must be at least as large as the LZMA2 stream including end marker.
+*  @return : - decompressed size of the stream in `src`, if known
+*            - FL2_CONTENTSIZE_ERROR if an error occurred (e.g. corruption, srcSize too small)
 *   note 1 : a 0 return value means the frame is valid but "empty".
-*   note 2 : decompressed size is an optional field, it may not be present, typically in streaming mode.
-*            When `return==FL2_CONTENTSIZE_UNKNOWN`, data to decompress could be any size.
-*            In which case, it's necessary to use streaming mode to decompress data.
-*            Optionally, application can rely on some implicit limit,
-*            as FL2_decompress() only needs an upper bound of decompressed size.
-*            (For example, data could be necessarily cut into blocks <= 16 KB).
-*   note 3 : decompressed size is always present when compression is done with FL2_compress()
-*   note 4 : decompressed size can be very large (64-bits value),
+*   note 2 : decompressed size can be very large (64-bits value),
 *            potentially larger than what local system can handle as a single memory segment.
 *            In which case, it's necessary to use streaming mode to decompress data.
 *   note 5 : If source is untrusted, decompressed size could be wrong or intentionally modified.
 *            Always ensure return value fits within application's authorized limits.
-*            Each application can set its own limits.*/
-#define FL2_CONTENTSIZE_UNKNOWN (size_t)-1
-#define FL2_CONTENTSIZE_ERROR   (size_t)-2
+*            Each application can set its own limits. */
+#define FL2_CONTENTSIZE_ERROR (size_t)-1
 FL2LIB_API size_t FL2_findDecompressedSize(const void *src, size_t srcSize);
 
 
@@ -140,8 +130,13 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* ctx,
 /*! FL2_compressCCtxBlock() :
 *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
 *  The FL2_p_overlapFraction parameter will not be used.
-*  Can be called multiple times. FL2_endFrame() must be called when finished. */
-FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx, 
+*  Can be called multiple times. FL2_endFrame() must be called when finished.
+*  For compatibility with this library the caller must write a property byte at
+*  the beginning of the output. Obtain it by calling FL2_dictSizeProp() before
+*  compressing the first block or after the last. No hash will be written, but
+*  the caller can calculate it using the interface in xxhash.h, write it at the end,
+*  and set bit 7 in the property byte. */
+FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcStart, size_t srcSize);
 
@@ -152,8 +147,8 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity);
 
 /*! FL2_compressCCtxBlock_toFn() :
-*  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section,
-*  and compressed data is written to a callback function.
+*  Same as FL2_compressCCtx except the caller is responsible for supplying an
+*  overlap section, and compressed data is written to a callback function.
 *  The FL2_p_overlapFraction parameter will not be used.
 *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
 FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
@@ -300,16 +295,16 @@ FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, 
 *  Specify compressionLevel=0 when calling a compression function.
 * *******************************************************************************/
 
-#define FL2_WINDOWLOG_MAX_32   28
-#define FL2_WINDOWLOG_MAX_64   31
-#define FL2_WINDOWLOG_MAX    ((unsigned)(sizeof(size_t) == 4 ? FL2_WINDOWLOG_MAX_32 : FL2_WINDOWLOG_MAX_64))
+#define FL2_DICTLOG_MAX_32   27
+#define FL2_DICTLOG_MAX_64   30
+#define FL2_DICTLOG_MAX    ((unsigned)(sizeof(size_t) == 4 ? FL2_DICTLOG_MAX_32 : FL2_DICTLOG_MAX_64))
 #define FL2_WINDOWLOG_MIN      20
 #define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
 #define FL2_SEARCHLOG_MAX     (FL2_CHAINLOG_MAX-1)
 #define FL2_SEARCHLOG_MIN       0
-#define FL2_FASTLENGTH_MIN    6   /* only useful for btopt */
-#define FL2_FASTLENGTH_MAX  254   /* only useful for btopt */
+#define FL2_FASTLENGTH_MIN    6   /* only used by optimizer */
+#define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
 #define FL2_SEARCH_DEPTH_MIN 6
@@ -332,7 +327,7 @@ typedef enum {
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
                               * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
-                              * Must be clamped between FL2_WINDOWLOG_MIN and FL2_WINDOWLOG_MAX.
+                              * Must be clamped between FL2_WINDOWLOG_MIN and FL2_DICTLOG_MAX.
                               * Special: value 0 means "do not change dictionaryLog". */
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
@@ -379,7 +374,6 @@ typedef enum {
 
 /*! FL2_CCtx_setParameter() :
  *  Set one compression parameter, selected by enum FL2_cParameter.
- *  Note : when `value` is an enum, cast it to unsigned for proper type checking.
  *  @result : informational value (typically, the one being set, possibly corrected),
  *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);

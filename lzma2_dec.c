@@ -101,11 +101,6 @@ S - Props
 typedef enum
 {
     LZMA2_STATE_CONTROL,
-    LZMA2_STATE_UNPACK0,
-    LZMA2_STATE_UNPACK1,
-    LZMA2_STATE_PACK0,
-    LZMA2_STATE_PACK1,
-    LZMA2_STATE_PROP,
     LZMA2_STATE_DATA,
     LZMA2_STATE_DATA_CONT,
     LZMA2_STATE_FINISHED,
@@ -1185,5 +1180,5 @@ size_t Lzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
         else
             src += packSize;
     }
-    return (size_t)-1;
+    return LZMA2_CONTENTSIZE_ERROR;
 }

@@ -123,8 +123,6 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
     }
 }
 
-unsigned g_param1 = 1, g_param2 = 8;
-
 #define kHash3Bits 14
 #define GET_HASH_3(data) (((data << 8) * 506832829U) >> (32 - kHash3Bits))
 
@@ -163,7 +161,7 @@ static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
             g_nbSeconds = value;
         }
         else if(strcmp(param, "d") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_windowLog, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_dictionaryLog, value);
         }
         else if (strcmp(param, "o") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_overlapFraction, value);
@@ -187,8 +185,13 @@ static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
             FL2_CCtx_setParameter(fcs, FL2_p_bufferLog, value);
         }
         else if (strcmp(param, "a") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_compressionStrategy, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_strategy, value);
         }
+#ifdef RMF_REFERENCE
+        else if (strcmp(param, "r") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_useReferenceMF, value);
+        }
+#endif
     }
 }
 

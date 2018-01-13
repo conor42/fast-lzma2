@@ -1,0 +1,240 @@
+// bench.cpp : Defines the entry point for the console application.
+//
+
+#include <stdlib.h>
+#include <stdio.h>
+#include "..\fast-lzma2.h"
+#include "datagen.h"
+#include "mem.h"
+#include "..\util.h"
+
+extern size_t g_total;
+
+#define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
+#define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
+#define COOLPERIOD_SEC        5
+
+#define KB *(1 <<10)
+#define MB *(1 <<20)
+#define GB *(1U<<30)
+
+static U32 g_nbSeconds = 10;
+static unsigned g_mt = 3;
+
+static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t srcSize, char* compressedBuffer, size_t maxCompressedSize,
+    char* resultBuffer)
+{
+
+//    RDG_genBuffer(compressedBuffer, maxCompressedSize, 0.10, 0.50, 1);
+
+    U64 fastestC = (U64)(-1LL), fastestD = (U64)(-1LL);
+    UTIL_time_t coolTime;
+    U64 const maxTime = (g_nbSeconds * TIMELOOP_MICROSEC) + 1;
+    U64 totalCTime = 0, totalDTime = 0;
+    U32 cCompleted = 0, dCompleted = 0;
+#       define NB_MARKS 4
+    const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
+    U32 markNb = 0;
+
+    coolTime = UTIL_getTime();
+    printf( "\r%79s\r", "");
+    size_t cSize = 0;
+    while (!cCompleted || !dCompleted) {
+
+        /* overheat protection */
+        if (UTIL_clockSpanMicro(coolTime) > ACTIVEPERIOD_MICROSEC) {
+            printf( "\rcooling down ...    \r");
+            UTIL_sleep(COOLPERIOD_SEC);
+            printf("\r                    \r");
+            coolTime = UTIL_getTime();
+        }
+
+        UTIL_time_t clockStart;
+        /* Compression */
+        if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase result buffer */
+
+        UTIL_sleepMilli(1);  /* give processor time to other processes */
+        UTIL_waitForNextTick();
+        clockStart = UTIL_getTime();
+
+        if (!cCompleted) {   /* still some time to do compression tests */
+            U64 const clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
+            U32 nbLoops = 0;
+            do {
+                cSize = FL2_compressCCtx(fcs, compressedBuffer, maxCompressedSize, srcBuffer, srcSize, 0);
+                nbLoops++;
+            } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
+            {   U64 const loopDuration = UTIL_clockSpanMicro(clockStart);
+            if (loopDuration < fastestC*nbLoops)
+                fastestC = loopDuration / nbLoops;
+            totalCTime += loopDuration;
+            cCompleted = (totalCTime >= maxTime);  /* end compression tests */
+            }
+        }
+
+#if 0       /* disable decompression test */
+        dCompleted = 1;
+        (void)totalDTime; (void)fastestD;   /* unused when decompression disabled */
+#else
+        /* Decompression */
+        if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
+
+        UTIL_sleepMilli(1); /* give processor time to other processes */
+        UTIL_waitForNextTick();
+
+        if (!dCompleted) {
+            U64 clockLoop = g_nbSeconds ? TIMELOOP_MICROSEC : 1;
+            U32 nbLoops = 0;
+            UTIL_time_t const clockStart = UTIL_getTime();
+            do {
+                size_t const regenSize = FL2_decompressDCtx(dctx,
+                    resultBuffer, srcSize,
+                    compressedBuffer, cSize);
+                if (FL2_isError(regenSize)) {
+                    printf("FL2_decompressDCtx() failed on size %u : %s  \r\n",
+                        (unsigned)cSize, FL2_getErrorName(regenSize));
+                    return;
+                }
+                nbLoops++;
+            } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
+        {   U64 const loopDuration = UTIL_clockSpanMicro(clockStart);
+            if (loopDuration < fastestD*nbLoops)
+                fastestD = loopDuration / nbLoops;
+            totalDTime += loopDuration;
+            dCompleted = (totalDTime >= maxTime);
+        }
+            if (memcmp(resultBuffer, srcBuffer, srcSize) != 0)
+                printf("Corruption on dSize %u cSize %u\r\n", (unsigned)srcSize, (unsigned)cSize);
+        }
+
+#endif
+        double ratio = (double)srcSize / (double)cSize;
+        markNb = (markNb + 1) % NB_MARKS;
+        {   int const ratioAccuracy = (ratio < 10.) ? 3 : 2;
+        double const compressionSpeed = (double)srcSize / fastestC;
+        int const cSpeedAccuracy = 2;// (compressionSpeed < 10.) ? 2 : 1;
+        double const decompressionSpeed = (double)srcSize / fastestD;
+        printf("%2s-%-17.17s :%10u ->%10u (%5.*f),%6.*f MB/s ,%6.1f MB/s\r",
+            marks[markNb], "", (U32)srcSize, (U32)cSize,
+            ratioAccuracy, ratio,
+            cSpeedAccuracy, compressionSpeed,
+            decompressionSpeed);
+        }
+    }
+}
+
+unsigned g_param1 = 1, g_param2 = 8;
+
+#define kHash3Bits 14
+#define GET_HASH_3(data) (((data << 8) * 506832829U) >> (32 - kHash3Bits))
+
+int hash_test(void)
+{
+    for (U32 i = 0; i < 0xFFFF; ++i) {
+        BYTE flags[1 << kHash3Bits];
+        memset(flags, 0, sizeof(flags));
+        for (U32 j = 0; j <= 0xFF; ++j) {
+            U32 hash = GET_HASH_3(j | (i << 8));
+            if (flags[hash])
+                return 0;
+            flags[hash] = 1;
+        }
+    }
+    return 1;
+}
+
+static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
+{
+    for (int i = 2; i < argc; ++i) {
+        if (argv[i][0] == '-' && argv[i][1] >= '0' && argv[i][1] <= '9')
+            FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, atoi(argv[i] + 1));
+    }
+    for (int i = 2; i < argc; ++i) {
+        if (argv[i][0] != '-')
+            continue;
+        char param[4];
+        int j = 1;
+        for (; j < 4 && argv[i][j] && (argv[i][j] < '0' || argv[i][j] > '9'); ++j) {
+            param[j-1] = argv[i][j];
+        }
+        param[j-1] = 0;
+        unsigned value = atoi(argv[i] + j);
+        if (strcmp(param, "t") == 0) {
+            g_nbSeconds = value;
+        }
+        else if(strcmp(param, "d") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_windowLog, value);
+        }
+        else if (strcmp(param, "o") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_overlapFraction, value);
+        }
+        else if (strcmp(param, "ds") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_chainLog, value);
+        }
+        else if (strcmp(param, "mc") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_searchLog, value);
+        }
+        else if (strcmp(param, "sd") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_searchDepth, value);
+        }
+        else if (strcmp(param, "fb") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_fastLength, value);
+        }
+        else if (strcmp(param, "q") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_divideAndConquer, value);
+        }
+        else if (strcmp(param, "b") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_bufferLog, value);
+        }
+        else if (strcmp(param, "a") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_compressionStrategy, value);
+        }
+    }
+}
+
+int main(int argc, char** argv)
+{
+    if (argc < 2)
+        return 1;
+    size_t size;
+    char* src;
+    if (1) {
+        FILE* f = fopen(argv[1], "rb");
+        if (f == NULL)
+            return 1;
+        fseek(f, 0, 2);
+        size = ftell(f);
+        if (size > 2UL << 29)size = 2UL << 29;
+        fseek(f, 0, 0);
+        src = malloc(size);
+        size = fread(src, 1, size, f);
+        fclose(f);
+    }
+    else {
+        size = 1UL << 30;
+        src = malloc(size);
+        RDG_genBuffer(src, size, 0.6, 0.02, 1);
+    }
+    unsigned threads = 1;
+    for (int i = 2; i < argc; ++i) {
+        if (argv[i][0] == '-' && argv[i][1] == 'T')
+        threads = atoi(argv[i] + 2);
+    }
+    FL2_CCtx* fcs = FL2_createCCtxMt(threads);
+    FL2_DCtx* dctx = FL2_createDCtx();
+    if (fcs == NULL)
+        return 1;
+    parse_params(fcs, argc, argv);
+    char* compressedBuffer = malloc(size / 2);
+    char* resultBuffer = malloc(size);
+//    for (unsigned u = 5; u < 8; ++u) {
+//        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, u);
+        benchmark(fcs, dctx, src, size, compressedBuffer, size / 2, resultBuffer);
+//        printf("%u\r\n", u);
+        g_nbSeconds += 3;
+//      }
+    free(compressedBuffer);
+    free(src);
+    return 0;
+}
+

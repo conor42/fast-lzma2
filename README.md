@@ -33,7 +33,3 @@ A significant amount of testing has already been done, but the library is in bet
 ### License
 
 Fast LZMA2 is dual-licensed under [BSD](LICENSE) and [GPLv2](COPYING).
-
-### Contributing
-
-Please use the "dev" branch for all proposed contributions.

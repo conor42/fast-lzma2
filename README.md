@@ -23,8 +23,8 @@ Compression data rate vs ratio
 
 ### Build
 
-The library is work in progress, so currently only a VS 2015 project is available for building.
-If anyone would like to contribute files for make, cmake, or other build systems, please do so.
+The library is work in progress, so currently only VS 2015 projects are available for building a benchmark program and fuzz tester.
+If anyone would like to contribute files for make, cmake, or other build systems, please do so. I plan to add a DLL project soon.
 
 ### Status
 

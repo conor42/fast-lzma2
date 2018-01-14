@@ -168,7 +168,6 @@
     <ClInclude Include="..\..\atomic.h" />
     <ClInclude Include="..\..\compiler.h" />
     <ClInclude Include="..\..\count.h" />
-    <ClInclude Include="..\..\crc32.h" />
     <ClInclude Include="..\..\data_block.h" />
     <ClInclude Include="..\..\error_private.h" />
     <ClInclude Include="..\..\fast-lzma2.h" />

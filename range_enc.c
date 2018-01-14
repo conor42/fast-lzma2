@@ -28,14 +28,14 @@ const unsigned price_table[kBitModelTotal >> kNumMoveReducingBits] = {
     2,   2,   2,   1,   1,   1,   1,   1
 };
 
-void SetOutputBuffer(RangeEncoder* rc, BYTE *out_buffer, size_t chunk_size)
+void SetOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer, size_t chunk_size)
 {
     rc->out_buffer = out_buffer;
     rc->chunk_size = chunk_size;
     rc->out_index = 0;
 }
 
-void RangeEncReset(RangeEncoder* rc)
+void RangeEncReset(RangeEncoder* const rc)
 {
     rc->low = 0;
     rc->range = (U32)-1;
@@ -43,7 +43,7 @@ void RangeEncReset(RangeEncoder* rc)
     rc->cache = 0;
 }
 
-void ShiftLow(RangeEncoder* rc)
+void ShiftLow(RangeEncoder* const rc)
 {
 	if (rc->low < 0xFF000000 || rc->low > 0xFFFFFFFF)
 	{
@@ -59,7 +59,7 @@ void ShiftLow(RangeEncoder* rc)
     rc->low = (rc->low << 8) & 0xFFFFFFFF;
 }
 
-void EncodeBitTree(RangeEncoder* rc, Probability *probs, unsigned bit_count, unsigned symbol)
+void EncodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol)
 {
 	size_t tree_index = 1;
     assert(bit_count > 0);
@@ -72,7 +72,7 @@ void EncodeBitTree(RangeEncoder* rc, Probability *probs, unsigned bit_count, uns
 	} while (bit_count != 0);
 }
 
-void EncodeBitTreeReverse(RangeEncoder* rc, Probability *probs, unsigned bit_count, unsigned symbol)
+void EncodeBitTreeReverse(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol)
 {
 	unsigned tree_index = 1;
     assert(bit_count != 0);
@@ -84,7 +84,7 @@ void EncodeBitTreeReverse(RangeEncoder* rc, Probability *probs, unsigned bit_cou
 	} while (--bit_count != 0);
 }
 
-void EncodeDirect(RangeEncoder* rc, unsigned value, unsigned bit_count)
+void EncodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count)
 {
 	assert(bit_count > 0);
 	do {

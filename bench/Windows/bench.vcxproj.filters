@@ -68,9 +68,6 @@
     <ClInclude Include="..\..\compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\crc32.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\data_block.h">
       <Filter>Header Files</Filter>
     </ClInclude>

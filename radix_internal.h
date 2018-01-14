@@ -93,59 +93,45 @@ struct FL2_matchTable_s
     U32 table[1];
 };
 
-void RMF_bitpackInit(struct FL2_matchTable_s* tbl, const void* data, size_t start, size_t end);
-void RMF_bitpackInitComplete(struct FL2_matchTable_s* tbl, const void* data, size_t start, size_t end);
-void RMF_structuredInit(struct FL2_matchTable_s* tbl, const void* data, size_t start, size_t end);
-long RMF_findEndHeadIndex(RMF_tableHead* head_table, size_t end, size_t block_size, unsigned thread_count);
+void RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
+void RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
 void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
-    unsigned job,
-    unsigned multiThread,
-    const void* srcStart,
+    unsigned const job,
+    unsigned const multi_thread,
+    const void* const data,
     size_t const block_start,
     size_t const block_size);
 void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
-    unsigned job,
-    unsigned multiThread,
-    const void* srcStart,
+    unsigned const job,
+    unsigned const multi_thread,
+    const void* const data,
     size_t const block_start,
     size_t const block_size);
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
-    BYTE depth,
-    BYTE max_depth,
-    U32 list_count,
-    size_t stack_base);
-int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* tbl, const BYTE* data, size_t index, size_t end, unsigned max_depth);
-int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* tbl, const BYTE* data, size_t index, size_t end, unsigned max_depth);
-void RMF_bitpackLimitLengths(struct FL2_matchTable_s* tbl, size_t index);
-void RMF_structuredLimitLengths(struct FL2_matchTable_s* tbl, size_t index);
-BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* tbl, size_t index);
-BYTE* RMF_structuredAsOutputBuffer(struct FL2_matchTable_s* tbl, size_t index);
-size_t RMF_bitpackExtendMatch(const BYTE* const data,
-    const U32* const table,
-    ptrdiff_t const start_index,
-    ptrdiff_t limit,
-    U32 const link,
-    size_t const length);
-size_t RMF_structuredExtendMatch(const BYTE* const data,
-    const U32* const table,
-    ptrdiff_t const start_index,
-    ptrdiff_t limit,
-    U32 const link,
-    size_t const length);
-size_t RMF_bitpackGetMatch(struct FL2_matchTable_s* tbl,
+    BYTE const depth,
+    BYTE const max_depth,
+    U32 const list_count,
+    size_t const stack_base);
+int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);
+int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);
+void RMF_bitpackLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
+void RMF_structuredLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
+BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const index);
+BYTE* RMF_structuredAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const index);
+size_t RMF_bitpackGetMatch(const struct FL2_matchTable_s* const tbl,
     const BYTE* const data,
-    size_t index,
-    size_t limit,
-    unsigned max_depth,
-    size_t* offsetPtr);
-size_t RMF_structuredGetMatch(struct FL2_matchTable_s* tbl,
+    size_t const index,
+    size_t const limit,
+    unsigned const max_depth,
+    size_t* const offset_ptr);
+size_t RMF_structuredGetMatch(const struct FL2_matchTable_s* const tbl,
     const BYTE* const data,
-    size_t index,
-    size_t limit,
-    unsigned max_depth,
-    size_t* offsetPtr);
+    size_t const index,
+    size_t const limit,
+    unsigned const max_depth,
+    size_t* const offset_ptr);
 
 #if defined (__cplusplus)
 }

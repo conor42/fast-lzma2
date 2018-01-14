@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2017-present, Conor McCarthy
-* All rights reserved.
-* Based on zstd.h copyright Yann Collet
-*
-* This source code is licensed under both the BSD-style license (found in the
-* LICENSE file in the root directory of this source tree) and the GPLv2 (found
-* in the COPYING file in the root directory of this source tree).
-* You may select, at your option, one of the above-listed licenses.
+ * Copyright (c) 2017-present, Conor McCarthy
+ * All rights reserved.
+ * Based on zstd.h copyright Yann Collet
+ *
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
+ * You may select, at your option, one of the above-listed licenses.
 */
 #if defined (__cplusplus)
 extern "C" {
@@ -61,7 +61,10 @@ FL2LIB_API const char* FL2_versionString(void);
 ***************************************/
 
 /*! FL2_compress() :
-                                                    */
+ *  Compresses `src` content as a single LZMA2 compressed stream into already allocated `dst`.
+ *  Call FL2_compressMt() to use > 1 thread. Specify 0 for nbThreads to use all cores.
+ *  @return : compressed size written into `dst` (<= `dstCapacity),
+ *            or an error code if it fails (which can be tested using FL2_isError()). */
 FL2LIB_API size_t FL2_compress(void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
@@ -72,26 +75,26 @@ FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
     unsigned nbThreads);
 
 /*! FL2_decompress() :
-*  `compressedSize` : must be the _exact_ size of some number of compressed and/or skippable frames.
-*  `dstCapacity` is an upper bound of originalSize to regenerate.
-*  If user cannot imply a maximum upper bound, it's better to use streaming mode to decompress data.
-*  @return : the number of bytes decompressed into `dst` (<= `dstCapacity`),
-*            or an errorCode if it fails (which can be tested using FL2_isError()). */
+ *  `compressedSize` : must be the _exact_ size of some number of compressed and/or skippable frames.
+ *  `dstCapacity` is an upper bound of originalSize to regenerate.
+ *  If user cannot imply a maximum upper bound, it's better to use streaming mode to decompress data.
+ *  @return : the number of bytes decompressed into `dst` (<= `dstCapacity`),
+ *            or an errorCode if it fails (which can be tested using FL2_isError()). */
 FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize);
 
 /*! FL2_findDecompressedSize()
-*  `src` should point to the start of a LZMA2 encoded stream.
-*  `srcSize` must be at least as large as the LZMA2 stream including end marker.
-*  @return : - decompressed size of the stream in `src`, if known
-*            - FL2_CONTENTSIZE_ERROR if an error occurred (e.g. corruption, srcSize too small)
-*   note 1 : a 0 return value means the frame is valid but "empty".
-*   note 2 : decompressed size can be very large (64-bits value),
-*            potentially larger than what local system can handle as a single memory segment.
-*            In which case, it's necessary to use streaming mode to decompress data.
-*   note 5 : If source is untrusted, decompressed size could be wrong or intentionally modified.
-*            Always ensure return value fits within application's authorized limits.
-*            Each application can set its own limits. */
+ *  `src` should point to the start of a LZMA2 encoded stream.
+ *  `srcSize` must be at least as large as the LZMA2 stream including end marker.
+ *  @return : - decompressed size of the stream in `src`, if known
+ *            - FL2_CONTENTSIZE_ERROR if an error occurred (e.g. corruption, srcSize too small)
+ *   note 1 : a 0 return value means the frame is valid but "empty".
+ *   note 2 : decompressed size can be very large (64-bits value),
+ *            potentially larger than what local system can handle as a single memory segment.
+ *            In which case, it's necessary to use streaming mode to decompress data.
+ *   note 5 : If source is untrusted, decompressed size could be wrong or intentionally modified.
+ *            Always ensure return value fits within application's authorized limits.
+ *            Each application can set its own limits. */
 #define FL2_CONTENTSIZE_ERROR (size_t)-1
 FL2LIB_API size_t FL2_findDecompressedSize(const void *src, size_t srcSize);
 
@@ -109,10 +112,10 @@ FL2LIB_API int         FL2_maxHighCLevel(void);           /*!< maximum compressi
 *  Explicit memory management
 ***************************************/
 /*= Compression context
-*  When compressing many times,
-*  it is recommended to allocate a context just once, and re-use it for each successive compression operation.
-*  This will make workload friendlier for system's memory.
-*  Use one context per thread for parallel execution in multi-threaded environments. */
+ *  When compressing many times,
+ *  it is recommended to allocate a context just once, and re-use it for each successive compression operation.
+ *  This will make workload friendlier for system's memory.
+ *  Use one context per thread for parallel execution in multi-threaded environments. */
 typedef struct FL2_CCtx_s FL2_CCtx;
 FL2LIB_API FL2_CCtx* FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads);
@@ -121,64 +124,65 @@ FL2LIB_API void      FL2_freeCCtx(FL2_CCtx* cctx);
 typedef void(*FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
 /*! FL2_compressCCtx() :
-*  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
+ *  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
 FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
 
 /*! FL2_compressCCtxBlock() :
-*  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
-*  The FL2_p_overlapFraction parameter will not be used.
-*  Can be called multiple times. FL2_endFrame() must be called when finished.
-*  For compatibility with this library the caller must write a property byte at
-*  the beginning of the output. Obtain it by calling FL2_dictSizeProp() before
-*  compressing the first block or after the last. No hash will be written, but
-*  the caller can calculate it using the interface in xxhash.h, write it at the end,
-*  and set bit 7 in the property byte. */
+ *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
+ *  The FL2_p_overlapFraction parameter will not be used.
+ *  srcStart + srcSize should equal the dictionary size except on the last call.
+ *  Can be called multiple times. FL2_endFrame() must be called when finished.
+ *  For compatibility with this library the caller must write a property byte at
+ *  the beginning of the output. Obtain it by calling FL2_dictSizeProp() before
+ *  compressing the first block or after the last. No hash will be written, but
+ *  the caller can calculate it using the interface in xxhash.h, write it at the end,
+ *  and set bit 7 in the property byte. */
 FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcStart, size_t srcSize);
 
 /*! FL2_endFrame() :
-*  Write the end marker to terminate the LZMA2 stream.
-*  Must be called after compressing with FL2_compressCCtxBlock() */
+ *  Write the end marker to terminate the LZMA2 stream.
+ *  Must be called after compressing with FL2_compressCCtxBlock() */
 FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity);
 
 /*! FL2_compressCCtxBlock_toFn() :
-*  Same as FL2_compressCCtx except the caller is responsible for supplying an
-*  overlap section, and compressed data is written to a callback function.
-*  The FL2_p_overlapFraction parameter will not be used.
-*  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
+ *  Same as FL2_compressCCtx except the caller is responsible for supplying an
+ *  overlap section, and compressed data is written to a callback function.
+ *  The FL2_p_overlapFraction parameter will not be used.
+ *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
 FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque,
     const void* src, size_t srcStart, size_t srcSize);
 
 /*! FL2_endFrame() :
-*  Write the end marker to a callback function to terminate the LZMA2 stream.
-*  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
+ *  Write the end marker to a callback function to terminate the LZMA2 stream.
+ *  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
 FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque);
 
 /*! FL2_dictSizeProp() :
-*  Get the dictionary size property.
-*  Intended for use with the FL2_p_omitProperties parameter for creating a
-*  7-zip compatible LZMA2 stream. */
+ *  Get the dictionary size property.
+ *  Intended for use with the FL2_p_omitProperties parameter for creating a
+ *  7-zip compatible LZMA2 stream. */
 FL2LIB_API unsigned char FL2_dictSizeProp(FL2_CCtx* ctx);
 
 /*= Decompression context
-*  When decompressing many times,
-*  it is recommended to allocate a context only once,
-*  and re-use it for each successive compression operation.
-*  This will make the workload friendlier for the system's memory.
-*  Use one context per thread for parallel execution. */
+ *  When decompressing many times,
+ *  it is recommended to allocate a context only once,
+ *  and re-use it for each successive compression operation.
+ *  This will make the workload friendlier for the system's memory.
+ *  Use one context per thread for parallel execution. */
 typedef struct CLzma2Dec_s FL2_DCtx;
 FL2LIB_API FL2_DCtx* FL2_createDCtx(void);
 FL2LIB_API size_t     FL2_freeDCtx(FL2_DCtx* dctx);
 
 /*! FL2_decompressDCtx() :
-*  Same as FL2_decompress(), requires an allocated FL2_DCtx (see FL2_createDCtx()) */
+ *  Same as FL2_decompress(), requires an allocated FL2_DCtx (see FL2_createDCtx()) */
 FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize);
@@ -202,42 +206,42 @@ typedef struct FL2_outBuffer_s {
 
 
 /*-***********************************************************************
-*  Streaming compression - HowTo
-*
-*  A FL2_CStream object is required to track streaming operation.
-*  Use FL2_createCStream() and FL2_freeCStream() to create/release resources.
-*  FL2_CStream objects can be reused multiple times on consecutive compression operations.
-*  It is recommended to re-use FL2_CStream in situations where many streaming operations will be achieved consecutively,
-*  since it will play nicer with system's memory, by re-using already allocated memory.
-*
-*  Start a new compression by initializing FL2_CStream.
-*  Use FL2_initCStream() to start a new compression operation.
-*
-*  Use FL2_compressStream() repetitively to consume input stream.
-*  The function will automatically update both `pos` fields.
-*  It will always consume the entire input unless an error occurs,
-*  unlike the decompression function.
-*  @return : a size hint - remaining capacity to fill before compression occurs,
-*            or an error code, which can be tested using FL2_isError().
-*            Note : it's just a hint, any other value will work fine.
-*
-*  At any moment, it's possible, but not recommended, to flush whatever data remains
-*  within internal buffer using FL2_flushStream().
-*  `output->pos` will be updated.
-*  Note 1 : this will reduce compression ratio because the algorithm is block-based.
-*  Note 2 : some content might still be left within internal buffers if `output->size` is too small.
-*  @return : nb of bytes still present within internal buffers (0 if they're empty)
-*            or an error code, which can be tested using FL2_isError().
-*
-*  FL2_endStream() instructs to finish a frame.
-*  It will perform a flush and write the LZMA2 termination byte (required).
-*  FL2_endStream() may not be able to flush full data if `output->size` is too small.
-*  In which case, call again FL2_endStream() to complete the flush.
-*  @return : 0 if stream fully completed and flushed,
-*  or >0 to indicate the nb of bytes still present within the internal buffers,
-*  or an error code, which can be tested using FL2_isError().
-*
-* *******************************************************************/
+ *  Streaming compression - HowTo
+ *
+ *  A FL2_CStream object is required to track streaming operation.
+ *  Use FL2_createCStream() and FL2_freeCStream() to create/release resources.
+ *  FL2_CStream objects can be reused multiple times on consecutive compression operations.
+ *  It is recommended to re-use FL2_CStream in situations where many streaming operations will be achieved consecutively,
+ *  since it will play nicer with system's memory, by re-using already allocated memory.
+ *
+ *  Start a new compression by initializing FL2_CStream.
+ *  Use FL2_initCStream() to start a new compression operation.
+ *
+ *  Use FL2_compressStream() repetitively to consume input stream.
+ *  The function will automatically update both `pos` fields.
+ *  It will always consume the entire input unless an error occurs,
+ *  unlike the decompression function.
+ *  @return : a size hint - remaining capacity to fill before compression occurs,
+ *            or an error code, which can be tested using FL2_isError().
+ *            Note : it's just a hint, any other value will work fine.
+ *
+ *  At any moment, it's possible, but not recommended, to flush whatever data remains
+ *  within internal buffer using FL2_flushStream().
+ *  `output->pos` will be updated.
+ *  Note 1 : this will reduce compression ratio because the algorithm is block-based.
+ *  Note 2 : some content might still be left within internal buffers if `output->size` is too small.
+ *  @return : nb of bytes still present within internal buffers (0 if they're empty)
+ *            or an error code, which can be tested using FL2_isError().
+ *
+ *  FL2_endStream() instructs to finish a frame.
+ *  It will perform a flush and write the LZMA2 termination byte (required).
+ *  FL2_endStream() may not be able to flush full data if `output->size` is too small.
+ *  In which case, call again FL2_endStream() to complete the flush.
+ *  @return : 0 if stream fully completed and flushed,
+ *  or >0 to indicate the nb of bytes still present within the internal buffers,
+ *  or an error code, which can be tested using FL2_isError().
+ *
+ * *******************************************************************/
 
 typedef struct FL2_CStream_s FL2_CStream;
 
@@ -253,25 +257,25 @@ FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
 
 
 /*-***************************************************************************
-*  Streaming decompression - HowTo
-*
-*  A FL2_DStream object is required to track streaming operations.
-*  Use FL2_createDStream() and FL2_freeDStream() to create/release resources.
-*  FL2_DStream objects can be re-used multiple times.
-*
-*  Use FL2_initDStream() to start a new decompression operation.
-*   @return : recommended first input size
-*
-*  Use FL2_decompressStream() repetitively to consume your input.
-*  The function will update both `pos` fields.
-*  If `input.pos < input.size`, some input has not been consumed.
-*  It's up to the caller to present again remaining data.
-*  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`
-*  If `output.pos < output.size`, decoder has flushed everything it could.
-*  @return : 0 when a frame is completely decoded and fully flushed,
-*            an error code, which can be tested using FL2_isError(),
-*            1, which means there is still some decoding to do to complete current frame.
-* *******************************************************************************/
+ *  Streaming decompression - HowTo
+ *
+ *  A FL2_DStream object is required to track streaming operations.
+ *  Use FL2_createDStream() and FL2_freeDStream() to create/release resources.
+ *  FL2_DStream objects can be re-used multiple times.
+ *
+ *  Use FL2_initDStream() to start a new decompression operation.
+ *   @return : recommended first input size
+ *
+ *  Use FL2_decompressStream() repetitively to consume your input.
+ *  The function will update both `pos` fields.
+ *  If `input.pos < input.size`, some input has not been consumed.
+ *  It's up to the caller to present again remaining data.
+ *  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`
+ *  If `output.pos < output.size`, decoder has flushed everything it could.
+ *  @return : 0 when a frame is completely decoded and fully flushed,
+ *            an error code, which can be tested using FL2_isError(),
+ *            1, which means there is still some decoding to do to complete current frame.
+ * *******************************************************************************/
 
 #define LZMA_REQUIRED_INPUT_MAX 20
 
@@ -286,14 +290,14 @@ FL2LIB_API size_t FL2_initDStream(FL2_DStream* fds);
 FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************
-*  Compression parameters - HowTo
-*
-*  Any function that takes a 'compressionLevel' parameter will replace any
-*  parameters affected by compression level that are already set.
-*  Call FL2_CCtx_setParameter with FL2_p_compressionLevel to set the level,
-*  then call FL2_CCtx_setParameter again with any other settings to change.
-*  Specify compressionLevel=0 when calling a compression function.
-* *******************************************************************************/
+ *  Compression parameters - HowTo
+ *
+ *  Any function that takes a 'compressionLevel' parameter will replace any
+ *  parameters affected by compression level that are already set.
+ *  Call FL2_CCtx_setParameter with FL2_p_compressionLevel to set the level,
+ *  then call FL2_CCtx_setParameter again with any other settings to change.
+ *  Specify compressionLevel=0 when calling a compression function.
+ * *******************************************************************************/
 
 #define FL2_DICTLOG_MAX_32   27
 #define FL2_DICTLOG_MAX_64   30

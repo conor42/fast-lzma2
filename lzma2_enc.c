@@ -338,7 +338,7 @@ void EncodeLiteralBuf(FL2_lzmaEncoderCtx* enc, const BYTE* data_block, size_t in
     }
 }
 
-size_t RMF_bitpackExtendMatch(const BYTE* const data,
+static size_t RMF_bitpackExtendMatch(const BYTE* const data,
     const U32* const table,
     ptrdiff_t const start_index,
     ptrdiff_t limit,
@@ -367,7 +367,7 @@ size_t RMF_bitpackExtendMatch(const BYTE* const data,
 
 #define GetMatchLength(table, index) ((const RMF_unit*)(table))[(index) >> UNIT_BITS].lengths[(index) & UNIT_MASK]
 
-size_t RMF_structuredExtendMatch(const BYTE* const data,
+static size_t RMF_structuredExtendMatch(const BYTE* const data,
     const U32* const table,
     ptrdiff_t const start_index,
     ptrdiff_t limit,

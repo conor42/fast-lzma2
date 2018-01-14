@@ -190,6 +190,9 @@ static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
         else if (strcmp(param, "h") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_doXXHash, value);
         }
+        else if (strcmp(param, "x") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_highCompression, value);
+        }
 #ifdef RMF_REFERENCE
         else if (strcmp(param, "r") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_useReferenceMF, value);
@@ -233,12 +236,12 @@ int main(int argc, char** argv)
     parse_params(fcs, argc, argv);
     char* compressedBuffer = malloc(size / 2);
     char* resultBuffer = malloc(size);
-//    for (unsigned u = 1; u <= 12; ++u) {
-//        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, u);
+    for (unsigned u = 1; u <= 12; ++u) {
+        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, u);
         benchmark(fcs, dctx, src, size, compressedBuffer, size / 2, resultBuffer);
-//        printf("%u\r\n", u);
-        g_nbSeconds += 3;
-//      }
+        printf("%u\r\n", u);
+        g_nbSeconds += 5;
+      }
     free(compressedBuffer);
     free(src);
     return 0;

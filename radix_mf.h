@@ -33,21 +33,21 @@ typedef struct
 #endif
 } RMF_parameters;
 
-FL2_matchTable* RMF_createMatchTable(RMF_parameters* params, size_t dict_reduce, unsigned thread_count);
-void RMF_freeMatchTable(FL2_matchTable* tbl);
-BYTE RMF_compatibleParameters(FL2_matchTable* tbl, RMF_parameters* params, size_t dict_reduce);
-size_t RMF_applyParameters(FL2_matchTable* tbl, RMF_parameters* params, size_t dict_reduce);
-size_t RMF_threadCount(const FL2_matchTable * tbl);
-void RMF_initTable(FL2_matchTable* tbl, const void* data, size_t start, size_t end);
+FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const params, size_t const dict_reduce, unsigned const thread_count);
+void RMF_freeMatchTable(FL2_matchTable* const tbl);
+BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_parameters* const params, size_t const dict_reduce);
+size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const params, size_t const dict_reduce);
+size_t RMF_threadCount(const FL2_matchTable * const tbl);
+void RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end);
 void RMF_buildTable(FL2_matchTable* const tbl,
-    unsigned job,
-    unsigned multi_thread,
-    const void* src,
+    unsigned const job,
+    unsigned const multi_thread,
+    const void* const data,
     size_t const block_start,
     size_t const block_size);
-int RMF_integrityCheck(const FL2_matchTable* tbl, const BYTE* data, size_t index, size_t end, unsigned max_depth);
-void RMF_limitLengths(FL2_matchTable* tbl, size_t index);
-BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t index);
+int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
+void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
+BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);
 
 #if defined (__cplusplus)
 }

@@ -26,7 +26,7 @@ FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize)
 {
     size_t dSize;
-    FL2_DCtx* dctx = FL2_createDCtx();
+    FL2_DCtx* const dctx = FL2_createDCtx();
     if(dctx == NULL)
         return FL2_ERROR(memory_allocation);
     dSize = FL2_decompressDCtx(dctx,
@@ -39,7 +39,7 @@ FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
 FL2LIB_API FL2_DCtx* FL2_createDCtx(void)
 {
     DEBUGLOG(3, "FL2_createDCtx");
-    FL2_DCtx* dctx = malloc(sizeof(FL2_DCtx));
+    FL2_DCtx* const dctx = malloc(sizeof(FL2_DCtx));
     if (dctx) {
         LzmaDec_Construct(dctx);
     }
@@ -62,10 +62,10 @@ FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* dctx,
 {
     size_t res;
     BYTE prop = *(const BYTE*)src;
-    BYTE do_hash = prop >> FL2_PROP_HASH_BIT;
+    BYTE const do_hash = prop >> FL2_PROP_HASH_BIT;
     size_t dicPos;
     const BYTE *srcBuf = src;
-    size_t srcEnd = srcSize - 1;
+    size_t const srcEnd = srcSize - 1;
     ++srcBuf;
     --srcSize;
     prop &= FL2_LZMA_PROP_MASK;
@@ -85,9 +85,9 @@ FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* dctx,
     dicPos = dctx->dicPos - dicPos;
 
     if (do_hash) {
-        DEBUGLOG(4, "Checking hash");
         XXH32_canonical_t canonical;
         U32 hash;
+        DEBUGLOG(4, "Checking hash");
         if (srcEnd - srcSize < XXHASH_SIZEOF)
             return FL2_ERROR(srcSize_wrong);
         memcpy(&canonical, srcBuf + srcSize, XXHASH_SIZEOF);
@@ -116,8 +116,8 @@ struct FL2_DStream_s
 
 FL2LIB_API FL2_DStream* FL2_createDStream(void)
 {
+    FL2_DStream* const fds = malloc(sizeof(FL2_DStream));
     DEBUGLOG(3, "FL2_createDStream");
-    FL2_DStream* fds = malloc(sizeof(FL2_DStream));
     if (fds) {
         LzmaDec_Construct(&fds->dec);
         fds->stage = FL2DEC_STAGE_INIT;
@@ -171,7 +171,7 @@ FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, 
         if (fds->stage == FL2DEC_STAGE_DECOMP) {
             size_t destSize = output->size - output->pos;
             size_t srcSize = input->size - input->pos;
-            size_t res = Lzma2Dec_DecodeToBuf(&fds->dec, (BYTE*)output->dst + output->pos, &destSize, (const BYTE*)input->src + input->pos, &srcSize, LZMA_FINISH_ANY);
+            size_t const res = Lzma2Dec_DecodeToBuf(&fds->dec, (BYTE*)output->dst + output->pos, &destSize, (const BYTE*)input->src + input->pos, &srcSize, LZMA_FINISH_ANY);
 
             DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
 
@@ -189,9 +189,9 @@ FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, 
             }
         }
         if (fds->stage == FL2DEC_STAGE_HASH) {
-            DEBUGLOG(4, "Checking hash");
             XXH32_canonical_t canonical;
             U32 hash;
+            DEBUGLOG(4, "Checking hash");
             if (input->size - input->pos < XXHASH_SIZEOF)
                 return 1;
             memcpy(&canonical, (BYTE*)input->src + input->pos, XXHASH_SIZEOF);

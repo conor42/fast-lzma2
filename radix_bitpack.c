@@ -50,18 +50,18 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 
 #define Radix_Get_Match RMF_bitpackGetMatch
 
-BYTE* RMF_bitpackAsOutputBuffer(FL2_matchTable* tbl, size_t index)
+BYTE* RMF_bitpackAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 {
     return (BYTE*)(tbl->table + index);
 }
 
 /* Restrict the match lengths so that they don't reach beyond index */
-void RMF_bitpackLimitLengths(FL2_matchTable* tbl, size_t index)
+void RMF_bitpackLimitLengths(FL2_matchTable* const tbl, size_t const index)
 {
     DEBUGLOG(5, "RMF_limitLengths : end %u, max length %u", (U32)index, RADIX_MAX_LENGTH);
     SetNull(index - 1);
     for (U32 length = 2; length < RADIX_MAX_LENGTH && length <= index; ++length) {
-        U32 link = tbl->table[index - length];
+        U32 const link = tbl->table[index - length];
         if (link != RADIX_NULL_LINK) {
             tbl->table[index - length] = (MIN(length, link >> RADIX_LINK_BITS) << RADIX_LINK_BITS) | (link & RADIX_LINK_MASK);
         }

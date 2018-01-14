@@ -43,22 +43,22 @@ typedef struct
 	BYTE cache;
 } RangeEncoder;
 
-void RangeEncReset(RangeEncoder* rc);
+void RangeEncReset(RangeEncoder* const rc);
 
-void SetOutputBuffer(RangeEncoder* rc, BYTE *out_buffer, size_t chunk_size);
+void SetOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer, size_t chunk_size);
 
-void RangeEncReset(RangeEncoder* rc);
+void RangeEncReset(RangeEncoder* const rc);
 
-void ShiftLow(RangeEncoder* rc);
+void ShiftLow(RangeEncoder* const rc);
 
-void EncodeBitTree(RangeEncoder* rc, Probability *probs, unsigned bit_count, unsigned symbol);
+void EncodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol);
 
-void EncodeBitTreeReverse(RangeEncoder* rc, Probability *probs, unsigned bit_count, unsigned symbol);
+void EncodeBitTreeReverse(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol);
 
-void EncodeDirect(RangeEncoder* rc, unsigned value, unsigned bit_count);
+void EncodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count);
 
 HINT_INLINE
-void EncodeBit0(RangeEncoder* rc, Probability *rprob)
+void EncodeBit0(RangeEncoder* const rc, Probability *const rprob)
 {
 	unsigned prob = *rprob;
     rc->range = (rc->range >> kNumBitModelTotalBits) * prob;
@@ -71,7 +71,7 @@ void EncodeBit0(RangeEncoder* rc, Probability *rprob)
 }
 
 HINT_INLINE
-void EncodeBit1(RangeEncoder* rc, Probability *rprob)
+void EncodeBit1(RangeEncoder* const rc, Probability *const rprob)
 {
 	unsigned prob = *rprob;
 	U32 new_bound = (rc->range >> kNumBitModelTotalBits) * prob;
@@ -86,7 +86,7 @@ void EncodeBit1(RangeEncoder* rc, Probability *rprob)
 }
 
 HINT_INLINE
-void EncodeBit(RangeEncoder* rc, Probability *rprob, unsigned bit)
+void EncodeBit(RangeEncoder* const rc, Probability *const rprob, unsigned const bit)
 {
 	unsigned prob = *rprob;
 	if (bit != 0) {
@@ -114,7 +114,7 @@ void EncodeBit(RangeEncoder* rc, Probability *rprob, unsigned bit)
 #define GET_PRICE_1(rc, prob) price_table[((prob) ^ (kBitModelTotal - 1)) >> kNumMoveReducingBits]
 
 HINT_INLINE
-unsigned GetTreePrice(RangeEncoder* rc, const Probability* prob_table, unsigned bit_count, size_t symbol)
+unsigned GetTreePrice(RangeEncoder* const rc, const Probability* const prob_table, unsigned const bit_count, size_t symbol)
 {
 	unsigned price = 0;
 	symbol |= ((size_t)1 << bit_count);
@@ -129,7 +129,7 @@ unsigned GetTreePrice(RangeEncoder* rc, const Probability* prob_table, unsigned 
 }
 
 HINT_INLINE
-unsigned GetReverseTreePrice(RangeEncoder* rc, const Probability* prob_table, unsigned bit_count, size_t symbol)
+unsigned GetReverseTreePrice(RangeEncoder* const rc, const Probability* const prob_table, unsigned const bit_count, size_t symbol)
 {
 	unsigned price = 0;
 	size_t m = 1;
@@ -143,7 +143,7 @@ unsigned GetReverseTreePrice(RangeEncoder* rc, const Probability* prob_table, un
 	return price;
 }
 
-static void Flush(RangeEncoder* rc)
+static void Flush(RangeEncoder* const rc)
 {
     for (int i = 0; i < 5; ++i)
         ShiftLow(rc);

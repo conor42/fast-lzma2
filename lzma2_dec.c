@@ -2,6 +2,7 @@
 2017-04-03 : Igor Pavlov : Public domain
 Modified for FL2 by Conor McCarthy */
 
+#include <stdlib.h>
 #include "lzma2_dec.h"
 #include "fl2_internal.h"
 
@@ -935,7 +936,7 @@ void LzmaDec_InitDicAndState(CLzma2Dec *p, BYTE initDic, BYTE initState);
 
 static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSize, CLzmaProps *prop, const BYTE *src, ptrdiff_t *srcLen)
 {
-    size_t len = *srcLen;
+    ptrdiff_t len = *srcLen;
     *srcLen = 0;
     if (len <= 0)
         return 0;
@@ -952,7 +953,7 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
         *unpackSize = (((U32)src[1] << 8) | src[2]) + 1;
     }
     else {
-        U32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
+        S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
         if (len < 5 + hasProp)
             return 0;
         *srcLen = 5 + hasProp;
@@ -988,7 +989,7 @@ size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
         size_t dicPos;
 
         if(p->state2 == LZMA2_STATE_CONTROL) {
-            size_t len = inSize - *srcLen;
+            ptrdiff_t len = inSize - *srcLen;
             p->state2 = Lzma2Dec_NextChunkInfo(&p->control, &p->unpackSize, &p->packSize, &p->prop, src, &len);
             *srcLen += len;
             src += len;

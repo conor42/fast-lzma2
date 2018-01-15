@@ -62,6 +62,10 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             U32 nbLoops = 0;
             do {
                 cSize = FL2_compressCCtx(fcs, compressedBuffer, maxCompressedSize, srcBuffer, srcSize, 0);
+                if (FL2_isError(cSize)) {
+                    printf("FL2_compressCCtx() error : %s  \r\n", FL2_getErrorName(cSize));
+                    return;
+                }
                 nbLoops++;
             } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
             {   U64 const loopDuration = UTIL_clockSpanMicro(clockStart);
@@ -218,7 +222,7 @@ int main(int argc, char** argv)
             return 1;
         fseek(f, 0, 2);
         size = ftell(f);
-        if (size > 2UL << 29)size = 2UL << 29;
+        if (size > 1UL << 30) size = 1UL << 30;
         fseek(f, 0, 0);
         src = malloc(size);
         size = fread(src, 1, size, f);
@@ -240,14 +244,15 @@ int main(int argc, char** argv)
         return 1;
     int end_level = parse_params(fcs, argc, argv);
     int level = (int)FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, 0);
-    char* compressedBuffer = malloc(size / 2);
+    size_t maxCompressedSize = FL2_compressBound(size);
+    char* compressedBuffer = malloc(maxCompressedSize);
     char* resultBuffer = malloc(size);
     if (!end_level)
         end_level = level;
     else if (end_level > FL2_maxCLevel())
         end_level = FL2_maxCLevel();
     for (; level <= end_level; ++level) {
-        benchmark(fcs, dctx, src, size, compressedBuffer, size / 2, resultBuffer);
+        benchmark(fcs, dctx, src, size, compressedBuffer, maxCompressedSize, resultBuffer);
         FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, level + 1);
         printf("%u\r\n", level);
         g_nbSeconds += 5;

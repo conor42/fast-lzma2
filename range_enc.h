@@ -143,7 +143,8 @@ unsigned GetReverseTreePrice(RangeEncoder* const rc, const Probability* const pr
 	return price;
 }
 
-static void Flush(RangeEncoder* const rc)
+HINT_INLINE
+void Flush(RangeEncoder* const rc)
 {
     for (int i = 0; i < 5; ++i)
         ShiftLow(rc);

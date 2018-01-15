@@ -330,6 +330,7 @@ typedef enum {
                               * Special: value 0 means "do not change cLevel". */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
                               * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
+    FL2_p_7zLevel,          /* For use by the 7-zip fork employing this library. 1 - 9 */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                               * Must be clamped between FL2_WINDOWLOG_MIN and FL2_DICTLOG_MAX.
                               * Special: value 0 means "do not change dictionaryLog". */

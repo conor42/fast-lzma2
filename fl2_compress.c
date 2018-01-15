@@ -27,6 +27,7 @@
 
 #define FL2_CLEVEL_DEFAULT   9
 #define FL2_MAX_CLEVEL      12
+#define FL2_MAX_7Z_CLEVEL   9
 #define FL2_MAX_HIGH_CLEVEL 9
 
 FL2LIB_API int FL2_maxCLevel(void)
@@ -55,17 +56,17 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 28, 2, 14, 3, 252, 160, 1, 10, FL2_ultra } /* 12 */
 };
 
-static const FL2_compressionParameters FL2_7zCParameters[FL2_MAX_CLEVEL + 1] = {
+static const FL2_compressionParameters FL2_7zCParameters[FL2_MAX_7Z_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0 },
     { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
     { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
     { 21, 2, 7, 0, 16, 32, 1, 8, FL2_fast }, /* 3 */
     { 20, 2, 7, 0, 16, 32, 1, 8, FL2_opt }, /* 4 */
-    { 25, 2, 9, 0, 40, 64, 1, 8, FL2_ultra }, /* 5 */
-    { 26, 2, 10, 1, 60, 64, 1, 9, FL2_ultra }, /* 6 */
-    { 27, 3, 12, 1, 128, 128, 1, 10, FL2_ultra }, /* 7 */
-    { 28, 3, 13, 2, 128, 160, 1, 10, FL2_ultra }, /* 8 */
-    { 28, 3, 14, 3, 252, 160, 1, 10, FL2_ultra }, /* 9 */
+    { 24, 2, 9, 0, 40, 48, 1, 8, FL2_ultra }, /* 5 */
+    { 25, 2, 10, 0, 48, 64, 1, 8, FL2_ultra }, /* 6 */
+    { 26, 2, 11, 1, 60, 96, 1, 9, FL2_ultra }, /* 7 */
+    { 27, 2, 12, 2, 128, 128, 1, 10, FL2_ultra }, /* 8 */
+    { 27, 3, 14, 3, 252, 160, 0, 10, FL2_ultra } /* 9 */
 };
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
@@ -93,7 +94,7 @@ void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* c
     cParams->strategy = params->strategy;
     cParams->second_dict_bits = params->chainLog;
     cParams->random_filter = 0;
-    rParams->dictionary_log = MIN(params->windowLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
+    rParams->dictionary_log = MIN(params->dictionaryLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
     rParams->match_buffer_log = params->bufferLog;
     rParams->overlap_fraction = params->overlapFraction;
     rParams->divide_and_conquer = params->divideAndConquer;
@@ -486,6 +487,14 @@ FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, un
             FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, cctx->params.compressionLevel);
         }
         return cctx->params.highCompression;
+
+    case FL2_p_7zLevel:
+        if (value > 0) { /* 0 : does not change current level */
+            if ((int)value > FL2_MAX_7Z_CLEVEL) value = FL2_MAX_7Z_CLEVEL;
+            FL2_fillParameters(cctx, &FL2_7zCParameters[value]);
+            cctx->params.compressionLevel = value;
+        }
+        return cctx->params.compressionLevel;
 
     case FL2_p_dictionaryLog:
         if (value) {  /* 0 : does not change current dictionaryLog */

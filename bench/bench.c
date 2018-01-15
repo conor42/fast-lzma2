@@ -141,12 +141,13 @@ int hash_test(void)
     return 1;
 }
 
-static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
+static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
 {
     for (int i = 2; i < argc; ++i) {
         if (argv[i][0] == '-' && argv[i][1] >= '0' && argv[i][1] <= '9')
             FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, atoi(argv[i] + 1));
     }
+    int end_level = 0;
     for (int i = 2; i < argc; ++i) {
         if (argv[i][0] != '-')
             continue;
@@ -193,12 +194,16 @@ static void parse_params(FL2_CCtx* fcs, int argc, char** argv)
         else if (strcmp(param, "x") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_highCompression, value);
         }
+        else if (strcmp(param, "e") == 0) {
+            end_level = value;
+        }
 #ifdef RMF_REFERENCE
         else if (strcmp(param, "r") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_useReferenceMF, value);
         }
 #endif
     }
+    return end_level;
 }
 
 int main(int argc, char** argv)
@@ -233,13 +238,18 @@ int main(int argc, char** argv)
     FL2_DCtx* dctx = FL2_createDCtx();
     if (fcs == NULL)
         return 1;
-    parse_params(fcs, argc, argv);
+    int end_level = parse_params(fcs, argc, argv);
+    int level = (int)FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, 0);
     char* compressedBuffer = malloc(size / 2);
     char* resultBuffer = malloc(size);
-    for (unsigned u = 1; u <= 12; ++u) {
-        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, u);
+    if (!end_level)
+        end_level = level;
+    else if (end_level > FL2_maxCLevel())
+        end_level = FL2_maxCLevel();
+    for (; level <= end_level; ++level) {
         benchmark(fcs, dctx, src, size, compressedBuffer, size / 2, resultBuffer);
-        printf("%u\r\n", u);
+        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, level + 1);
+        printf("%u\r\n", level);
         g_nbSeconds += 5;
       }
     free(compressedBuffer);

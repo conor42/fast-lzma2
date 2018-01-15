@@ -20,19 +20,15 @@ const char* ERR_getErrorString(ERR_enum code)
     {
     case PREFIX(no_error): return "No error detected";
     case PREFIX(GENERIC):  return "Error (generic)";
-    case PREFIX(version_unsupported): return "Version not supported";
     case PREFIX(corruption_detected): return "Corrupted block detected";
     case PREFIX(checksum_wrong): return "Restored data doesn't match checksum";
     case PREFIX(parameter_unsupported): return "Unsupported parameter";
     case PREFIX(parameter_outOfBound): return "Parameter is out of bound";
     case PREFIX(init_missing): return "Context should be init first";
     case PREFIX(memory_allocation): return "Allocation error : not enough memory";
-    case PREFIX(tableLog_tooLarge): return "tableLog requires too much memory : unsupported";
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
     case PREFIX(srcSize_wrong): return "Src size is incorrect";
         /* following error codes are not stable and may be removed or changed in a future version */
-    case PREFIX(frameIndex_tooLarge): return "Frame index is too large";
-    case PREFIX(seekableIO): return "An I/O error occurred when reading/seeking";
     case PREFIX(maxCode):
     default: return notErrorCode;
     }

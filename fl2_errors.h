@@ -46,24 +46,16 @@ typedef enum {
   FL2_error_no_error = 0,
   FL2_error_GENERIC  = 1,
   FL2_error_internal = 2,
-  FL2_error_prefix_unknown                = 10,
-  FL2_error_version_unsupported           = 12,
-  FL2_error_corruption_detected = 20,
-  FL2_error_checksum_wrong      = 22,
-  FL2_error_parameter_unsupported   = 40,
-  FL2_error_parameter_outOfBound    = 42,
-  FL2_error_tableLog_tooLarge       = 44,
-  FL2_error_maxSymbolValue_tooLarge = 46,
-  FL2_error_maxSymbolValue_tooSmall = 48,
-  FL2_error_stage_wrong       = 60,
-  FL2_error_init_missing      = 62,
-  FL2_error_memory_allocation = 64,
-  FL2_error_dstSize_tooSmall = 70,
-  FL2_error_srcSize_wrong    = 72,
-  /* following error codes are not stable and may be removed or changed in a future version */
-  FL2_error_frameIndex_tooLarge = 100,
-  FL2_error_seekableIO          = 102,
-  FL2_error_maxCode = 120  /* never EVER use this value directly, it can change in future versions! Use FL2_isError() instead */
+  FL2_error_corruption_detected = 3,
+  FL2_error_checksum_wrong      = 4,
+  FL2_error_parameter_unsupported   = 5,
+  FL2_error_parameter_outOfBound    = 6,
+  FL2_error_stage_wrong       = 7,
+  FL2_error_init_missing      = 8,
+  FL2_error_memory_allocation = 9,
+  FL2_error_dstSize_tooSmall = 10,
+  FL2_error_srcSize_wrong    = 11,
+  FL2_error_maxCode = 20  /* never EVER use this value directly, it can change in future versions! Use FL2_isError() instead */
 } FL2_ErrorCode;
 
 /*! FL2_getErrorCode() :

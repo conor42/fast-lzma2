@@ -604,14 +604,15 @@ void RMF_buildTable(FL2_matchTable* const tbl,
     unsigned const multi_thread,
     const void* const src,
     size_t const block_start,
-    size_t const block_size)
+    size_t const block_size,
+    FL2_progressFn progress, void* opaque, U32 weight)
 {
     DEBUGLOG(5, "RMF_buildTable : thread %u", job);
     if (tbl->isStruct) {
-        RMF_structuredBuildTable(tbl, job, multi_thread, src, block_start, block_size);
+        RMF_structuredBuildTable(tbl, job, multi_thread, src, block_start, block_size, progress, opaque, weight);
     }
     else {
-        RMF_bitpackBuildTable(tbl, job, multi_thread, src, block_start, block_size);
+        RMF_bitpackBuildTable(tbl, job, multi_thread, src, block_start, block_size, progress, opaque, weight);
     }
 }
 

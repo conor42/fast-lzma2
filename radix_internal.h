@@ -100,13 +100,15 @@ void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
     unsigned const multi_thread,
     const void* const data,
     size_t const block_start,
-    size_t const block_size);
+    size_t const block_size,
+    FL2_progressFn progress, void* opaque, U32 weight);
 void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
     unsigned const job,
     unsigned const multi_thread,
     const void* const data,
     size_t const block_start,
-    size_t const block_size);
+    size_t const block_size,
+    FL2_progressFn progress, void* opaque, U32 weight);
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,

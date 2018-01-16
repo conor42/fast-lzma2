@@ -121,7 +121,7 @@ FL2LIB_API FL2_CCtx* FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads);
 FL2LIB_API void      FL2_freeCCtx(FL2_CCtx* cctx);
 
-typedef void(*FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
+typedef void (*FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
 /*! FL2_compressCCtx() :
  *  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
@@ -129,6 +129,8 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
+
+typedef int (*FL2_progressFn)(size_t done, void* opaque);
 
 /*! FL2_compressCCtxBlock() :
  *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
@@ -142,7 +144,8 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* ctx,
  *  and set bit 7 in the property byte. */
 FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
-    const void* src, size_t srcStart, size_t srcSize);
+    const void* src, size_t srcStart, size_t srcSize,
+    FL2_progressFn progress, void* opaque);
 
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.
@@ -157,7 +160,8 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
  *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
 FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque,
-    const void* src, size_t srcStart, size_t srcSize);
+    const void* src, size_t srcStart, size_t srcSize,
+    FL2_progressFn progress);
 
 /*! FL2_endFrame() :
  *  Write the end marker to a callback function to terminate the LZMA2 stream.

@@ -11,6 +11,8 @@
 #ifndef RADIX_MF_H
 #define RADIX_MF_H
 
+#include "fast-lzma2.h"
+
 #if defined (__cplusplus)
 extern "C" {
 #endif
@@ -44,7 +46,8 @@ void RMF_buildTable(FL2_matchTable* const tbl,
     unsigned const multi_thread,
     const void* const data,
     size_t const block_start,
-    size_t const block_size);
+    size_t const block_size,
+    FL2_progressFn progress, void* opaque, U32 weight);
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);

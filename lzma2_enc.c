@@ -347,7 +347,7 @@ static size_t RMF_bitpackExtendMatch(const BYTE* const data,
 {
     ptrdiff_t end_index = start_index + length;
     ptrdiff_t dist = start_index - link;
-    if (limit > start_index + kMatchLenMax)
+    if (limit > start_index + (ptrdiff_t)kMatchLenMax)
         limit = start_index + kMatchLenMax;
     while (end_index < limit && end_index - (table[end_index] & RADIX_LINK_MASK) == dist) {
         end_index += table[end_index] >> RADIX_LINK_BITS;
@@ -376,7 +376,7 @@ static size_t RMF_structuredExtendMatch(const BYTE* const data,
 {
     ptrdiff_t end_index = start_index + length;
     ptrdiff_t dist = start_index - link;
-    if (limit > start_index + kMatchLenMax)
+    if (limit > start_index + (ptrdiff_t)kMatchLenMax)
         limit = start_index + kMatchLenMax;
     while (end_index < limit && end_index - GetMatchLink(table, end_index) == dist) {
         end_index += GetMatchLength(table, end_index);
@@ -960,7 +960,7 @@ size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
     }
     if (first_3 >= 0) {
         int cycles = enc->match_cycles;
-        ptrdiff_t end_index = index - ((match.dist < hash_dict_3) ? match.dist : hash_dict_3);
+        ptrdiff_t end_index = index - (((ptrdiff_t)match.dist < hash_dict_3) ? match.dist : hash_dict_3);
         ptrdiff_t match_3 = first_3;
         if (match_3 >= end_index) {
             do {
@@ -1861,7 +1861,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     const FL2_lzma2Parameters* options,
-    BYTE do_random_check)
+    BYTE do_random_check,
+    FL2_progressFn progress, void* opaque, size_t base, U32 weight)
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
@@ -2001,6 +2002,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         }
         out_dest += compressed_size + header_size;
         index = next_index;
+        if (progress)
+            progress(base + (((index - start) * weight) >> 4), opaque);
     }
     return out_dest - RMF_getTableAsOutputBuffer(tbl, start);
 }

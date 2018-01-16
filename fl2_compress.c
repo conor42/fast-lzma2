@@ -177,7 +177,7 @@ static void FL2_buildRadixTable(void* const jobDescription)
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* const cctx = job->cctx;
 
-    RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
+    RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, NULL, NULL, 0);
 }
 
 /* FL2_compressRadixChunk() : POOL_function type */
@@ -188,7 +188,7 @@ static void FL2_compressRadixChunk(void* const jobDescription)
 
     unsigned const num = job->num;
 
-    cctx->jobs[num].cSize = FL2_lzma2Encode(cctx->jobs[num].enc, cctx->matchTable, job->block, &cctx->params.cParams, 0);
+    cctx->jobs[num].cSize = FL2_lzma2Encode(cctx->jobs[num].enc, cctx->matchTable, job->block, &cctx->params.cParams, 0, NULL, NULL, 0, 0);
 }
 
 static void FL2_initEncoders(FL2_CCtx* const cctx)
@@ -198,12 +198,12 @@ static void FL2_initEncoders(FL2_CCtx* const cctx)
     }
 }
 
-static size_t FL2_compressCurBlock(FL2_CCtx* const cctx)
+static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress, void* opaque)
 {
     size_t const encodeSize = (cctx->curBlock.end - cctx->curBlock.start);
 
 #ifdef FL2_MULTITHREAD
-    size_t mfThreads = encodeSize / RMF_MIN_BYTES_PER_THREAD;
+    size_t mfThreads = cctx->curBlock.end / RMF_MIN_BYTES_PER_THREAD;
     size_t nbThreads = MIN(cctx->jobCount, encodeSize / MIN_BYTES_PER_THREAD);
     nbThreads += !nbThreads;
 #else
@@ -260,7 +260,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx)
         }
 #endif
 
-    RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
+    RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, progress, opaque, 7);
 
 #ifdef FL2_MULTITHREAD
 
@@ -276,7 +276,8 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx)
     for (size_t u = 1; u < nbThreads; ++u) {
         POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u]);   /* this call is blocking when thread worker pool is exhausted */
     }
-    FL2_compressRadixChunk(&cctx->jobs[0]);
+
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (7 * encodeSize) >> 4, 9 * (U32)nbThreads);
     POOL_waitAll(cctx->factory);
 
 #else /* FL2_MULTITHREAD */
@@ -302,7 +303,8 @@ static void FL2_beginFrame(FL2_CCtx* const cctx)
 static size_t FL2_compressBlock(FL2_CCtx* const cctx,
     const void* const src, size_t const srcStart, size_t srcSize,
     void* const dst, size_t dstCapacity,
-    FL2_writerFn const writeFn, void* const opaque)
+    FL2_writerFn const writeFn, void* const opaque,
+    FL2_progressFn progress)
 {
     BYTE* dstBuf = dst;
     size_t outSize = 0;
@@ -318,7 +320,7 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
 
         cctx->curBlock.end = cctx->curBlock.start + MIN(srcSize, dictionary_size - cctx->curBlock.start);
 
-        nbThreads = FL2_compressCurBlock(cctx);
+        nbThreads = FL2_compressCurBlock(cctx, progress, opaque);
         if (FL2_isError(nbThreads))
             return nbThreads;
 
@@ -369,13 +371,13 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
 
     DEBUGLOG(4, "FL2_compressCCtx : level %u, %u src => %u avail", cctx->params.compressionLevel, (U32)srcSize, (U32)dstCapacity);
 
-    if (dstCapacity < 2 - cctx->params.omitProp) /* empty LZMA2 stream is byte sequence {0, 0} */
+    if (dstCapacity < 2U - cctx->params.omitProp) /* empty LZMA2 stream is byte sequence {0, 0} */
         return FL2_ERROR(dstSize_tooSmall);
 
     FL2_beginFrame(cctx);
 
     dstBuf += !cctx->params.omitProp;
-    cSize = FL2_compressBlock(cctx, src, 0, srcSize, dstBuf, end - dstBuf, NULL, NULL);
+    cSize = FL2_compressBlock(cctx, src, 0, srcSize, dstBuf, end - dstBuf, NULL, NULL, NULL);
     if(!cctx->params.omitProp)
         dstBuf[-1] = FL2_getProp(cctx, cctx->dictMax);
 
@@ -401,9 +403,10 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
 
 FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* cctx,
     void* dst, size_t dstCapacity,
-    const void* src, size_t srcStart, size_t srcSize)
+    const void* src, size_t srcStart, size_t srcSize,
+    FL2_progressFn progress, void* opaque)
 {
-    return FL2_compressBlock(cctx, src, srcStart, srcSize, dst, dstCapacity, NULL, NULL);
+    return FL2_compressBlock(cctx, src, srcStart, srcSize, dst, dstCapacity, NULL, opaque, progress);
 }
 
 FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
@@ -417,9 +420,10 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
 
 FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
     FL2_writerFn writeFn, void* opaque,
-    const void* src, size_t srcStart, size_t srcSize)
+    const void* src, size_t srcStart, size_t srcSize,
+    FL2_progressFn progress)
 {
-    return FL2_compressBlock(cctx, src, srcStart, srcSize, NULL, 0, writeFn, opaque);
+    return FL2_compressBlock(cctx, src, srcStart, srcSize, NULL, 0, writeFn, opaque, progress);
 }
 
 FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
@@ -680,7 +684,7 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs,
             cctx->curBlock.end = fcs->inBuff.end;
 
             fcs->out_thread = 0;
-            fcs->thread_count = FL2_compressCurBlock(cctx);
+            fcs->thread_count = FL2_compressCurBlock(cctx, NULL, NULL);
             if (FL2_isError(fcs->thread_count))
                 return fcs->thread_count;
 

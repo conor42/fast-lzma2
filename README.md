@@ -1,7 +1,7 @@
  The __Fast LZMA2 Library__ is a lossless high-ratio data compression library based on the LZMA2 codec in 7-zip.
 
-The library uses a parallel buffered radix matchfinder and some optimizations from Zstandard to achieve a 50% to 80%
-speed gain over 7-zip at the higher levels. It also uses some threading, portability, and testing code from Zstandard.
+The library uses a parallel buffered radix matchfinder and some optimizations from Zstandard to achieve a 20% to 100%
+speed gain over 7-zip at the higher levels, depending on the source data. It also uses some threading, portability, and testing code from Zstandard.
 
 Use of the parallel buffered radix matchfinder instead of BT4 allows multithreaded execution with a simple design and low memory
 requirement. The library can compress using many threads without dividing the input into large chunks. Extra

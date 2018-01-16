@@ -881,18 +881,27 @@ static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi
     return -1;
 }
 
+#define UPDATE_INTERVAL 0x40000U
+
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
 void Radix_Build_Table(FL2_matchTable* const tbl,
     unsigned const job,
     unsigned const multi_thread,
     const void* data,
     size_t const block_start,
-    size_t const block_size)
+    size_t const block_size,
+    FL2_progressFn progress, void* opaque, U32 weight)
 {
+    if (!block_size)
+        return;
     const BYTE* const data_block = data;
+    U64 const enc_size = block_size - block_start;
     unsigned const best = !tbl->params.divide_and_conquer;
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
     size_t const bounded_start = block_size - max_depth - MAX_READ_BEYOND_DEPTH;
+    ptrdiff_t next_progress = 0;
+    size_t update = UPDATE_INTERVAL;
+    size_t total = 0;
 
     for (;;)
     {
@@ -902,6 +911,16 @@ void Radix_Build_Table(FL2_matchTable* const tbl,
 
         if (index < 0) {
             break;
+        }
+        if (progress) {
+            while (next_progress < index) {
+                total += tbl->list_heads[next_progress].count;
+                ++next_progress;
+            }
+            if (total >= update) {
+                progress((size_t)((total * enc_size / block_size * weight) >> 4), opaque);
+                update = total + UPDATE_INTERVAL;
+            }
         }
         list_head = tbl->list_heads[index];
         tbl->list_heads[index].head = RADIX_NULL_LINK;

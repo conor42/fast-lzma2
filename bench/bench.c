@@ -3,10 +3,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "..\fast-lzma2.h"
+#include "../fast-lzma2.h"
 #include "datagen.h"
 #include "mem.h"
-#include "..\util.h"
+#include "../util.h"
 
 extern size_t g_total;
 

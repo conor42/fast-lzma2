@@ -9,6 +9,7 @@
 */
 
 #include <stddef.h>     /* size_t, ptrdiff_t */
+#include <stdlib.h>     /* malloc, free */
 #include "fast-lzma2.h"
 #include "mem.h"          /* U32, U64, MEM_64bits */
 #include "fl2_internal.h"

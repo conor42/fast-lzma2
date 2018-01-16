@@ -12,6 +12,8 @@ Public domain
 #include "range_enc.h"
 #include "count.h"
 
+#include <stdlib.h>
+
 #define kNumReps 4U
 #define kNumStates 12U
 

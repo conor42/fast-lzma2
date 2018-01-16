@@ -7,6 +7,7 @@ Modified for FL2 by Conor McCarthy */
 #include "fl2_internal.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 #define kNumTopBits 24
 #define kTopValue ((U32)1 << kNumTopBits)

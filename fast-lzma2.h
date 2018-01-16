@@ -35,6 +35,15 @@ extern "C" {
 #  define FL2LIB_API FL2LIB_VISIBILITY
 #endif
 
+/* ======   Calling convention   ======*/
+
+#if defined(__GNUC__)
+#  define FL2LIB_CALL __attribute__((cdecl))
+#elif defined(_MSC_VER)
+#  define FL2LIB_CALL __cdecl
+#else
+#  define FL2LIB_CALL
+#endif
 
 /*******************************************************************************************************
 Introduction
@@ -47,13 +56,13 @@ Introduction
 #define FL2_VERSION_RELEASE  0
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
-FL2LIB_API unsigned FL2_versionNumber(void);   /**< useful to check dll version */
+FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
 
 #define FL2_LIB_VERSION FL2_VERSION_MAJOR.FL2_VERSION_MINOR.FL2_VERSION_RELEASE
 #define FL2_QUOTE(str) #str
 #define FL2_EXPAND_AND_QUOTE(str) FL2_QUOTE(str)
 #define FL2_VERSION_STRING FL2_EXPAND_AND_QUOTE(FL2_LIB_VERSION)
-FL2LIB_API const char* FL2_versionString(void);
+FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void);
 
 
 /***************************************
@@ -65,11 +74,11 @@ FL2LIB_API const char* FL2_versionString(void);
  *  Call FL2_compressMt() to use > 1 thread. Specify 0 for nbThreads to use all cores.
  *  @return : compressed size written into `dst` (<= `dstCapacity),
  *            or an error code if it fails (which can be tested using FL2_isError()). */
-FL2LIB_API size_t FL2_compress(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_compress(void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressMt(void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel,
     unsigned nbThreads);
@@ -80,7 +89,7 @@ FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
  *  If user cannot imply a maximum upper bound, it's better to use streaming mode to decompress data.
  *  @return : the number of bytes decompressed into `dst` (<= `dstCapacity`),
  *            or an errorCode if it fails (which can be tested using FL2_isError()). */
-FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize);
 
 /*! FL2_findDecompressedSize()
@@ -96,16 +105,16 @@ FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
  *            Always ensure return value fits within application's authorized limits.
  *            Each application can set its own limits. */
 #define FL2_CONTENTSIZE_ERROR (size_t)-1
-FL2LIB_API size_t FL2_findDecompressedSize(const void *src, size_t srcSize);
+FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize);
 
 
 /*======  Helper functions  ======*/
 #define FL2_COMPRESSBOUND(srcSize)   ((srcSize) + (((srcSize) + 0xFFF) / 0x1000) * 3 + 6)  /* this formula calculates the maximum size of data stored in uncompressed chunks */
-FL2LIB_API size_t      FL2_compressBound(size_t srcSize); /*!< maximum compressed size in worst case scenario */
-FL2LIB_API unsigned    FL2_isError(size_t code);          /*!< tells if a `size_t` function result is an error code */
-FL2LIB_API const char* FL2_getErrorName(size_t code);     /*!< provides readable string from an error code */
-FL2LIB_API int         FL2_maxCLevel(void);               /*!< maximum compression level available */
-FL2LIB_API int         FL2_maxHighCLevel(void);           /*!< maximum compression level available in high mode */
+FL2LIB_API size_t      FL2LIB_CALL FL2_compressBound(size_t srcSize); /*!< maximum compressed size in worst case scenario */
+FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells if a `size_t` function result is an error code */
+FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code);     /*!< provides readable string from an error code */
+FL2LIB_API int         FL2LIB_CALL FL2_maxCLevel(void);               /*!< maximum compression level available */
+FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maximum compression level available in high mode */
 
 
 /***************************************
@@ -117,20 +126,20 @@ FL2LIB_API int         FL2_maxHighCLevel(void);           /*!< maximum compressi
  *  This will make workload friendlier for system's memory.
  *  Use one context per thread for parallel execution in multi-threaded environments. */
 typedef struct FL2_CCtx_s FL2_CCtx;
-FL2LIB_API FL2_CCtx* FL2_createCCtx(void);
-FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads);
-FL2LIB_API void      FL2_freeCCtx(FL2_CCtx* cctx);
+FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void);
+FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads);
+FL2LIB_API void      FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx);
 
-typedef void (*FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
+typedef void (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
 /*! FL2_compressCCtx() :
  *  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
-FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-typedef int (*FL2_progressFn)(size_t done, void* opaque);
+typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
 
 /*! FL2_compressCCtxBlock() :
  *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
@@ -142,7 +151,7 @@ typedef int (*FL2_progressFn)(size_t done, void* opaque);
  *  compressing the first block or after the last. No hash will be written, but
  *  the caller can calculate it using the interface in xxhash.h, write it at the end,
  *  and set bit 7 in the property byte. */
-FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcStart, size_t srcSize,
     FL2_progressFn progress, void* opaque);
@@ -150,7 +159,7 @@ FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* ctx,
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.
  *  Must be called after compressing with FL2_compressCCtxBlock() */
-FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity);
 
 /*! FL2_compressCCtxBlock_toFn() :
@@ -158,7 +167,7 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
  *  overlap section, and compressed data is written to a callback function.
  *  The FL2_p_overlapFraction parameter will not be used.
  *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
-FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque,
     const void* src, size_t srcStart, size_t srcSize,
     FL2_progressFn progress);
@@ -166,14 +175,14 @@ FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
 /*! FL2_endFrame() :
  *  Write the end marker to a callback function to terminate the LZMA2 stream.
  *  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
-FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque);
 
 /*! FL2_dictSizeProp() :
  *  Get the dictionary size property.
  *  Intended for use with the FL2_p_omitProperties parameter for creating a
  *  7-zip compatible LZMA2 stream. */
-FL2LIB_API unsigned char FL2_dictSizeProp(FL2_CCtx* ctx);
+FL2LIB_API unsigned char FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* ctx);
 
 /*= Decompression context
  *  When decompressing many times,
@@ -182,12 +191,12 @@ FL2LIB_API unsigned char FL2_dictSizeProp(FL2_CCtx* ctx);
  *  This will make the workload friendlier for the system's memory.
  *  Use one context per thread for parallel execution. */
 typedef struct CLzma2Dec_s FL2_DCtx;
-FL2LIB_API FL2_DCtx* FL2_createDCtx(void);
-FL2LIB_API size_t     FL2_freeDCtx(FL2_DCtx* dctx);
+FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void);
+FL2LIB_API size_t    FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx);
 
 /*! FL2_decompressDCtx() :
  *  Same as FL2_decompress(), requires an allocated FL2_DCtx (see FL2_createDCtx()) */
-FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize);
 
@@ -250,14 +259,14 @@ typedef struct FL2_outBuffer_s {
 typedef struct FL2_CStream_s FL2_CStream;
 
 /*===== FL2_CStream management functions =====*/
-FL2LIB_API FL2_CStream* FL2_createCStream(void);
-FL2LIB_API size_t FL2_freeCStream(FL2_CStream* fcs);
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
+FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
 
 /*===== Streaming compression functions =====*/
-FL2LIB_API size_t FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
-FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input);
-FL2LIB_API size_t FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output);
-FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
+FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
+FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input);
+FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output);
+FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
 
 
 /*-***************************************************************************
@@ -286,12 +295,12 @@ FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
 typedef struct FL2_DStream_s FL2_DStream;
 
 /*===== FL2_DStream management functions =====*/
-FL2LIB_API FL2_DStream* FL2_createDStream(void);
-FL2LIB_API size_t FL2_freeDStream(FL2_DStream* fds);
+FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void);
+FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
 /*===== Streaming decompression functions =====*/
-FL2LIB_API size_t FL2_initDStream(FL2_DStream* fds);
-FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds);
+FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************
  *  Compression parameters - HowTo
@@ -385,8 +394,8 @@ typedef enum {
  *  Set one compression parameter, selected by enum FL2_cParameter.
  *  @result : informational value (typically, the one being set, possibly corrected),
  *            or an error code (which can be tested with FL2_isError()). */
-FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
-FL2LIB_API size_t FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
 
 #endif  /* FAST_LZMA2_H */
 

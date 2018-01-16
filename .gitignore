@@ -23,8 +23,6 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-*.dll
-*.exe
 
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -77,6 +75,8 @@ artifacts/
 *.pidb
 *.svclog
 *.scc
+*.dll
+*.exe
 
 # Chutzpah Test files
 _Chutzpah*
@@ -299,3 +299,4 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+

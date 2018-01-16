@@ -5,8 +5,8 @@
 * Public domain
 */
 
-#ifndef RADYX_RANGE_ENCODER_H
-#define RADYX_RANGE_ENCODER_H
+#ifndef RANGE_ENCODER_H
+#define RANGE_ENCODER_H
 
 #include "mem.h"
 #include "compiler.h"
@@ -154,4 +154,4 @@ void Flush(RangeEncoder* const rc)
 }
 #endif
 
-#endif /* RADYX_RANGE_ENCODER_H */
+#endif /* RANGE_ENCODER_H */

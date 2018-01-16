@@ -13,11 +13,11 @@
 /*-************************************
 *  Dependencies
 **************************************/
-#include "..\platform.h"  /* SET_BINARY_MODE */
+#include "../platform.h"  /* SET_BINARY_MODE */
 #include <stdlib.h>    /* malloc, free */
 #include <stdio.h>     /* FILE, fwrite, fprintf */
 #include <string.h>    /* memcpy */
-#include "..\mem.h"       /* U32 */
+#include "../mem.h"       /* U32 */
 
 
 /*-************************************

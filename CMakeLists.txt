@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.10)
 option(BUILD_SHARED_LIBS "Build the shared library" ON)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 add_library(flzma2
   error_private.c
@@ -21,3 +22,6 @@ add_library(flzma2
 
 add_executable(fuzzer tests/fuzzer.c tests/datagen.c)
 target_link_libraries(fuzzer flzma2)
+
+add_executable(bench bench/bench.c)
+target_link_libraries(bench flzma2)

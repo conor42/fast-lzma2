@@ -875,7 +875,7 @@ static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi
     if (tbl->st_index < tbl->end_index) {
         long index = multi_thread ? FL2_atomic_increment(tbl->st_index) : FL2_nonAtomic_increment(tbl->st_index);
         if (index <= tbl->end_index) {
-            return tbl->stack[index];
+            return index;
         }
     }
     return -1;
@@ -906,7 +906,7 @@ void Radix_Build_Table(FL2_matchTable* const tbl,
     for (;;)
     {
         /* Get the next to process */
-        ptrdiff_t const index = RMF_getNextList(tbl, multi_thread);
+        ptrdiff_t index = RMF_getNextList(tbl, multi_thread);
         RMF_tableHead list_head;
 
         if (index < 0) {
@@ -914,7 +914,7 @@ void Radix_Build_Table(FL2_matchTable* const tbl,
         }
         if (progress) {
             while (next_progress < index) {
-                total += tbl->list_heads[next_progress].count;
+                total += tbl->list_heads[tbl->stack[next_progress]].count;
                 ++next_progress;
             }
             if (total >= update) {
@@ -922,6 +922,7 @@ void Radix_Build_Table(FL2_matchTable* const tbl,
                 update = total + UPDATE_INTERVAL;
             }
         }
+        index = tbl->stack[index];
         list_head = tbl->list_heads[index];
         tbl->list_heads[index].head = RADIX_NULL_LINK;
         if (list_head.count < 2 || list_head.head < block_start) {

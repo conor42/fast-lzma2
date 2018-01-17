@@ -201,7 +201,8 @@ static void FL2_initEncoders(FL2_CCtx* const cctx)
 static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress, void* opaque)
 {
     size_t const encodeSize = (cctx->curBlock.end - cctx->curBlock.start);
-
+    U32 rmf_weight = ZSTD_highbit32((U32)cctx->curBlock.end);
+    U32 enc_weight = cctx->params.cParams.strategy ? ZSTD_highbit32(cctx->params.cParams.fast_length) * (2 + cctx->params.cParams.strategy) : 10;
 #ifdef FL2_MULTITHREAD
     size_t mfThreads = cctx->curBlock.end / RMF_MIN_BYTES_PER_THREAD;
     size_t nbThreads = MIN(cctx->jobCount, encodeSize / MIN_BYTES_PER_THREAD);
@@ -210,6 +211,13 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     size_t mfThreads = 1;
     size_t nbThreads = 1;
 #endif
+
+    if (rmf_weight > 8) rmf_weight -= 8;
+    else rmf_weight = 1;
+    rmf_weight += 2 * ZSTD_highbit32(cctx->params.rParams.depth - 4) + 4 * (encodeSize > ((size_t)1 << 26));
+    rmf_weight <<= 1;
+    rmf_weight = (rmf_weight << 4) / (rmf_weight + enc_weight);
+    enc_weight = 16 - rmf_weight;
 
     DEBUGLOG(5, "FL2_compressCurBlock : %u threads, %u start, %u bytes", (U32)nbThreads, (U32)cctx->curBlock.start, (U32)encodeSize);
 
@@ -260,7 +268,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
         }
 #endif
 
-    RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, progress, opaque, 7);
+    RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, progress, opaque, rmf_weight);
 
 #ifdef FL2_MULTITHREAD
 
@@ -277,7 +285,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
         POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u]);   /* this call is blocking when thread worker pool is exhausted */
     }
 
-    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (7 * encodeSize) >> 4, 9 * (U32)nbThreads);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);
     POOL_waitAll(cctx->factory);
 
 #else /* FL2_MULTITHREAD */
@@ -502,7 +510,7 @@ FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, un
 
     case FL2_p_dictionaryLog:
         if (value) {  /* 0 : does not change current dictionaryLog */
-            CLAMPCHECK(value, FL2_WINDOWLOG_MIN, FL2_DICTLOG_MAX);
+            CLAMPCHECK(value, FL2_DICTLOG_MIN, FL2_DICTLOG_MAX);
             cctx->params.rParams.dictionary_log = value;
         }
         return cctx->params.rParams.dictionary_log;

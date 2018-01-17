@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../fast-lzma2.h"
-#include "datagen.h"
-#include "mem.h"
+#include "../tests/datagen.h"
+#include "../mem.h"
 #include "../util.h"
 
 extern size_t g_total;
@@ -19,7 +19,6 @@ extern size_t g_total;
 #define GB *(1U<<30)
 
 static U32 g_nbSeconds = 10;
-static unsigned g_mt = 3;
 
 static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t srcSize, char* compressedBuffer, size_t maxCompressedSize,
     char* resultBuffer)

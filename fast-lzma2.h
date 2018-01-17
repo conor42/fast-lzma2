@@ -315,7 +315,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_DICTLOG_MAX_32   27
 #define FL2_DICTLOG_MAX_64   30
 #define FL2_DICTLOG_MAX    ((unsigned)(sizeof(size_t) == 4 ? FL2_DICTLOG_MAX_32 : FL2_DICTLOG_MAX_64))
-#define FL2_WINDOWLOG_MIN      20
+#define FL2_DICTLOG_MIN      20
 #define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
 #define FL2_SEARCHLOG_MAX     (FL2_CHAINLOG_MAX-1)
@@ -345,7 +345,7 @@ typedef enum {
                               * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
     FL2_p_7zLevel,          /* For use by the 7-zip fork employing this library. 1 - 9 */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
-                              * Must be clamped between FL2_WINDOWLOG_MIN and FL2_DICTLOG_MAX.
+                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
                               * Special: value 0 means "do not change dictionaryLog". */
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed

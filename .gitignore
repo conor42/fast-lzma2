@@ -77,6 +77,7 @@ artifacts/
 *.scc
 *.dll
 *.exe
+*.o
 
 # Chutzpah Test files
 _Chutzpah*

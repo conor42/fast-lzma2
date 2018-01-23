@@ -139,7 +139,23 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     const void* src, size_t srcSize,
     int compressionLevel);
 
+/************************************************
+*  Caller-managed data buffer and overlap section
+************************************************/
+
+typedef struct {
+    unsigned char *data;
+    size_t start;   /* start = 0 (first block) or overlap */
+    size_t end;     /* never < overlap */
+    size_t bufSize; /* allocation size */
+} FL2_blockBuffer;
+
 typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
+
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* ctx, FL2_blockBuffer *block);
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* ctx, FL2_blockBuffer *block, unsigned char *dst);
+
+FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
 
 /*! FL2_compressCCtxBlock() :
  *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
@@ -153,7 +169,7 @@ typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
  *  and set bit 7 in the property byte. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
-    const void* src, size_t srcStart, size_t srcSize,
+    const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque);
 
 /*! FL2_endFrame() :
@@ -169,7 +185,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
  *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque,
-    const void* src, size_t srcStart, size_t srcSize,
+    const FL2_blockBuffer *block,
     FL2_progressFn progress);
 
 /*! FL2_endFrame() :

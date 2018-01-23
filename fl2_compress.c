@@ -303,13 +303,13 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     return nbThreads;
 }
 
-static void FL2_beginFrame(FL2_CCtx* const cctx)
+FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx)
 {
     cctx->dictMax = 0;
 }
 
 static size_t FL2_compressBlock(FL2_CCtx* const cctx,
-    const void* const src, size_t const srcStart, size_t srcSize,
+    const void* const src, size_t srcStart, size_t const srcEnd,
     void* const dst, size_t dstCapacity,
     FL2_writerFn const writeFn, void* const opaque,
     FL2_progressFn progress)
@@ -319,14 +319,14 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
     size_t const dictionary_size = (size_t)1 << cctx->params.rParams.dictionary_log;
     size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
-    if (!srcSize)
+    if (srcStart >= srcEnd)
         return 0;
     cctx->curBlock.data = src;
     cctx->curBlock.start = srcStart;
-    while (srcSize > 0) {
+    while (srcStart < srcEnd) {
         size_t nbThreads;
 
-        cctx->curBlock.end = cctx->curBlock.start + MIN(srcSize, dictionary_size - cctx->curBlock.start);
+        cctx->curBlock.end = cctx->curBlock.start + MIN(srcEnd - srcStart, dictionary_size - cctx->curBlock.start);
 
         nbThreads = FL2_compressCurBlock(cctx, progress, opaque);
         if (FL2_isError(nbThreads))
@@ -353,7 +353,7 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
                 dstCapacity -= cctx->jobs[u].cSize;
             }
         }
-        srcSize -= cctx->curBlock.end - cctx->curBlock.start;
+        srcStart += cctx->curBlock.end - cctx->curBlock.start;
         cctx->curBlock.data += cctx->curBlock.end - block_overlap;
         cctx->curBlock.start = block_overlap;
     }
@@ -409,12 +409,39 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
     return dstBuf - (BYTE*)dst;
 }
 
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* cctx, FL2_blockBuffer *block)
+{
+    FL2_shiftBlock_switch(cctx, block, NULL);
+}
+
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_blockBuffer *block, BYTE *dst)
+{
+    size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    if (block->end > block_overlap) {
+        size_t const from = (block->end - block_overlap) & ~(sizeof(size_t) - 1);
+        size_t const overlap = block->end - from;
+        if (overlap <= from || dst) {
+            DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
+            memcpy(dst ? dst : block->data, block->data + from, overlap);
+        }
+        else {
+            DEBUGLOG(5, "Move overlap data : %u bytes", (U32)overlap);
+            memmove(block->data, block->data + from, overlap);
+        }
+        block->start = overlap;
+        block->end = overlap;
+    }
+    else {
+        block->start = block->end;
+    }
+}
+
 FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* cctx,
     void* dst, size_t dstCapacity,
-    const void* src, size_t srcStart, size_t srcSize,
+    const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque)
 {
-    return FL2_compressBlock(cctx, src, srcStart, srcSize, dst, dstCapacity, NULL, opaque, progress);
+    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, NULL, opaque, progress);
 }
 
 FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
@@ -428,10 +455,10 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
 
 FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
     FL2_writerFn writeFn, void* opaque,
-    const void* src, size_t srcStart, size_t srcSize,
+    const FL2_blockBuffer *block,
     FL2_progressFn progress)
 {
-    return FL2_compressBlock(cctx, src, srcStart, srcSize, NULL, 0, writeFn, opaque, progress);
+    return FL2_compressBlock(cctx, block->data, block->start, block->end, NULL, 0, writeFn, opaque, progress);
 }
 
 FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
@@ -765,18 +792,7 @@ FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL
             inBuff->end = 0;
         }
         if (inBuff->start > block_overlap && input->pos < input->size) {
-            size_t const from = (inBuff->end - block_overlap) & ~(sizeof(size_t) - 1);
-            size_t const overlap = inBuff->end - from;
-            if (overlap <= from) {
-                DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
-                memcpy(inBuff->data, inBuff->data + from, overlap);
-            }
-            else {
-                DEBUGLOG(5, "Move overlap data : %u bytes", (U32)overlap);
-                memmove(inBuff->data, inBuff->data + from, overlap);
-            }
-            inBuff->start = overlap;
-            inBuff->end = overlap;
+            FL2_shiftBlock(fcs->cctx, inBuff);
         }
         if (fcs->out_thread == fcs->thread_count) {
             size_t const toRead = MIN(input->size - input->pos, inBuff->bufSize - inBuff->end);

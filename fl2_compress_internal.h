@@ -55,13 +55,6 @@ typedef struct {
 } FL2_CCtx_params;
 
 typedef struct {
-    BYTE* data;
-    size_t start; /* start = overlap */
-    size_t end; /* never < overlap */
-    size_t bufSize;
-} FL2_blockBuffer;
-
-typedef struct {
     FL2_CCtx* cctx;
     FL2_lzmaEncoderCtx* enc;
     FL2_dataBlock block;

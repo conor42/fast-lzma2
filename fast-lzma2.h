@@ -69,6 +69,8 @@ FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void);
 *  Simple API
 ***************************************/
 
+#define FL2_MAXTHREADS 200
+
 /*! FL2_compress() :
  *  Compresses `src` content as a single LZMA2 compressed stream into already allocated `dst`.
  *  Call FL2_compressMt() to use > 1 thread. Specify 0 for nbThreads to use all cores.
@@ -115,7 +117,7 @@ FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells
 FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code);     /*!< provides readable string from an error code */
 FL2LIB_API int         FL2LIB_CALL FL2_maxCLevel(void);               /*!< maximum compression level available */
 FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maximum compression level available in high mode */
-
+FL2LIB_API size_t      FL2LIB_CALL FL2_memoryUsage(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
 
 /***************************************
 *  Explicit memory management
@@ -130,7 +132,7 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads);
 FL2LIB_API void      FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx);
 
-typedef void (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
+typedef int (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
 /*! FL2_compressCCtx() :
  *  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
@@ -138,6 +140,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_memoryUsage(const FL2_CCtx* cctx); /*!< memory usage determined by settings */
 
 /************************************************
 *  Caller-managed data buffer and overlap section

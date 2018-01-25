@@ -18,6 +18,8 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 #undef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
+#define RMF_BITPACK
+
 #define RADIX_MAX_LENGTH BITPACK_MAX_LENGTH
 
 #define InitMatchLink(index, link) tbl->table[index] = link
@@ -37,18 +39,6 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 #define SetNull(index) tbl->table[index] = RADIX_NULL_LINK
 
 #define IsNull(index) (tbl->table[index] == RADIX_NULL_LINK)
-
-#define Radix_Init RMF_bitpackInit
-
-#define Radix_Init_Complete RMF_bitpackInitComplete
-
-#define Radix_Build_Table RMF_bitpackBuildTable
-
-#define Radix_Integrity_Check RMF_bitpackIntegrityCheck
-
-#define Radix_Get_Out_Buffer RMF_bitpackAsOutputBuffer
-
-#define Radix_Get_Match RMF_bitpackGetMatch
 
 BYTE* RMF_bitpackAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 {

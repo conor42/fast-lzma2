@@ -80,9 +80,14 @@ static RMF_builder** RMF_createBuilderTable(U32* const matchTable, size_t const 
     return builders;
 }
 
-static int RMF_isStruct(const RMF_parameters* const params)
+static int RMF_isStruct(unsigned dictionary_log, unsigned depth)
 {
-    return params->dictionary_log > RADIX_LINK_BITS || params->depth > BITPACK_MAX_LENGTH;
+    return dictionary_log > RADIX_LINK_BITS || depth > BITPACK_MAX_LENGTH;
+}
+
+static int RMF_isStructParam(const RMF_parameters* const params)
+{
+    return RMF_isStruct(params->dictionary_log, params->depth);
 }
 
 /** RMF_clampCParams() :
@@ -103,7 +108,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
 
 static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_parameters* const params)
 {
-    int const isStruct = RMF_isStruct(params);
+    int const isStruct = RMF_isStructParam(params);
     unsigned const dictionary_log = tbl->params.dictionary_log;
     /* dictionary is allocated with the struct and is immutable */
     if (params->dictionary_log > tbl->params.dictionary_log
@@ -151,7 +156,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     RMF_parameters params = RMF_clampParams(*p);
 
     RMF_reduceDict(&params, dict_reduce);
-    isStruct = RMF_isStruct(&params);
+    isStruct = RMF_isStructParam(&params);
     dictionary_size = (size_t)1 << params.dictionary_log;
 
     DEBUGLOG(3, "RMF_createMatchTable : isStruct %d, dict %u", isStruct, (U32)dictionary_size);
@@ -192,7 +197,7 @@ BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_paramet
     RMF_parameters params = RMF_clampParams(*p);
     RMF_reduceDict(&params, dict_reduce);
     return tbl->params.dictionary_log > params.dictionary_log
-        || (tbl->params.dictionary_log == params.dictionary_log && tbl->allocStruct >= RMF_isStruct(&params));
+        || (tbl->params.dictionary_log == params.dictionary_log && tbl->allocStruct >= RMF_isStructParam(&params));
 }
 
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const p, size_t const dict_reduce)
@@ -207,14 +212,14 @@ size_t RMF_threadCount(const FL2_matchTable* const tbl)
     return tbl->thread_count;
 }
 
-void RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
+size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
 {
     DEBUGLOG(5, "RMF_initTable : start %u, size %u", (U32)start, (U32)end);
     if (tbl->isStruct) {
-        RMF_structuredInit(tbl, data, start, end);
+        return RMF_structuredInit(tbl, data, start, end);
     }
     else {
-        RMF_bitpackInit(tbl, data, start, end);
+        return RMF_bitpackInit(tbl, data, start, end);
     }
 }
 
@@ -600,20 +605,18 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
 }
 
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
-void RMF_buildTable(FL2_matchTable* const tbl,
+int RMF_buildTable(FL2_matchTable* const tbl,
     unsigned const job,
     unsigned const multi_thread,
-    const void* const src,
-    size_t const block_start,
-    size_t const block_size,
-    FL2_progressFn progress, void* opaque, U32 weight)
+    FL2_dataBlock const block,
+    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)
 {
     DEBUGLOG(5, "RMF_buildTable : thread %u", job);
     if (tbl->isStruct) {
-        RMF_structuredBuildTable(tbl, job, multi_thread, src, block_start, block_size, progress, opaque, weight);
+        return RMF_structuredBuildTable(tbl, job, multi_thread, block, progress, opaque, weight, init_done);
     }
     else {
-        RMF_bitpackBuildTable(tbl, job, multi_thread, src, block_start, block_size, progress, opaque, weight);
+        return RMF_bitpackBuildTable(tbl, job, multi_thread, block, progress, opaque, weight, init_done);
     }
 }
 
@@ -660,4 +663,12 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
     else {
         return RMF_bitpackAsOutputBuffer(tbl, index);
     }
+}
+
+size_t RMF_memoryUsage(unsigned const dict_log, unsigned const buffer_log, unsigned const depth, unsigned thread_count)
+{
+    size_t size = (size_t)(5U + RMF_isStruct(dict_log, depth)) << dict_log;
+    U32 buf_size = (U32)1 << (dict_log - buffer_log);
+    size += ((buf_size - 1) * sizeof(RMF_buildMatch) + sizeof(RMF_builder)) * thread_count;
+    return size;
 }

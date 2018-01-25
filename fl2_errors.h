@@ -55,6 +55,8 @@ typedef enum {
   FL2_error_memory_allocation = 9,
   FL2_error_dstSize_tooSmall = 10,
   FL2_error_srcSize_wrong    = 11,
+  FL2_error_write_failed     = 12,
+  FL2_error_canceled         = 13,
   FL2_error_maxCode = 20  /* never EVER use this value directly, it can change in future versions! Use FL2_isError() instead */
 } FL2_ErrorCode;
 

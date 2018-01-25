@@ -56,6 +56,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
 
 BYTE FL2_getDictSizeProp(size_t dictionary_size);
 
+size_t FL2_lzma2MemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count);
+
 #if defined (__cplusplus)
 }
 #endif

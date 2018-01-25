@@ -18,6 +18,8 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 #undef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
+#define RMF_STRUCTURED
+
 #define RADIX_MAX_LENGTH STRUCTURED_MAX_LENGTH
 
 #define InitMatchLink(index, link) ((RMF_unit*)tbl->table)[(index) >> UNIT_BITS].links[(index) & UNIT_MASK] = (U32)(link)
@@ -37,14 +39,6 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 #define SetNull(index) ((RMF_unit*)tbl->table)[(index) >> UNIT_BITS].links[(index) & UNIT_MASK] = RADIX_NULL_LINK
 
 #define IsNull(index) (((RMF_unit*)tbl->table)[(index) >> UNIT_BITS].links[(index) & UNIT_MASK] == RADIX_NULL_LINK)
-
-#define Radix_Init RMF_structuredInit
-
-#define Radix_Build_Table RMF_structuredBuildTable
-
-#define Radix_Integrity_Check RMF_structuredIntegrityCheck
-
-#define Radix_Get_Match RMF_structuredGetMatch
 
 BYTE* RMF_structuredAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 {

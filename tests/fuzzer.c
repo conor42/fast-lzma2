@@ -370,13 +370,14 @@ static int basicUnitTests(U32 seed, double compressibility)
     DISPLAYLEVEL(4, "OK \n");
 
     DISPLAYLEVEL(4, "test%3i : compress to callback fn : ", testNb++);
-    {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
+    {   FL2_blockBuffer in = { CNBuffer, 0, CNBuffSize, CNBuffSize };
+        FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_CCtx* cctx = FL2_createCCtxMt(0);
         if (cctx == NULL) goto _output_error;
         FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, 1);
         BYTE prop = FL2_dictSizeProp(cctx);
         callback(&prop, 1, &out);
-        CHECK(FL2_compressCCtxBlock_toFn(cctx, callback, &out, CNBuffer, 0, CNBuffSize, NULL));
+        CHECK(FL2_compressCCtxBlock_toFn(cctx, callback, &out, &in, NULL));
         CHECK(FL2_endFrame_toFn(cctx, callback, &out));
         FL2_freeCCtx(cctx);
         CHECK(FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, compressedBufferSize));

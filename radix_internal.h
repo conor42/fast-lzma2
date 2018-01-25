@@ -93,22 +93,18 @@ struct FL2_matchTable_s
     U32 table[1];
 };
 
-void RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
-void RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
-void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
+size_t RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
+size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
+int RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
     unsigned const job,
     unsigned const multi_thread,
-    const void* const data,
-    size_t const block_start,
-    size_t const block_size,
-    FL2_progressFn progress, void* opaque, U32 weight);
-void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
+    FL2_dataBlock const block,
+    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
+int RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
     unsigned const job,
     unsigned const multi_thread,
-    const void* const data,
-    size_t const block_start,
-    size_t const block_size,
-    FL2_progressFn progress, void* opaque, U32 weight);
+    FL2_dataBlock const block,
+    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,

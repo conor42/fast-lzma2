@@ -102,7 +102,13 @@ static void RadixInitReference(FL2_matchTable* const tbl, const void* const data
 }
 #endif
 
-void Radix_Init(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
+size_t
+#ifdef RMF_BITPACK
+RMF_bitpackInit
+#else
+RMF_structuredInit
+#endif
+(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
 {
     const BYTE* const data_block = (const BYTE*)data;
     size_t st_index = 0;
@@ -115,12 +121,12 @@ void Radix_Init(FL2_matchTable* const tbl, const void* const data, size_t const 
         for (size_t i = 0; i < end; ++i) {
             SetNull(i);
         }
-        return;
+        return 0;
     }
 #ifdef RMF_REFERENCE
     if (tbl->params.use_ref_mf) {
         RadixInitReference(tbl, data, start, end);
-        return;
+        return 0;
     }
 #endif
     SetNull(0);
@@ -158,12 +164,15 @@ void Radix_Init(FL2_matchTable* const tbl, const void* const data, size_t const 
                 else {
                     ptrdiff_t const prev_i = i;
                     /* Eliminate the repeat from the linked list to save time */
-                    if (dist == 1)
+                    if (dist == 1) {
                         i = HandleRepeat(tbl, data_block, start, end, i, radix_16);
-                    else
+                        rpt_total += i - prev_i + MAX_REPEAT / 2U - 1;
+                    }
+                    else {
                         i = HandleRepeat2(tbl, data_block, start, end, i, radix_16);
+                        rpt_total += i - prev_i + MAX_REPEAT - 2;
+                    }
                     radix_16 = ((size_t)data_block[i + 1] << 8) | data_block[i + 2];
-                    rpt_total += i - prev_i + MAX_REPEAT - 2;
                     count = 0;
                 }
             }
@@ -188,6 +197,7 @@ void Radix_Init(FL2_matchTable* const tbl, const void* const data, size_t const 
     SetNull(end - 1);
     tbl->end_index = (U32)st_index + ATOMIC_INITIAL_VALUE;
     tbl->st_index = ATOMIC_INITIAL_VALUE;
+    return rpt_total;
 }
 
 #if defined(_MSC_VER)
@@ -884,24 +894,27 @@ static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi
 #define UPDATE_INTERVAL 0x40000U
 
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
-void Radix_Build_Table(FL2_matchTable* const tbl,
+int
+#ifdef RMF_BITPACK
+RMF_bitpackBuildTable
+#else
+RMF_structuredBuildTable
+#endif
+(FL2_matchTable* const tbl,
     unsigned const job,
     unsigned const multi_thread,
-    const void* data,
-    size_t const block_start,
-    size_t const block_size,
-    FL2_progressFn progress, void* opaque, U32 weight)
+    FL2_dataBlock const block,
+    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)
 {
-    if (!block_size)
-        return;
-    const BYTE* const data_block = data;
-    U64 const enc_size = block_size - block_start;
+    if (!block.end)
+        return 0;
+    U64 const enc_size = block.end - block.start;
     unsigned const best = !tbl->params.divide_and_conquer;
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
-    size_t const bounded_start = block_size - max_depth - MAX_READ_BEYOND_DEPTH;
+    size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
     ptrdiff_t next_progress = 0;
     size_t update = UPDATE_INTERVAL;
-    size_t total = 0;
+    size_t total = init_done;
 
     for (;;)
     {
@@ -918,40 +931,50 @@ void Radix_Build_Table(FL2_matchTable* const tbl,
                 ++next_progress;
             }
             if (total >= update) {
-                progress((size_t)((total * enc_size / block_size * weight) >> 4), opaque);
+                if (progress((size_t)((total * enc_size / block.end * weight) >> 4), opaque)) {
+                    tbl->st_index = tbl->end_index;
+                    return 1;
+                }
                 update = total + UPDATE_INTERVAL;
             }
         }
         index = tbl->stack[index];
         list_head = tbl->list_heads[index];
         tbl->list_heads[index].head = RADIX_NULL_LINK;
-        if (list_head.count < 2 || list_head.head < block_start) {
+        if (list_head.count < 2 || list_head.head < block.start) {
             continue;
         }
 #ifdef RMF_REFERENCE
         if (tbl->params.use_ref_mf) {
-            RecurseListsReference(tbl->builders[job], data_block, block_size, list_head.head, list_head.count, max_depth);
+            RecurseListsReference(tbl->builders[job], block.data, block.end, list_head.head, list_head.count, max_depth);
             continue;
         }
 #endif
         if (list_head.head >= bounded_start) {
-            RecurseListsBound(tbl->builders[job], data_block, block_size, &list_head, (BYTE)max_depth);
-            if (list_head.count < 2 || list_head.head < block_start) {
+            RecurseListsBound(tbl->builders[job], block.data, block.end, &list_head, (BYTE)max_depth);
+            if (list_head.count < 2 || list_head.head < block.start) {
                 continue;
             }
         }
         if (best && list_head.count > tbl->builders[job]->match_buffer_limit)
         {
             /* Not worth buffering or too long */
-            RecurseLists16(tbl->builders[job], data_block, block_start, list_head.head, list_head.count, max_depth);
+            RecurseLists16(tbl->builders[job], block.data, block.start, list_head.head, list_head.count, max_depth);
         }
         else {
-            RecurseListsBuffered(tbl->builders[job], data_block, block_start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
+            RecurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
         }
     }
+    return 0;
 }
 
-int Radix_Integrity_Check(const FL2_matchTable* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth)
+int
+#ifdef RMF_BITPACK
+RMF_bitpackIntegrityCheck
+#else
+RMF_structuredIntegrityCheck
+#endif
+(const FL2_matchTable* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth)
 {
     int err = 0;
     for (index += !index; index < end; ++index) {
@@ -1007,7 +1030,13 @@ static size_t ExtendMatch(const FL2_matchTable* const tbl,
     return end_index - start_index;
 }
 
-size_t Radix_Get_Match(const FL2_matchTable* const tbl,
+size_t
+#ifdef RMF_BITPACK
+RMF_bitpackGetMatch
+#else
+RMF_structuredGetMatch
+#endif
+(const FL2_matchTable* const tbl,
     const BYTE* const data,
     size_t const index,
     size_t const limit,
@@ -1016,11 +1045,12 @@ size_t Radix_Get_Match(const FL2_matchTable* const tbl,
 {
     size_t length;
     size_t dist;
-    U32 const link = GetMatchLink(index);
-    if (link == RADIX_NULL_LINK)
+    U32 link;
+    if (IsNull(index))
         return 0;
+    link = GetMatchLink(index);
     length = GetMatchLength(index);
-    if (length < 3)
+    if (length < 2)
         return 0;
     dist = index - link;
     *offset_ptr = dist;

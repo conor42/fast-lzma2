@@ -1801,13 +1801,6 @@ static void EncoderStates_Reset(EncoderStates* es, unsigned lc, unsigned lp, uns
     }
 }
 
-/*size_t GetMemoryUsage(const Lzma2Options* options)
-{
-    return sizeof(FL2_lzmaEncoderCtx)
-        + (options->strategy != FL2_fast) ? sizeof(OptimalNode) * kOptimizerBufferSize : 0
-        + (options->strategy == FL2_ultra) ? sizeof(HashChains) + ((1UL << options->second_dict_bits) - 1) * sizeof(U32) : 0;
-}*/
-
 BYTE FL2_getDictSizeProp(size_t dictionary_size)
 {
     BYTE dict_size_prop = 0;
@@ -1822,6 +1815,14 @@ BYTE FL2_getDictSizeProp(size_t dictionary_size)
         }
     }
     return dict_size_prop;
+}
+
+size_t FL2_lzma2MemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count)
+{
+    size_t size = sizeof(FL2_lzmaEncoderCtx) + kChunkBufferSize;
+    if(strategy == FL2_ultra)
+        size += sizeof(HashChains) + (sizeof(U32) << chain_log) - sizeof(U32);
+    return size * thread_count;
 }
 
 static void Reset(FL2_lzmaEncoderCtx* enc, size_t max_distance)
@@ -1893,6 +1894,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         else {
             HashReset(enc, options->second_dict_bits);
         }
+        if (enc->hash_buf == NULL)
+            return FL2_ERROR(memory_allocation);
         enc->hash_prev_index = (start >= (size_t)enc->hash_dict_3) ? start - enc->hash_dict_3 : -1;
     }
     /* Each encoder writes a properties byte because the upstream encoder(s) could */
@@ -2004,8 +2007,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         }
         out_dest += compressed_size + header_size;
         index = next_index;
-        if (progress)
-            progress(base + (((index - start) * weight) >> 4), opaque);
+        if (progress && progress(base + (((index - start) * weight) >> 4), opaque) != 0)
+            return FL2_ERROR(canceled);
     }
     return out_dest - RMF_getTableAsOutputBuffer(tbl, start);
 }

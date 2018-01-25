@@ -20,7 +20,6 @@
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 
-#define FL2_MAXTHREADS 200
 #define MIN_BYTES_PER_THREAD 0x10000
 
 /*-=====  Pre-defined compression levels  =====-*/
@@ -81,6 +80,22 @@ static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL +
     { 27, 3, 14, 4, 128, 160, 0, 8, FL2_ultra }, /* 8 */
     { 28, 3, 14, 5, 128, 160, 0, 9, FL2_ultra } /* 9 */
 };
+
+size_t FL2_memoryUsage_internal(unsigned const dictionaryLog, unsigned const bufferLog, unsigned const searchDepth, unsigned chainLog, FL2_strategy strategy, unsigned nbThreads)
+{
+    size_t size = RMF_memoryUsage(dictionaryLog, bufferLog, searchDepth, nbThreads);
+    return size + FL2_lzma2MemoryUsage(chainLog, strategy, nbThreads);
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_memoryUsage(int compressionLevel, unsigned nbThreads)
+{
+    return FL2_memoryUsage_internal(FL2_defaultCParameters[compressionLevel].dictionaryLog,
+        FL2_defaultCParameters[compressionLevel].bufferLog,
+        FL2_defaultCParameters[compressionLevel].searchDepth,
+        FL2_defaultCParameters[compressionLevel].chainLog,
+        FL2_defaultCParameters[compressionLevel].strategy,
+        nbThreads);
+}
 
 void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* const params)
 {
@@ -177,7 +192,7 @@ static void FL2_buildRadixTable(void* const jobDescription)
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* const cctx = job->cctx;
 
-    RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, NULL, NULL, 0);
+    RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock, NULL, NULL, 0, 0);
 }
 
 /* FL2_compressRadixChunk() : POOL_function type */
@@ -201,8 +216,11 @@ static void FL2_initEncoders(FL2_CCtx* const cctx)
 static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress, void* opaque)
 {
     size_t const encodeSize = (cctx->curBlock.end - cctx->curBlock.start);
+    size_t init_done;
     U32 rmf_weight = ZSTD_highbit32((U32)cctx->curBlock.end);
-    U32 enc_weight = cctx->params.cParams.strategy ? ZSTD_highbit32(cctx->params.cParams.fast_length) * (2 + cctx->params.cParams.strategy) : 10;
+    U32 depth_weight = 2 + (cctx->params.rParams.depth >= 12) + (cctx->params.rParams.depth >= 28);
+    U32 enc_weight;
+    int err = 0;
 #ifdef FL2_MULTITHREAD
     size_t mfThreads = cctx->curBlock.end / RMF_MIN_BYTES_PER_THREAD;
     size_t nbThreads = MIN(cctx->jobCount, encodeSize / MIN_BYTES_PER_THREAD);
@@ -212,12 +230,20 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     size_t nbThreads = 1;
 #endif
 
-    if (rmf_weight > 8) rmf_weight -= 8;
-    else rmf_weight = 1;
-    rmf_weight += 2 * ZSTD_highbit32(cctx->params.rParams.depth - 4) + 4 * (encodeSize > ((size_t)1 << 26));
-    rmf_weight <<= 1;
-    rmf_weight = (rmf_weight << 4) / (rmf_weight + enc_weight);
-    enc_weight = 16 - rmf_weight;
+    if (rmf_weight >= 20) {
+        rmf_weight = depth_weight * (rmf_weight - 10) + (rmf_weight - 19) * 12;
+        if (cctx->params.cParams.strategy == 0)
+            enc_weight = 20;
+        else if (cctx->params.cParams.strategy == 1)
+            enc_weight = 50;
+        else enc_weight = 60 + cctx->params.cParams.second_dict_bits + ZSTD_highbit32(cctx->params.cParams.fast_length) * 3U;
+        rmf_weight = (rmf_weight << 4) / (rmf_weight + enc_weight);
+        enc_weight = 16 - rmf_weight;
+    }
+    else {
+        rmf_weight = 8;
+        enc_weight = 8;
+    }
 
     DEBUGLOG(5, "FL2_compressCurBlock : %u threads, %u start, %u bytes", (U32)nbThreads, (U32)cctx->curBlock.start, (U32)encodeSize);
 
@@ -259,7 +285,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 
     cctx->dictMax = MAX(cctx->dictMax, cctx->curBlock.end);
     /* initialize to length 2 */
-    RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
+    init_done = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
 
 #ifdef FL2_MULTITHREAD
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
@@ -268,17 +294,19 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
         }
 #endif
 
-    RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, progress, opaque, rmf_weight);
+    err = RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock, progress, opaque, rmf_weight, init_done);
 
 #ifdef FL2_MULTITHREAD
 
     POOL_waitAll(cctx->factory);
 
+    if (err)
+        return FL2_ERROR(canceled);
+
 #ifdef RMF_CHECK_INTEGRITY
-    {   int err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
-        if (err)
-            return FL2_ERROR(internal);
-    }
+    err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
+    if (err)
+        return FL2_ERROR(internal);
 #endif
 
     for (size_t u = 1; u < nbThreads; ++u) {
@@ -290,13 +318,15 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 
 #else /* FL2_MULTITHREAD */
 
+    if (err)
+        return FL2_ERROR(canceled);
+
 #ifdef RMF_CHECK_INTEGRITY
-    {   int err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
-        if (err)
-            return FL2_ERROR(internal);
-    }
+    err = RMF_integrityCheck(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end, cctx->params.rParams.depth);
+    if (err)
+        return FL2_ERROR(internal);
 #endif
-    FL2_compressRadixChunk(&cctx->jobs[0]);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight);
 
 #endif
 
@@ -344,7 +374,8 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
                 return FL2_ERROR(dstSize_tooSmall);
             }
             if (writeFn != NULL) {
-                writeFn(outBuf, cctx->jobs[u].cSize, opaque);
+                if(writeFn(outBuf, cctx->jobs[u].cSize, opaque))
+                    return FL2_ERROR(write_failed);
                 outSize += cctx->jobs[u].cSize;
             }
             else {
@@ -409,6 +440,16 @@ FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
     return dstBuf - (BYTE*)dst;
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_memoryUsage(const FL2_CCtx * cctx)
+{
+    return FL2_memoryUsage_internal(cctx->params.rParams.dictionary_log,
+        cctx->params.rParams.match_buffer_log,
+        cctx->params.rParams.depth,
+        cctx->params.cParams.second_dict_bits,
+        cctx->params.cParams.strategy,
+        cctx->jobCount);
+}
+
 FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* cctx, FL2_blockBuffer *block)
 {
     FL2_shiftBlock_switch(cctx, block, NULL);
@@ -465,7 +506,8 @@ FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque)
 {
     BYTE c = LZMA2_END_MARKER;
-    writeFn(&c, 1, opaque);
+    if(writeFn(&c, 1, opaque))
+        return FL2_ERROR(write_failed);
     return 1;
 }
 

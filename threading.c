@@ -17,7 +17,7 @@
 /* create fake symbol to avoid empty translation unit warning */
 int g_ZSTD_threading_useles_symbol;
 
-#if defined(FL2_MULTITHREAD) && defined(_WIN32)
+#if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
 
 /**
  * Windows minimalist Pthread Wrapper, based on :
@@ -72,4 +72,4 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void **value_ptr)
     }
 }
 
-#endif   /* FL2_MULTITHREAD */
+#endif   /* FL2_SINGLETHREAD */

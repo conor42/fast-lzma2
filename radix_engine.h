@@ -23,7 +23,6 @@ static size_t HandleRepeat(FL2_matchTable* const tbl, const BYTE* const data_blo
     tbl->list_heads[radix_16].count -= MAX_REPEAT / 2 - 2;
     /* Find the end */
     i += ZSTD_count(data_block + i + 2, data_block + i + 1, data_block + block_size);
-    /* Start processing again at the last 4 bytes */
     rpt_end = i;
     /* No point if it's in the overlap region */
     if (i >= (ptrdiff_t)start) {
@@ -41,6 +40,7 @@ static size_t HandleRepeat(FL2_matchTable* const tbl, const BYTE* const data_blo
     return rpt_end;
 }
 
+/* If a 2-byte repeat is found, fill that section of the table with matches of distance 2 */
 static size_t HandleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
 {
     size_t radix_16_rev;
@@ -54,18 +54,17 @@ static size_t HandleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_bl
     tbl->list_heads[radix_16_rev].head = (U32)(rpt_index - 2);
     tbl->list_heads[radix_16_rev].count -= MAX_REPEAT / 2 - 1;
     /* Find the end */
-    /* Start processing again at the last 4 bytes */
     i += ZSTD_count(data_block + i + 2, data_block + i, data_block + block_size);
     rpt_end = i;
     /* No point if it's in the overlap region */
     if (i >= (ptrdiff_t)start) {
         U32 len = 2;
-        /* Set matches at distance 1 and available length */
+        /* Set matches at distance 2 and available length */
         for (; i >= rpt_index && len <= RADIX_MAX_LENGTH; --i) {
             SetMatchLinkAndLength(i, (U32)(i - 2), len);
             ++len;
         }
-        /* Set matches at distance 1 and max length */
+        /* Set matches at distance 2 and max length */
         for (; i >= rpt_index; --i) {
             SetMatchLinkAndLength(i, (U32)(i - 2), RADIX_MAX_LENGTH);
         }
@@ -73,6 +72,7 @@ static size_t HandleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_bl
     return rpt_end;
 }
 
+/* Initialization for the reference algortithm */
 #ifdef RMF_REFERENCE
 static void RadixInitReference(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
 {
@@ -135,10 +135,14 @@ RMF_structuredInit
     tbl->stack[st_index++] = (U32)radix_16;
     tbl->list_heads[radix_16].head = 0;
     tbl->list_heads[radix_16].count = 1;
+
     radix_16 = ((size_t)((BYTE)radix_16) << 8) | data_block[2];
-    for (ptrdiff_t i = 1; i < block_size; ++i) {
+
+	ptrdiff_t i = 1;
+    for (; i < block_size; ++i) {
         /* Pre-load the next value for speed increase */
         size_t const next_radix = ((size_t)((BYTE)radix_16) << 8) | data_block[i + 2];
+
         U32 const prev = tbl->list_heads[radix_16].head;
         if (prev != RADIX_NULL_LINK) {
             S32 dist = (S32)i - prev;
@@ -172,7 +176,8 @@ RMF_structuredInit
                         i = HandleRepeat2(tbl, data_block, start, end, i, radix_16);
                         rpt_total += i - prev_i + MAX_REPEAT - 2;
                     }
-                    radix_16 = ((size_t)data_block[i + 1] << 8) | data_block[i + 2];
+					if (i < block_size)
+						radix_16 = ((size_t)data_block[i + 1] << 8) | data_block[i + 2];
                     count = 0;
                 }
             }
@@ -187,7 +192,7 @@ RMF_structuredInit
         }
     }
     /* Handle the last value */
-    if (tbl->list_heads[radix_16].head != RADIX_NULL_LINK) {
+    if (i <= block_size && tbl->list_heads[radix_16].head != RADIX_NULL_LINK) {
         SetMatchLinkAndLength(block_size, tbl->list_heads[radix_16].head, 2);
     }
     else {
@@ -195,8 +200,10 @@ RMF_structuredInit
     }
     /* Never a match at the last byte */
     SetNull(end - 1);
+
     tbl->end_index = (U32)st_index + ATOMIC_INITIAL_VALUE;
     tbl->st_index = ATOMIC_INITIAL_VALUE;
+
     return rpt_total;
 }
 
@@ -231,7 +238,7 @@ static void RecurseListsBuffered(RMF_builder* const tbl,
             list_count = (U32)tbl->match_buffer_limit;
         }
         for (; count < list_count; ++count) {
-            /* Next */
+            /* Pre-load next link */
             size_t const next_link = GetMatchLink(link);
             /* Get 4 data characters for later. This doesn't block on a cache miss. */
             *(U32*)tbl->match_buffer[count].chars = MEM_read32(data_src + link);
@@ -350,7 +357,7 @@ static void RecurseListsBound(RMF_builder* const tbl,
         }
         ++index;
     } while (index < list_count);
-    /* Convert radix values on the stack to counts */
+    /* Convert radix values on the stack to counts and reset any used tail slots */
     for (size_t j = 0; j < st_index; ++j) {
         tails_8[tbl->stack[j].count].prev_index = RADIX_NULL_LINK;
         tbl->stack[j].count = tails_8[tbl->stack[j].count].list_count;
@@ -493,8 +500,10 @@ static void RecurseLists16(RMF_builder* const tbl,
         size_t const radix_16 = next_radix_16;
         /* Initialization doesn't set lengths to 2 because it's a waste of time if buffering is used */
         SetMatchLength(link, (U32)next_link, 2);
+
         next_radix_8 = data_src[next_link];
         next_radix_16 = next_radix_8 + ((size_t)(data_src[next_link + 1]) << 8);
+
         prev = tbl->tails_8[radix_8].prev_index;
         if (prev != RADIX_NULL_LINK) {
             /* Link the previous occurrence to this one at length 3. */
@@ -505,6 +514,7 @@ static void RecurseLists16(RMF_builder* const tbl,
             reset_list[reset_count++] = radix_8;
         }
         tbl->tails_8[radix_8].prev_index = (U32)link;
+
         prev = tbl->tails_16[radix_16].prev_index;
         if (prev != RADIX_NULL_LINK) {
             ++tbl->tails_16[radix_16].list_count;

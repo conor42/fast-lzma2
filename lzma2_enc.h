@@ -45,7 +45,7 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create();
 
 void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc);
 
-void FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options);
+int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options);
 
 size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,

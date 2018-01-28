@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-#ifdef _LZMA_PROB32
+#ifdef LZMA_ENC_PROB32
 typedef U32 Probability;
 #else
 typedef U16 Probability;

@@ -195,10 +195,11 @@ struct FL2_lzmaEncoderCtx_s
 
 FL2_lzmaEncoderCtx* FL2_lzma2Create()
 {
-    DEBUGLOG(3, "FL2_lzma2Create");
     FL2_lzmaEncoderCtx* enc = malloc(sizeof(FL2_lzmaEncoderCtx));
+    DEBUGLOG(3, "FL2_lzma2Create");
     if (enc == NULL)
         return NULL;
+
     enc->out_buf = malloc(kChunkBufferSize);
     if (enc->out_buf == NULL) {
         free(enc);
@@ -207,12 +208,12 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create()
     enc->lc = 3;
     enc->lp = 0;
     enc->pb = 2;
-    enc->fast_length = 32;
+    enc->fast_length = 48;
     enc->len_end_max = kOptimizerBufferSize - 1;
     enc->lit_pos_mask = (1 << enc->lp) - 1;
     enc->pos_mask = (1 << enc->pb) - 1;
-    enc->match_cycles = 8;
-    enc->strategy = FL2_opt;
+    enc->match_cycles = 1;
+    enc->strategy = FL2_ultra;
     enc->match_price_count = kDistanceRepriceFrequency;
     enc->align_price_count = kAlignRepriceFrequency;
     enc->dist_price_table_size = kDistTableSizeMax;
@@ -911,7 +912,7 @@ static void HashReset(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
     memset(enc->hash_buf->table_3, 0xFF, sizeof(enc->hash_buf->table_3));
 }
 
-static void HashCreate(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
+static int HashCreate(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
 {
     DEBUGLOG(3, "Create hash chain : dict bits %u", dictionary_bits_3);
     if (enc->hash_buf) {
@@ -919,15 +920,19 @@ static void HashCreate(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
     }
     enc->hash_alloc_3 = (ptrdiff_t)1 << dictionary_bits_3;
     enc->hash_buf = malloc(sizeof(HashChains) + (enc->hash_alloc_3 - 1) * sizeof(S32));
+    if (enc->hash_buf == NULL)
+        return 1;
     HashReset(enc, dictionary_bits_3);
+    return 0;
 }
 
 /* Create a hash chain for hybrid mode */
-void FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options)
+int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options)
 {
     if (enc->strategy == FL2_ultra && enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {
-        HashCreate(enc, options->second_dict_bits);
+        return HashCreate(enc, options->second_dict_bits);
     }
+    return 0;
 }
 
 #define GET_HASH_3(data) ((((MEM_readLE32(data)) << 8) * 506832829U) >> (32 - kHash3Bits))
@@ -1003,7 +1008,7 @@ size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
 * encoding choices - a literal, 1-byte rep 0 match, all rep match lengths, and
 * all match lengths at available distances. It also checks the combined
 * sequences literal+rep0, rep+rep0 and match+rep0.
-* If the encoder has a hash chain, this method works in hybrid mode, using the
+* If is_hybrid != 0, this method works in hybrid mode, using the
 * hash chain to find shorter matches at near distances. */
 FORCE_INLINE_TEMPLATE
 size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
@@ -1175,7 +1180,7 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
                 /* Save time by exluding normal matches not longer than the rep */
                 start_len = len_test + 1;
             }
-            if (is_hybrid && MEM_read16(data + len_test + 1) == MEM_read16(data_2 + len_test + 1) && len_test + 3 <= bytes_avail) {
+            if (is_hybrid && len_test + 3 <= bytes_avail && MEM_read16(data + len_test + 1) == MEM_read16(data_2 + len_test + 1)) {
                 /* Try rep + literal + rep0 */
                 size_t len_test_2 = ZSTD_count(data + len_test + 3,
                     data_2 + len_test + 3,
@@ -1241,38 +1246,6 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
                 }
                 else break;
             }
-#if 0
-            len_test = length + 1;
-            if (rep_0_bytes == MEM_read16(data + len_test) && len_test + 2 <= bytes_avail) {
-                /* Try match + literal + rep0 */
-                const BYTE *data_2 = data - cur_dist - 1;
-                size_t limit = MIN(len_test + fast_length, bytes_avail);
-                size_t len_test_2 = ZSTD_count(data + len_test + 2, data_2 + len_test + 2, data + limit) + 2;
-                size_t state_2 = MatchNextState(state);
-                size_t pos_state_next = (index + length) & pos_mask;
-                U32 match_lit_rep_total_price = cur_and_len_price +
-                    GET_PRICE_0(rc, enc->states.is_match[state_2][pos_state_next]) +
-                    GetLiteralPriceMatched(&enc->rc, GetLiteralProbs(enc, index + length, data[len_test - 2]),
-                        data[len_test - 1], data_2[len_test - 1]);
-                state_2 = LiteralNextState(state_2);
-                pos_state_next = (pos_state_next + 1) & pos_mask;
-                match_lit_rep_total_price +=
-                    GET_PRICE_1(rc, enc->states.is_match[state_2][pos_state_next]) +
-                    GET_PRICE_1(rc, enc->states.is_rep[state_2]);
-                size_t offset = cur + len_test + len_test_2;
-                match_lit_rep_total_price += GetRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
-                if (match_lit_rep_total_price < enc->opt_buf[offset].price) {
-                    len_end = MAX(len_end, offset);
-                    enc->opt_buf[offset].price = match_lit_rep_total_price;
-                    enc->opt_buf[offset].prev_index = (unsigned)(cur + len_test);
-                    enc->opt_buf[offset].prev_dist = 0;
-                    enc->opt_buf[offset].is_combination = 1;
-                    enc->opt_buf[offset].prev_2 = 1;
-                    enc->opt_buf[offset].prev_index_2 = (unsigned)cur;
-                    enc->opt_buf[offset].prev_dist_2 = (U32)(cur_dist + kNumReps);
-                }
-            }
-#endif
         }
         else {
             /* Hybrid mode */
@@ -1331,7 +1304,7 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
                         break;
                     if (len_test == enc->matches[match_index].length) {
                         size_t rep_0_pos = len_test + 1;
-                        if (rep_0_bytes == MEM_read16(data + rep_0_pos) && rep_0_pos + 2 <= bytes_avail) {
+                        if (rep_0_pos + 2 <= bytes_avail && rep_0_bytes == MEM_read16(data + rep_0_pos)) {
                             /* Try match + literal + rep0 */
                             const BYTE *data_2 = data - cur_dist - 1;
                             size_t limit = MIN(rep_0_pos + fast_length, bytes_avail);
@@ -1889,13 +1862,12 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     if (enc->strategy == FL2_ultra) {
         /* Create a hash chain to put the encoder into hybrid mode */
         if (enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {
-            HashCreate(enc, options->second_dict_bits);
+            if(HashCreate(enc, options->second_dict_bits) != 0)
+                return FL2_ERROR(memory_allocation);
         }
         else {
             HashReset(enc, options->second_dict_bits);
         }
-        if (enc->hash_buf == NULL)
-            return FL2_ERROR(memory_allocation);
         enc->hash_prev_index = (start >= (size_t)enc->hash_dict_3) ? start - enc->hash_dict_3 : -1;
     }
     /* Each encoder writes a properties byte because the upstream encoder(s) could */

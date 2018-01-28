@@ -64,7 +64,9 @@ typedef struct {
 
 struct FL2_CCtx_s {
     FL2_CCtx_params params;
+#ifndef FL2_SINGLETHREAD
     POOL_ctx* factory;
+#endif
     FL2_dataBlock curBlock;
     size_t dictMax;
     FL2_matchTable* matchTable;

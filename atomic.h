@@ -17,7 +17,7 @@ extern "C" {
 
 /* atomic add */
 
-#if defined(FL2_MULTITHREAD) && defined(_WIN32)
+#if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
 
 #ifdef WINVER
 #undef WINVER
@@ -41,14 +41,14 @@ typedef LONG FL2_atomic;
 #define FL2_atomic_increment(n) InterlockedIncrement(&n)
 #define FL2_nonAtomic_increment(n) (++n)
 
-#elif defined(FL2_MULTITHREAD) && defined(__GNUC__)
+#elif !defined(FL2_SINGLETHREAD) && defined(__GNUC__)
 
 typedef long FL2_atomic;
 #define ATOMIC_INITIAL_VALUE 0
 #define FL2_atomic_increment(n) __sync_fetch_and_add(&n, 1)
 #define FL2_nonAtomic_increment(n) (n++)
 
-#elif defined(FL2_MULTITHREAD) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__) /* C11 */
+#elif !defined(FL2_SINGLETHREAD) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__) /* C11 */
 
 #include <stdatomic.h>
 
@@ -64,7 +64,7 @@ typedef long FL2_atomic;
 #define FL2_atomic_increment(n) (n++)
 #define FL2_nonAtomic_increment(n) (n++)
 
-#endif /* FL2_MULTITHREAD */
+#endif /* FL2_SINGLETHREAD */
 
 
 #if defined (__cplusplus)

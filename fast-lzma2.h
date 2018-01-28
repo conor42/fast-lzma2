@@ -73,7 +73,7 @@ FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void);
 
 /*! FL2_compress() :
  *  Compresses `src` content as a single LZMA2 compressed stream into already allocated `dst`.
- *  Call FL2_compressMt() to use > 1 thread. Specify 0 for nbThreads to use all cores.
+ *  Call FL2_compressMt() to use > 1 thread. Specify nbThreads = 0 to use all cores.
  *  @return : compressed size written into `dst` (<= `dstCapacity),
  *            or an error code if it fails (which can be tested using FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_compress(void* dst, size_t dstCapacity,
@@ -117,7 +117,6 @@ FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells
 FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code);     /*!< provides readable string from an error code */
 FL2LIB_API int         FL2LIB_CALL FL2_maxCLevel(void);               /*!< maximum compression level available */
 FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maximum compression level available in high mode */
-FL2LIB_API size_t      FL2LIB_CALL FL2_memoryUsage(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
 
 /***************************************
 *  Explicit memory management
@@ -126,13 +125,14 @@ FL2LIB_API size_t      FL2LIB_CALL FL2_memoryUsage(int compressionLevel, unsigne
  *  When compressing many times,
  *  it is recommended to allocate a context just once, and re-use it for each successive compression operation.
  *  This will make workload friendlier for system's memory.
- *  Use one context per thread for parallel execution in multi-threaded environments. */
+ *  The context may not use the number of threads requested if the library is compiled for single-threaded
+ *  compression or nbThreads > FL2_MAXTHREADS. Call FL2_CCtx_nbThreads to obtain the actual number. */
 typedef struct FL2_CCtx_s FL2_CCtx;
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads);
 FL2LIB_API void      FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx);
 
-typedef int (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
+FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* ctx);
 
 /*! FL2_compressCCtx() :
  *  Same as FL2_compress(), requires an allocated FL2_CCtx (see FL2_createCCtx()). */
@@ -140,8 +140,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
-
-FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_memoryUsage(const FL2_CCtx* cctx); /*!< memory usage determined by settings */
 
 /************************************************
 *  Caller-managed data buffer and overlap section
@@ -181,6 +179,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
  *  Must be called after compressing with FL2_compressCCtxBlock() */
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity);
+
+typedef int (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
 /*! FL2_compressCCtxBlock_toFn() :
  *  Same as FL2_compressCCtx except the caller is responsible for supplying an
@@ -371,7 +371,9 @@ typedef enum {
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
-    FL2_p_bufferLog,
+    FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
+                             * 2 ^ (dictionaryLog - bufferLog). Lower number = slower, better compression,
+                             * higher memory usage. */
     FL2_p_chainLog,         /* Size of the full-search table, as a power of 2.
                               * Resulting table size is (1 << (chainLog+2)).
                               * Larger tables result in better and slower compression.
@@ -416,6 +418,22 @@ typedef enum {
  *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
 FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
+
+/***************************************
+*  Context memory usage
+***************************************/
+
+/*! FL2_estimate*() :
+*  These functions estimate memory usage of a CCtx before its creation or before any operation has begun.
+*  FL2_estimateCCtxSize() will provide a budget large enough for any compression level up to selected one.
+*  To use FL2_estimateCCtxSize_usingCCtx, set the compression level and any other settings for the context,
+*  then call the function. Some allocation occurs when the context is created, but the large memory buffers
+*  used for string matching are allocated only when compression begins. */
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCCtx(const FL2_CStream* fcs);
 
 #endif  /* FAST_LZMA2_H */
 

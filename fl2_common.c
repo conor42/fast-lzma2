@@ -35,7 +35,7 @@ FL2LIB_API size_t FL2_compressBound(size_t srcSize)
 }
 
 /*-****************************************
-*  ZSTD Error Management
+*  FL2 Error Management
 ******************************************/
 /*! FL2_isError() :
  *  tells if a return value is an error code */

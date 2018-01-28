@@ -262,11 +262,12 @@ static size_t findDiff(const void* buf1, const void* buf2, size_t max)
     return u;
 }
 
-static void callback(const void *src, size_t size, void *opaque)
+static int callback(const void *src, size_t size, void *opaque)
 {
     FL2_outBuffer *out = (FL2_outBuffer*)opaque;
     memcpy((BYTE*)out->dst + out->pos, src, size);
     out->pos += size;
+    return 0;
 }
 
 /*=============================================
@@ -729,7 +730,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                      (FL2_maxCLevel() * 2U / cLevelLimiter) )
                      + 1;
             unsigned lc = FUZ_rand(&lseed) % 5;
-            FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, cLevel);
+			FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cctx, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
             if((FUZ_rand(&lseed) & 7) > 6)
                 FL2_CCtx_setParameter(cctx, FL2_p_searchDepth, 64);

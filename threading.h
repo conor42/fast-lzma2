@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-#if defined(FL2_MULTITHREAD) && defined(_WIN32)
+#if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
 
 /**
  * Windows minimalist Pthread Wrapper, based on :
@@ -72,7 +72,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
  */
 
 
-#elif defined(FL2_MULTITHREAD)   /* posix assumed ; need a better detection method */
+#elif !defined(FL2_SINGLETHREAD)   /* posix assumed ; need a better detection method */
 /* ===   POSIX Systems   === */
 #  include <pthread.h>
 
@@ -93,7 +93,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 #define ZSTD_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
 #define ZSTD_pthread_join(a, b)         pthread_join((a),(b))
 
-#else  /* FL2_MULTITHREAD not defined */
+#else  /* FL2_SINGLETHREAD defined */
 /* No multithreading support */
 
 typedef int ZSTD_pthread_mutex_t;
@@ -111,56 +111,7 @@ typedef int ZSTD_pthread_cond_t;
 
 /* do not use ZSTD_pthread_t */
 
-#endif /* FL2_MULTITHREAD */
-
-/* atomic add */
-#ifdef FL2_MULTITHREAD
-
-#ifdef _WIN32
-
-typedef LONG ZSTD_atomic;
-#define ATOMIC_INITIAL_VALUE -1
-#define ATOMIC_END_VALUE 0
-#define ZSTD_atomic_increment(n) InterlockedIncrement(&n)
-#define ZSTD_atomic_decrement(n) InterlockedDecrement(&n)
-#define ZSTD_nonAtomic_increment(n) (++n)
-#define ZSTD_nonAtomic_decrement(n) (--n)
-
-#elif defined(__GNUC__)
-
-typedef long ZSTD_atomic;
-#define ATOMIC_INITIAL_VALUE 0
-#define ATOMIC_END_VALUE 1
-#define ZSTD_atomic_increment(n) __sync_fetch_and_add(&n, 1)
-#define ZSTD_atomic_decrement(n) __sync_fetch_and_add(&n, -1)
-#define ZSTD_nonAtomic_increment(n) (n++)
-#define ZSTD_nonAtomic_decrement(n) (n--)
-
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__) /* C11 */
-
-#include <stdatomic.h>
-
-typedef _Atomic long ZSTD_atomic;
-#define ATOMIC_INITIAL_VALUE 0
-#define ATOMIC_END_VALUE 1
-#define ZSTD_atomic_increment(n) atomic_fetch_add(&n, 1)
-#define ZSTD_atomic_decrement(n) atomic_fetch_add(&n, -1)
-#define ZSTD_nonAtomic_increment(n) (n++)
-#define ZSTD_nonAtomic_decrement(n) (n--)
-
-#endif /* _WIN32 */
-
-#else  /* FL2_MULTITHREAD not defined */
-
-typedef long ZSTD_atomic;
-#define ATOMIC_INITIAL_VALUE 0
-#define ATOMIC_END_VALUE 1
-#define ZSTD_atomic_increment(n) (n++)
-#define ZSTD_atomic_decrement(n) (n--)
-#define ZSTD_nonAtomic_increment(n) (n++)
-#define ZSTD_nonAtomic_decrement(n) (n--)
-
-#endif /* FL2_MULTITHREAD */
+#endif /* FL2_SINGLETHREAD */
 
 #if defined (__cplusplus)
 }

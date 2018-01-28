@@ -21,7 +21,7 @@
 #  pragma warning(disable : 4701)  /* disable: C4701: potentially uninitialized local variable */
 #endif
 
-#define MIN_MATCH_BUFFER_SIZE 256 /* min buffer size at least FL2_SEARCH_DEPTH_MAX + 2 for bounded build */
+#define MIN_MATCH_BUFFER_SIZE 256U /* min buffer size at least FL2_SEARCH_DEPTH_MAX + 2 for bounded build */
 #define MAX_MATCH_BUFFER_SIZE (1UL << 24) /* max buffer size constrained by 24-bit link values */
 
 #define REPEAT_CHECK_TABLE ((1 << 1) | (1 << 2) | (1 << 4) | (1 << 8) | (1 << 16) | (1ULL << 32))
@@ -38,14 +38,13 @@ static void RMF_initTailTable(RMF_builder* const tbl)
     }
 }
 
-static RMF_builder* RMF_createBuilder(U32* const matchTable, size_t match_buffer_size)
+static RMF_builder* RMF_createBuilder(size_t match_buffer_size)
 {
     match_buffer_size = MIN(match_buffer_size, MAX_MATCH_BUFFER_SIZE);
     match_buffer_size = MAX(match_buffer_size, MIN_MATCH_BUFFER_SIZE);
 
     {   RMF_builder* const builder = (RMF_builder*)malloc(
             sizeof(RMF_builder) + (match_buffer_size - 1) * sizeof(RMF_buildMatch));
-        builder->table = matchTable;
         builder->match_buffer_size = match_buffer_size;
         builder->match_buffer_limit = match_buffer_size;
         RMF_initTailTable(builder);
@@ -65,16 +64,19 @@ static void RMF_freeBuilderTable(RMF_builder** const builders, unsigned const si
 
 static RMF_builder** RMF_createBuilderTable(U32* const matchTable, size_t const match_buffer_size, unsigned const max_len, unsigned const size)
 {
-    DEBUGLOG(3, "RMF_createBuilderTable : match_buffer_size %u, builders %u", (U32)match_buffer_size, size);
     RMF_builder** builders = (RMF_builder**)malloc(size * sizeof(RMF_builder*));
+    DEBUGLOG(3, "RMF_createBuilderTable : match_buffer_size %u, builders %u", (U32)match_buffer_size, size);
     if (builders == NULL)
         return NULL;
+    for (unsigned i = 0; i < size; ++i)
+        builders[i] = NULL;
     for (unsigned i = 0; i < size; ++i) {
-        builders[i] = RMF_createBuilder(matchTable, match_buffer_size);
+        builders[i] = RMF_createBuilder(match_buffer_size);
         if (builders[i] == NULL) {
             RMF_freeBuilderTable(builders, i);
             return NULL;
         }
+        builders[i]->table = matchTable;
         builders[i]->max_len = max_len;
     }
     return builders;
@@ -125,7 +127,6 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_
             RMF_freeBuilderTable(tbl->builders, tbl->thread_count);
             tbl->builders = RMF_createBuilderTable(tbl->table, match_buffer_size, tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH, tbl->thread_count);
             if (tbl->builders == NULL) {
-                free(tbl);
                 return FL2_ERROR(memory_allocation);
             }
         }
@@ -169,7 +170,6 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     tbl->allocStruct = isStruct;
     tbl->thread_count = thread_count;
     tbl->params = params;
-    tbl->params.match_buffer_log = 0;
     tbl->builders = NULL;
 
     RMF_applyParameters_internal(tbl, &params);
@@ -361,7 +361,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
         }
     }
-    /* Convert radix values on the stack to counts */
+    /* Convert radix values on the stack to counts and reset any used tail slots */
     for (size_t j = stack_base; j < st_index; ++j) {
         tbl->tails_8[tbl->stack[j].count].prev_index = RADIX_NULL_LINK;
         tbl->stack[j].count = (U32)tbl->tails_8[tbl->stack[j].count].list_count;
@@ -667,7 +667,7 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 
 size_t RMF_memoryUsage(unsigned const dict_log, unsigned const buffer_log, unsigned const depth, unsigned thread_count)
 {
-    size_t size = (size_t)(5U + RMF_isStruct(dict_log, depth)) << dict_log;
+    size_t size = (size_t)(4U + RMF_isStruct(dict_log, depth)) << dict_log;
     U32 buf_size = (U32)1 << (dict_log - buffer_log);
     size += ((buf_size - 1) * sizeof(RMF_buildMatch) + sizeof(RMF_builder)) * thread_count;
     return size;

@@ -21,7 +21,7 @@
 #endif
 
 
-#ifdef FL2_MULTITHREAD
+#ifndef FL2_SINGLETHREAD
 
 #include "threading.h"   /* pthread adaptation */
 
@@ -227,7 +227,7 @@ void POOL_waitAll(void *ctxVoid)
     ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
 }
 
-#else  /* FL2_MULTITHREAD  not defined */
+#else  /* FL2_SINGLETHREAD  defined */
 /* No multi-threading support */
 
 /* We don't need any data, but if it is empty malloc() might return NULL. */
@@ -262,4 +262,4 @@ size_t POOL_sizeof(POOL_ctx* ctx) {
     return sizeof(*ctx);
 }
 
-#endif  /* FL2_MULTITHREAD */
+#endif  /* FL2_SINGLETHREAD */

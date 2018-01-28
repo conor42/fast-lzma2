@@ -12,7 +12,7 @@ objects = ..\error_private.o \
 ..\threading.o \
 ..\xxhash.o
 
-CFLAGS := -Wall -O3 -DFL2_MULTITHREAD -DFL2_DLL_EXPORT=1 -pthread
+CFLAGS := -Wall -O3 -DFL2_DLL_EXPORT=1 -pthread
 CC := gcc
 
 libflzma2-x64 : $(objects)

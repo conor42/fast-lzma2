@@ -11,14 +11,14 @@ Modified for FL2 by Conor McCarthy */
 extern "C" {
 #endif
 
-/* #define _LZMA_PROB32 */
-/* _LZMA_PROB32 can increase the speed on some CPUs,
+/* #define LZMA_DEC_PROB16 */
+/* 32-bit probs can increase the speed on some CPUs,
    but memory usage for CLzma2Dec::probs will be doubled in that case */
 
-#ifdef _LZMA_PROB32
-#define Probability U32
-#else
+#ifdef LZMA_DEC_PROB16
 #define Probability U16
+#else
+#define Probability U32
 #endif
 
 
@@ -136,11 +136,7 @@ typedef struct
 
 void LzmaDec_Construct(CLzma2Dec *p);
 
-void LzmaDec_Init(CLzma2Dec *p);
-
-/* There are two types of LZMA streams:
-     0) Stream with end mark. That end mark adds about 6 bytes to compressed size.
-     1) Stream without end mark. You must know exact uncompressed size to decompress such stream. */
+void FLzmaDec_Init(CLzma2Dec *p);
 
 typedef enum
 {
@@ -175,119 +171,25 @@ typedef enum
 /* ELzmaStatus is used only as output value for function call */
 
 
-/* ---------- Interfaces ---------- */
+void FLzmaDec_Free(CLzma2Dec *state);
 
-/* There are 3 levels of interfaces:
-     1) Dictionary Interface
-     2) Buffer Interface
-     3) One Call Interface
-   You can select any of these interfaces, but don't mix functions from different
-   groups for same object. */
-
-
-/* There are two variants to allocate state for Dictionary Interface:
-     1) LzmaDec_Allocate / LzmaDec_Free
-     2) LzmaDec_AllocateProbs / LzmaDec_FreeProbs
-   You can use variant 2, if you set dictionary buffer manually.
-   For Buffer Interface you must always use variant 1.
-
-LzmaDec_Allocate* can return:
-  SZ_OK
-  SZ_ERROR_MEM         - Memory allocation error
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-*/
-   
-void LzmaDec_Free(CLzma2Dec *state);
-
-/* ---------- Dictionary Interface ---------- */
-
-/* You can use it, if you want to eliminate the overhead for data copying from
-   dictionary to some other external buffer.
-   You must work with CLzma2Dec variables directly in this interface.
-
-   STEPS:
-     LzmaDec_Constr()
-     LzmaDec_Allocate()
-     for (each new stream)
-     {
-       LzmaDec_Init()
-       while (it needs more decompression)
-       {
-         LzmaDec_DecodeToDic()
-         use data from CLzma2Dec::dic and update CLzma2Dec::dicPos
-       }
-     }
-     LzmaDec_Free()
-*/
-
-/* LzmaDec_DecodeToDic
-   
-   The decoding to internal dictionary buffer (CLzma2Dec::dic).
-   You must manually update CLzma2Dec::dicPos, if it reaches CLzma2Dec::dicBufSize !!!
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (dicLimit).
-  LZMA_FINISH_ANY - Decode just dicLimit bytes.
-  LZMA_FINISH_END - Stream must be finished after dicLimit.
-
-Returns:
-  SZ_OK
-    status:
-      LZMA_STATUS_FINISHED_WITH_MARK
-      LZMA_STATUS_NOT_FINISHED
-      LZMA_STATUS_NEEDS_MORE_INPUT
-      LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
-  SZ_ERROR_DATA - Data error
-*/
-
-size_t LzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
+size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
 
-/* ---------- Buffer Interface ---------- */
-
-/* It's zlib-like interface.
-   See LzmaDec_DecodeToDic description for information about STEPS and return results,
-   but you must use LzmaDec_DecodeToBuf instead of LzmaDec_DecodeToDic and you don't need
-   to work with CLzma2Dec variables manually.
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (*destLen).
-  LZMA_FINISH_ANY - Decode just destLen bytes.
-  LZMA_FINISH_END - Stream must be finished after (*destLen).
-*/
-
-size_t LzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
+size_t FLzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t Lzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
+size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
 
-/* ---------- State Interface ---------- */
+size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
 
-size_t Lzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
-
-
-/*
-finishMode:
-It has meaning only if the decoding reaches output limit (*destLen or dicLimit).
-LZMA_FINISH_ANY - use smallest number of input bytes
-LZMA_FINISH_END - read EndOfStream marker after decoding
-
-Returns:
-SZ_OK
-status:
-LZMA_STATUS_FINISHED_WITH_MARK
-LZMA_STATUS_NOT_FINISHED
-LZMA_STATUS_NEEDS_MORE_INPUT
-SZ_ERROR_DATA - Data error
-*/
-
-size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
+size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-size_t Lzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
+size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
 

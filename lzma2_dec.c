@@ -292,13 +292,8 @@ static BYTE LzmaDec_TryDummy(const CLzma2Dec *p, unsigned state, U32 range, U32 
 And it decodes new LZMA-symbols while (buf < bufLimit), but "buf" is without last normalization
 Out:
   Result:
-    SZ_OK - OK
-    SZ_ERROR_DATA - Error
-  p->remainLen:
-    < kMatchSpecLenStart : normal remain
-    = kMatchSpecLenStart : finished
-    = kMatchSpecLenStart + 1 : Flush marker (unused now)
-    = kMatchSpecLenStart + 2 : State Init Marker (unused now)
+    FL2_error_no_error - OK
+    FL2_ERROR(corruption_detected) - Error
 */
 
 static size_t LzmaDec_DecodeReal(CLzma2Dec *p, size_t limit, const BYTE *bufLimit)
@@ -563,18 +558,10 @@ static size_t LzmaDec_DecodeReal(CLzma2Dec *p, size_t limit, const BYTE *bufLimi
               {
                 U32 t;
                 code -= range;
-                t = (0 - ((U32)code >> 31)); /* (U32)((Int32)code >> 31) */
+                t = (0 - ((U32)code >> 31));
                 distance = (distance << 1) + (t + 1);
                 code += range & t;
               }
-              /*
-              distance <<= 1;
-              if (code >= range)
-              {
-                code -= range;
-                distance |= 1;
-              }
-              */
             }
             while (--numDirectBits != 0);
             prob = probs + Align;
@@ -741,7 +728,7 @@ static void LzmaDec_InitDicAndState(CLzma2Dec *p, BYTE initDic, BYTE initState)
     p->needInitState = 1;
 }
 
-void LzmaDec_Init(CLzma2Dec *p)
+void FLzmaDec_Init(CLzma2Dec *p)
 {
   p->dicPos = 0;
   LzmaDec_InitDicAndState(p, 1, 1);
@@ -759,7 +746,7 @@ static void LzmaDec_InitStateReal(CLzma2Dec *p)
   p->needInitState = 0;
 }
 
-size_t LzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit, const BYTE *src, size_t *srcLen,
+size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit, const BYTE *src, size_t *srcLen,
     ELzmaFinishMode finishMode)
 {
     size_t inSize = *srcLen;
@@ -822,7 +809,7 @@ size_t LzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit, const BYTE *src, size_
     }
 }
 
-size_t LzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+size_t FLzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
 {
   size_t outSize = *destLen;
   size_t inSize = *srcLen;
@@ -846,7 +833,7 @@ size_t LzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYTE
       curFinishMode = finishMode;
     }
 
-    res = LzmaDec_DecodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
+    res = FLzmaDec_DecodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
     src += inSizeCur;
     inSize -= inSizeCur;
     *srcLen += inSizeCur;
@@ -875,12 +862,12 @@ static void LzmaDec_FreeDict(CLzma2Dec *p)
     p->dic = NULL;
 }
 
-void LzmaDec_Free(CLzma2Dec *p)
+void FLzmaDec_Free(CLzma2Dec *p)
 {
   LzmaDec_FreeDict(p);
 }
 
-size_t Lzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
+size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
 {
     U32 dictSize;
     if (dictProp > 40)
@@ -920,7 +907,7 @@ size_t Lzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
     p->needInitDic = 1;
     p->needInitState2 = 1;
     p->needInitProp = 1;
-    LzmaDec_Init(p);
+    FLzmaDec_Init(p);
     return FL2_error_no_error;
 }
 
@@ -940,13 +927,13 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
     ptrdiff_t len = *srcLen;
     *srcLen = 0;
     if (len <= 0)
-        return 0;
+        return LZMA2_STATE_CONTROL;
     *control = *src;
     *srcLen = 1;
     if (*control == 0)
         return LZMA2_STATE_FINISHED;
     if (len < 3)
-        return 0;
+        return LZMA2_STATE_CONTROL;
     if (LZMA2_IS_UNCOMPRESSED_STATE(*control)) {
         if (*control > 2)
             return LZMA2_STATE_ERROR;
@@ -956,7 +943,7 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
     else {
         S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
         if (len < 5 + hasProp)
-            return 0;
+            return LZMA2_STATE_CONTROL;
         *srcLen = 5 + hasProp;
         *unpackSize = ((U32)(*control & 0x1F) << 16) + ((U32)src[1] << 8) + src[2] + 1;
         *packSize = ((U32)src[3] << 8) + src[4] + 1;
@@ -978,7 +965,7 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
     return LZMA2_STATE_DATA;
 }
 
-size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
+size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
 {
     size_t inSize = *srcLen;
@@ -1010,7 +997,7 @@ size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
 
         if (p->state2 != LZMA2_STATE_DATA && p->state2 != LZMA2_STATE_DATA_CONT)
         {
-            if (p->state2 == 0)
+            if (p->state2 == LZMA2_STATE_CONTROL)
             {
                 return LZMA_STATUS_NEEDS_MORE_INPUT;
             }
@@ -1078,7 +1065,7 @@ size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
                 if (inCur > p->packSize)
                     inCur = (size_t)p->packSize;
 
-                res = LzmaDec_DecodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
+                res = FLzmaDec_DecodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
 
                 src += inCur;
                 *srcLen += inCur;
@@ -1118,7 +1105,7 @@ size_t Lzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
 }
 
 
-size_t Lzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
 {
     size_t outSize = *destLen, inSize = *srcLen;
     *srcLen = *destLen = 0;
@@ -1141,7 +1128,7 @@ size_t Lzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYT
             curFinishMode = finishMode;
         }
 
-        res = Lzma2Dec_DecodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
+        res = FLzma2Dec_DecodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
 
         src += inCur;
         inSize -= inCur;
@@ -1158,7 +1145,7 @@ size_t Lzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BYT
     }
 }
 
-size_t Lzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
+size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
 {
     const BYTE *end = src + srcLen;
     size_t unpackTotal = 0;
@@ -1173,7 +1160,7 @@ size_t Lzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
         if (state == LZMA2_STATE_FINISHED)
             return unpackTotal;
         src += len;
-        if (state == LZMA2_STATE_ERROR || state == 0)
+        if (state == LZMA2_STATE_ERROR || state == LZMA2_STATE_CONTROL)
             break;
         unpackTotal += unpackSize;
 

@@ -43,7 +43,7 @@ size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* cons
 size_t RMF_threadCount(const FL2_matchTable * const tbl);
 size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end);
 int RMF_buildTable(FL2_matchTable* const tbl,
-    unsigned const job,
+	size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block,
     FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);

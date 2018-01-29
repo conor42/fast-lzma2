@@ -606,7 +606,7 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
 
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
 int RMF_buildTable(FL2_matchTable* const tbl,
-    unsigned const job,
+	size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block,
     FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)

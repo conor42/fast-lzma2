@@ -144,7 +144,7 @@ FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads)
     cctx->matchTable = NULL;
 
 #ifndef FL2_SINGLETHREAD
-    cctx->factory = POOL_create(nbThreads - 1, 0);
+    cctx->factory = POOL_create(nbThreads - 1);
     if (nbThreads > 1 && cctx->factory == NULL) {
         FL2_freeCCtx(cctx);
         return NULL;
@@ -190,23 +190,21 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* cctx)
 }
 
 /* FL2_buildRadixTable() : POOL_function type */
-static void FL2_buildRadixTable(void* const jobDescription)
+static void FL2_buildRadixTable(void* const jobDescription, size_t n)
 {
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* const cctx = job->cctx;
 
-    RMF_buildTable(cctx->matchTable, job->num, 1, cctx->curBlock, NULL, NULL, 0, 0);
+    RMF_buildTable(cctx->matchTable, n, 1, cctx->curBlock, NULL, NULL, 0, 0);
 }
 
 /* FL2_compressRadixChunk() : POOL_function type */
-static void FL2_compressRadixChunk(void* const jobDescription)
+static void FL2_compressRadixChunk(void* const jobDescription, size_t n)
 {
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* const cctx = job->cctx;
 
-    unsigned const num = job->num;
-
-    cctx->jobs[num].cSize = FL2_lzma2Encode(cctx->jobs[num].enc, cctx->matchTable, job->block, &cctx->params.cParams, 0, NULL, NULL, 0, 0);
+    cctx->jobs[n].cSize = FL2_lzma2Encode(cctx->jobs[n].enc, cctx->matchTable, job->block, &cctx->params.cParams, 0, NULL, NULL, 0, 0);
 }
 
 static int FL2_initEncoders(FL2_CCtx* const cctx)
@@ -295,7 +293,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 #ifndef FL2_SINGLETHREAD
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
     for (size_t u = 1; u < mfThreads; ++u) {
-        POOL_add(cctx->factory, FL2_buildRadixTable, &cctx->jobs[u]);
+		POOL_add(cctx->factory, FL2_buildRadixTable, &cctx->jobs[u], u);
     }
 #endif
 
@@ -315,7 +313,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 #endif
 
     for (size_t u = 1; u < nbThreads; ++u) {
-        POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u]);
+		POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
     }
 
     cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);

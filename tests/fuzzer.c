@@ -28,11 +28,11 @@
 #include <string.h>       /* strcmp */
 #include <time.h>         /* clock_t */
 #define FL2_STATIC_LINKING_ONLY  /* FL2_compressContinue, FL2_compressBlock */
-#include "fast-lzma2.h"         /* FL2_VERSION_STRING */
-#include "fl2_errors.h"  /* FL2_getErrorCode */
+#include "../fast-lzma2.h"         /* FL2_VERSION_STRING */
+#include "../fl2_errors.h"  /* FL2_getErrorCode */
 #include "datagen.h"      /* RDG_genBuffer */
-#include "mem.h"
-#include "xxhash.h"
+#include "../mem.h"
+#include "../xxhash.h"
 
 /*-************************************
 *  Constants
@@ -287,7 +287,6 @@ static int basicUnitTests(U32 seed, double compressibility)
     void* const decodedBuffer = malloc(CNBuffSize);
     FL2_CStream *const cstream = FL2_createCStream();
     FL2_DStream *const dstream = FL2_createDStream();
-    U32 hash;
     int testResult = 0;
     U32 testNb=0;
     size_t cSize;
@@ -299,7 +298,6 @@ static int basicUnitTests(U32 seed, double compressibility)
         goto _end;
     }
     RDG_genBuffer(CNBuffer, CNBuffSize, compressibility, 0., seed);
-    hash = XXH32(CNBuffer, CNBuffSize, 0);
 
     /* Basic tests */
     DISPLAYLEVEL(4, "test%3i : FL2_getErrorName : ", testNb++);

@@ -11,14 +11,14 @@ objects = ../error_private.o \
 ../range_enc.o \
 ../threading.o \
 ../xxhash.o \
-../tests/datagen.o \
-bench.o
+datagen.o \
+fuzzer.o
 
 CFLAGS := -Wall -O3 -pthread
 CC := gcc
 
-bench : $(objects)
-	$(CC) -pthread -o bench.exe $(objects)
+fuzzer : $(objects)
+	$(CC) -pthread -o fuzzer.exe $(objects)
 
 error_private.o : ../error_private.h
 fl2_common.o : ../fast-lzma2.h ../error_private.h ../fl2_internal.h
@@ -33,4 +33,4 @@ radix_struct.o : ../fast-lzma2.h ../mem.h ../threading.h ../fl2_internal.h ../ra
 range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
 threading.o : ../threading.h
 xxhash.o : ../xxhash.h
-bench.o : ../fast-lzma2.h ../mem.h ../util.h ../tests/datagen.h
+fuzzer.o : ../fast-lzma2.h ../fl2_errors.h ../mem.h ../xxhash.h datagen.h

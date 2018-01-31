@@ -1819,12 +1819,47 @@ static BYTE GetLcLpPbCode(FL2_lzmaEncoderCtx* enc)
 BYTE IsChunkRandom(FL2_matchTable* tbl,
     const FL2_dataBlock block, size_t start, size_t len)
 {
-    return 0;
-}
-
-BYTE IsRandom(FL2_matchTable* tbl)
-{
-    return 0;
+#if 0
+	static const size_t max_dist_table[] = { 0, 0, 1 << 8, 1 << 16, 1 << 24 };
+	size_t end = MIN(start + len, block.end);
+	size_t count = 0;
+	if (tbl->isStruct)
+	{
+		for (size_t index = start; index < end; ) {
+			U32 link = GetMatchLink(tbl->table, index);
+			if (link == RADIX_NULL_LINK) {
+				++index;
+				++count;
+				continue;
+			}
+			size_t length = GetMatchLength(tbl->table, index);
+			if (length > 4)
+				++count;
+			else
+				count += (index - GetMatchLink(tbl->table, index) < max_dist_table[length]) ? 1 : length;
+			index += length;
+		}
+	}
+	else {
+		for (size_t index = start; index < end; ) {
+			U32 link = tbl->table[index];
+			if (link == RADIX_NULL_LINK) {
+				++index;
+				++count;
+				continue;
+			}
+			size_t length = link >> RADIX_LINK_BITS;
+			if (length > 4)
+				++count;
+			else
+				count += (index - (link & RADIX_LINK_MASK) < max_dist_table[length]) ? 1 : length;
+			index += length;
+		}
+	}
+	size_t chunk = end - start;
+    return count > (chunk - chunk / 64U);
+#endif
+	return 0;
 }
 
 #ifdef __GNUC__
@@ -1883,7 +1918,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     {
         unsigned header_size = encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize;
         EncoderStates saved_states;
-        BYTE try_encoding = !next_is_random && !IsRandom(tbl);
+        BYTE try_encoding = !next_is_random;
         size_t next_index;
         size_t compressed_size;
         size_t uncompressed_size;
@@ -1927,7 +1962,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         out_dest[1] = (BYTE)((uncompressed_size - 1) >> 8);
         out_dest[2] = (BYTE)(uncompressed_size - 1);
         /* Output an uncompressed chunk if necessary */
-        if (next_is_random || IsRandom(tbl) || uncompressed_size + 3 <= compressed_size + header_size) {
+        if (next_is_random || uncompressed_size + 3 <= compressed_size + header_size) {
             DEBUGLOG(5, "Storing chunk : was %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
             if (index == 0) {
                 out_dest[0] = kChunkUncompressedDictReset;
@@ -1961,8 +1996,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
                 encode_properties = 0;
             }
         }
-        if (!IsRandom(tbl)
-            && (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size))
+        if (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size)
         {
             if (block.end - index < kChunkSize * 2u) {
                 /* Record that this encoder may have had incompressible data at the end */

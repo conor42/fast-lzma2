@@ -96,7 +96,7 @@ static void RadixInitReference(FL2_matchTable* const tbl, const void* const data
         }
     }
     SetNull(end - 1);
-    tbl->end_index = (U32)st_index + ATOMIC_INITIAL_VALUE;
+    tbl->end_index = (U32)st_index;
     tbl->st_index = ATOMIC_INITIAL_VALUE;
     (void)start;
 }
@@ -201,7 +201,7 @@ RMF_structuredInit
     /* Never a match at the last byte */
     SetNull(end - 1);
 
-    tbl->end_index = (U32)st_index + ATOMIC_INITIAL_VALUE;
+    tbl->end_index = (U32)st_index;
     tbl->st_index = ATOMIC_INITIAL_VALUE;
 
     return rpt_total;
@@ -894,7 +894,7 @@ static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi
 {
     if (tbl->st_index < tbl->end_index) {
         long index = multi_thread ? FL2_atomic_increment(tbl->st_index) : FL2_nonAtomic_increment(tbl->st_index);
-        if (index <= tbl->end_index) {
+        if (index < tbl->end_index) {
             return index;
         }
     }

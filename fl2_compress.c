@@ -29,12 +29,12 @@
 #define FL2_MAX_7Z_CLEVEL   9
 #define FL2_MAX_HIGH_CLEVEL 9
 
-FL2LIB_API int FL2_maxCLevel(void)
+FL2LIB_API int FL2LIB_CALL FL2_maxCLevel(void)
 { 
     return FL2_MAX_CLEVEL;
 }
 
-FL2LIB_API int FL2_maxHighCLevel(void)
+FL2LIB_API int FL2LIB_CALL FL2_maxHighCLevel(void)
 {
     return FL2_MAX_HIGH_CLEVEL;
 }
@@ -100,12 +100,12 @@ void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* c
     rParams->depth = params->searchDepth;
 }
 
-FL2LIB_API FL2_CCtx* FL2_createCCtx(void)
+FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void)
 {
     return FL2_createCCtxMt(1);
 }
 
-FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads)
+FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
 {
     FL2_CCtx* cctx;
 
@@ -165,7 +165,7 @@ FL2LIB_API FL2_CCtx* FL2_createCCtxMt(unsigned nbThreads)
     return cctx;
 }
 
-FL2LIB_API void FL2_freeCCtx(FL2_CCtx* cctx)
+FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx)
 {
     if (cctx == NULL) 
         return;
@@ -400,7 +400,7 @@ static BYTE FL2_getProp(FL2_CCtx* cctx, size_t dictionary_size)
     return FL2_getDictSizeProp(dictionary_size) | (BYTE)((cctx->params.doXXH != 0) << FL2_PROP_HASH_BIT);
 }
 
-FL2LIB_API size_t FL2_compressCCtx(FL2_CCtx* cctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel)
@@ -473,7 +473,7 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_bloc
     }
 }
 
-FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* cctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* cctx,
     void* dst, size_t dstCapacity,
     const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque)
@@ -481,7 +481,7 @@ FL2LIB_API size_t FL2_compressCCtxBlock(FL2_CCtx* cctx,
     return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, NULL, opaque, progress);
 }
 
-FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity)
 {
     if (!dstCapacity)
@@ -490,7 +490,7 @@ FL2LIB_API size_t FL2_endFrame(FL2_CCtx* ctx,
     return 1;
 }
 
-FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
     FL2_writerFn writeFn, void* opaque,
     const FL2_blockBuffer *block,
     FL2_progressFn progress)
@@ -498,7 +498,7 @@ FL2LIB_API size_t FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
     return FL2_compressBlock(cctx, block->data, block->start, block->end, NULL, 0, writeFn, opaque, progress);
 }
 
-FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_CCtx* ctx,
     FL2_writerFn writeFn, void* opaque)
 {
     BYTE c = LZMA2_END_MARKER;
@@ -507,7 +507,7 @@ FL2LIB_API size_t FL2_endFrame_toFn(FL2_CCtx* ctx,
     return 1;
 }
 
-FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_compressMt(void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel,
     unsigned nbThreads)
@@ -523,14 +523,14 @@ FL2LIB_API size_t FL2_compressMt(void* dst, size_t dstCapacity,
     return cSize;
 }
 
-FL2LIB_API size_t FL2_compress(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_compress(void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel)
 {
     return FL2_compressMt(dst, dstCapacity, src, srcSize, compressionLevel, 1);
 }
 
-FL2LIB_API BYTE FL2_dictSizeProp(FL2_CCtx* cctx)
+FL2LIB_API BYTE FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* cctx)
 {
     return FL2_getDictSizeProp(cctx->dictMax ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log);
 }
@@ -540,7 +540,7 @@ FL2LIB_API BYTE FL2_dictSizeProp(FL2_CCtx* cctx)
         return FL2_ERROR(parameter_outOfBound);  \
 }   }
 
-FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value)
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value)
 {
     switch (param)
     {
@@ -677,7 +677,7 @@ FL2LIB_API size_t FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, un
     }
 }
 
-FL2LIB_API FL2_CStream* FL2_createCStream(void)
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
 {
     FL2_CCtx* const cctx = FL2_createCCtx();
     FL2_CStream* const fcs = malloc(sizeof(FL2_CStream));
@@ -704,7 +704,7 @@ FL2LIB_API FL2_CStream* FL2_createCStream(void)
     return fcs;
 }
 
-FL2LIB_API size_t FL2_freeCStream(FL2_CStream* fcs)
+FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs)
 {
     if (fcs == NULL)
         return 0;
@@ -718,7 +718,7 @@ FL2LIB_API size_t FL2_freeCStream(FL2_CStream* fcs)
     return 0;
 }
 
-FL2LIB_API size_t FL2_initCStream(FL2_CStream* fcs, int compressionLevel)
+FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel)
 {
     DEBUGLOG(4, "FL2_initCStream level %d", compressionLevel);
 
@@ -818,7 +818,7 @@ static size_t FL2_remainingOutputSize(FL2_CStream* const fcs)
     return total;
 }
 
-FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input)
+FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input)
 {
     FL2_blockBuffer* const inBuff = &fcs->inBuff;
     FL2_CCtx* const cctx = fcs->cctx;
@@ -862,7 +862,7 @@ FL2LIB_API size_t FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL
     return (inBuff->data == NULL) ? (size_t)1 << cctx->params.rParams.dictionary_log : inBuff->bufSize - inBuff->end;
 }
 
-FL2LIB_API size_t FL2_flushStream_internal(FL2_CStream* fcs, FL2_outBuffer* output, int ending)
+static size_t FL2_flushStream_internal(FL2_CStream* fcs, FL2_outBuffer* output, int ending)
 {
     if (FL2_isError(fcs->thread_count))
         return fcs->thread_count;
@@ -876,12 +876,12 @@ FL2LIB_API size_t FL2_flushStream_internal(FL2_CStream* fcs, FL2_outBuffer* outp
     return FL2_remainingOutputSize(fcs);
 }
 
-FL2LIB_API size_t FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output)
+FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output)
 {
     return FL2_flushStream_internal(fcs, output, 0);
 }
 
-FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output)
+FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output)
 {
     {   size_t cSize = FL2_flushStream_internal(fcs, output, 1);
         if (cSize != 0)
@@ -914,7 +914,7 @@ FL2LIB_API size_t FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output)
     return 0;
 }
 
-FL2LIB_API size_t FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value)
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value)
 {
     if (fcs->inBuff.start < fcs->inBuff.end)
         return FL2_ERROR(stage_wrong);

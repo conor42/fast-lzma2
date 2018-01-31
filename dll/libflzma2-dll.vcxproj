@@ -102,6 +102,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <OmitFramePointers>true</OmitFramePointers>
       <WholeProgramOptimization>true</WholeProgramOptimization>
+      <CallingConvention>FastCall</CallingConvention>
     </ClCompile>
     <Link>
       <TargetMachine>MachineX86</TargetMachine>

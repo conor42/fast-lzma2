@@ -24,12 +24,12 @@
 /*-****************************************
 *  Version
 ******************************************/
-unsigned FL2_versionNumber(void) { return FL2_VERSION_NUMBER; }
+FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void) { return FL2_VERSION_NUMBER; }
 
-const char* FL2_versionString(void) { return FL2_VERSION_STRING; }
+FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void) { return FL2_VERSION_STRING; }
 
 
-FL2LIB_API size_t FL2_compressBound(size_t srcSize)
+FL2LIB_API size_t FL2LIB_CALL FL2_compressBound(size_t srcSize)
 {
     return FL2_COMPRESSBOUND(srcSize);
 }
@@ -39,19 +39,19 @@ FL2LIB_API size_t FL2_compressBound(size_t srcSize)
 ******************************************/
 /*! FL2_isError() :
  *  tells if a return value is an error code */
-unsigned FL2_isError(size_t code) { return ERR_isError(code); }
+FL2LIB_API unsigned FL2LIB_CALL FL2_isError(size_t code) { return ERR_isError(code); }
 
 /*! FL2_getErrorName() :
  *  provides error code string from function result (useful for debugging) */
-const char* FL2_getErrorName(size_t code) { return ERR_getErrorName(code); }
+FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code) { return ERR_getErrorName(code); }
 
 /*! FL2_getError() :
  *  convert a `size_t` function result into a proper FL2_errorCode enum */
-FL2_ErrorCode FL2_getErrorCode(size_t code) { return ERR_getErrorCode(code); }
+FL2LIB_API FL2_ErrorCode FL2LIB_CALL FL2_getErrorCode(size_t code) { return ERR_getErrorCode(code); }
 
 /*! FL2_getErrorString() :
  *  provides error code string from enum */
-const char* FL2_getErrorString(FL2_ErrorCode code) { return ERR_getErrorString(code); }
+FL2LIB_API const char* FL2LIB_CALL FL2_getErrorString(FL2_ErrorCode code) { return ERR_getErrorString(code); }
 
 /*! g_debuglog_enable :
  *  turn on/off debug traces (global switch) */

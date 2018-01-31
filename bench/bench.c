@@ -209,7 +209,7 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
     return end_level;
 }
 
-int main(int argc, char** argv)
+int __cdecl main(int argc, char** argv)
 {
     if (argc < 2)
         return 1;

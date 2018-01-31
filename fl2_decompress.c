@@ -17,12 +17,12 @@
 #include "lzma2_dec.h"
 #include "xxhash.h"
 
-FL2LIB_API size_t FL2_findDecompressedSize(const void *src, size_t srcSize)
+FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize)
 {
     return FLzma2Dec_UnpackSize(src, srcSize);
 }
 
-FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
+FL2LIB_API size_t FL2LIB_CALL FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize)
 {
     size_t dSize;
@@ -36,7 +36,7 @@ FL2LIB_API size_t FL2_decompress(void* dst, size_t dstCapacity,
     return dSize;
 }
 
-FL2LIB_API FL2_DCtx* FL2_createDCtx(void)
+FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void)
 {
     DEBUGLOG(3, "FL2_createDCtx");
     FL2_DCtx* const dctx = malloc(sizeof(FL2_DCtx));
@@ -46,7 +46,7 @@ FL2LIB_API FL2_DCtx* FL2_createDCtx(void)
     return dctx;
 }
 
-FL2LIB_API size_t FL2_freeDCtx(FL2_DCtx* dctx)
+FL2LIB_API size_t FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx)
 {
     if (dctx != NULL) {
         DEBUGLOG(3, "FL2_freeDCtx");
@@ -56,7 +56,7 @@ FL2LIB_API size_t FL2_freeDCtx(FL2_DCtx* dctx)
     return 0;
 }
 
-FL2LIB_API size_t FL2_decompressDCtx(FL2_DCtx* dctx,
+FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize)
 {
@@ -120,7 +120,7 @@ struct FL2_DStream_s
     BYTE do_hash;
 };
 
-FL2LIB_API FL2_DStream* FL2_createDStream(void)
+FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)
 {
     FL2_DStream* const fds = malloc(sizeof(FL2_DStream));
     DEBUGLOG(3, "FL2_createDStream");
@@ -133,7 +133,7 @@ FL2LIB_API FL2_DStream* FL2_createDStream(void)
     return fds;
 }
 
-FL2LIB_API size_t FL2_freeDStream(FL2_DStream* fds)
+FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
 {
     if (fds != NULL) {
         DEBUGLOG(3, "FL2_freeDStream");
@@ -145,14 +145,14 @@ FL2LIB_API size_t FL2_freeDStream(FL2_DStream* fds)
 }
 
 /*===== Streaming decompression functions =====*/
-FL2LIB_API size_t FL2_initDStream(FL2_DStream* fds)
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
     return 0;
 }
 
-FL2LIB_API size_t FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
+FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
     if (input->pos < input->size) {
         if (fds->stage == FL2DEC_STAGE_INIT) {

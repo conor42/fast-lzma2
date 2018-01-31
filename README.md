@@ -1,5 +1,9 @@
  The __Fast LZMA2 Library__ is a lossless high-ratio data compression library based on the LZMA2 codec in 7-zip.
 
+Binaries of a 7-Zip fork using the algorithm are available in the [7-Zip-FL2 project].
+
+[7-Zip-FL2 project]: https://github.com/conor42/7-Zip-FL2/releases/
+
 The library uses a parallel buffered radix matchfinder and some optimizations from Zstandard to achieve a 20% to 100%
 speed gain over 7-zip at the higher levels, depending on the source data. It also uses some threading, portability, and testing code
 from Zstandard.
@@ -13,8 +17,9 @@ dictionary size, which raises the decompression memory usage. However a reduced 
 A high-compression option is provided to select parameters which achieve higher compression on smaller dictionaries. The speed/ratio
 tradeoff is less optimal with this enabled, but it is still normally faster than BT4.
 
-Tested vs 7-zip LZMA2 on the [Silesia compression corpus] using two threads. The design goal for the encoder and compression level
-parameters was to move the line as far as possible toward the top left of the graph. This provides an optimal speed/ratio tradeoff.
+Tested in memory vs the 7-zip LZMA2 encoder on the [Silesia compression corpus] using two threads. The design goal for the encoder and
+compression level parameters was to move the line as far as possible toward the top left of the graph. This provides an optimal
+speed/ratio tradeoff.
 
 [Silesia compression corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 

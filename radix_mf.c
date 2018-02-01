@@ -611,7 +611,7 @@ int RMF_buildTable(FL2_matchTable* const tbl,
     FL2_dataBlock const block,
     FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)
 {
-    DEBUGLOG(5, "RMF_buildTable : thread %u", job);
+    DEBUGLOG(5, "RMF_buildTable : thread %u", (U32)job);
     if (tbl->isStruct) {
         return RMF_structuredBuildTable(tbl, job, multi_thread, block, progress, opaque, weight, init_done);
     }

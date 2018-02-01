@@ -204,7 +204,7 @@ static void FL2_compressRadixChunk(void* const jobDescription, size_t n)
     const FL2_job* const job = (FL2_job*)jobDescription;
     FL2_CCtx* const cctx = job->cctx;
 
-    cctx->jobs[n].cSize = FL2_lzma2Encode(cctx->jobs[n].enc, cctx->matchTable, job->block, &cctx->params.cParams, 0, NULL, NULL, 0, 0);
+    cctx->jobs[n].cSize = FL2_lzma2Encode(cctx->jobs[n].enc, cctx->matchTable, job->block, &cctx->params.cParams, NULL, NULL, 0, 0);
 }
 
 static int FL2_initEncoders(FL2_CCtx* const cctx)
@@ -316,7 +316,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 		POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
     }
 
-    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);
     POOL_waitAll(cctx->factory);
 
 #else /* FL2_SINGLETHREAD */
@@ -329,7 +329,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     if (err)
         return FL2_ERROR(internal);
 #endif
-    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, 0, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight);
 
 #endif
 

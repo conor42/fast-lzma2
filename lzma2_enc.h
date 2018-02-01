@@ -51,7 +51,6 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     const FL2_lzma2Parameters* options,
-    BYTE do_random_check,
     FL2_progressFn progress, void* opaque, size_t base, U32 weight);
 
 BYTE FL2_getDictSizeProp(size_t dictionary_size);

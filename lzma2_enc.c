@@ -4,6 +4,9 @@ Modified for FL2 by Conor McCarthy
 Public domain
 */
 
+#include <stdlib.h>
+#include <math.h>
+
 #include "fl2_internal.h"
 #include "mem.h"
 #include "lzma2_enc.h"
@@ -11,8 +14,6 @@ Public domain
 #include "radix_mf.h"
 #include "range_enc.h"
 #include "count.h"
-
-#include <stdlib.h>
 
 #define kNumReps 4U
 #define kNumStates 12U
@@ -74,11 +75,14 @@ Public domain
 #define kChunkStateReset (1U << kChunkResetShift)
 #define kChunkStatePropertiesReset (2U << kChunkResetShift)
 #define kChunkAllReset (3U << kChunkResetShift)
-#define kRandomFilterMarginBits 7U
+#define kRandomFilterMarginBits 8U
 
 #define kMaxHashDictBits 14U
 #define kHash3Bits 14U
 #define kNullLink -1
+
+#define kMaybeRandomWordCount 0xF800U
+#define kMinTestChunkSize 0x4000
 
 static const BYTE kLiteralNextStates[kNumStates] = { 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 4, 5 };
 #define LiteralNextState(s) kLiteralNextStates[s]
@@ -176,8 +180,6 @@ struct FL2_lzmaEncoderCtx_s
     unsigned dist_slot_prices[kNumLenToPosStates][kDistTableSizeMax];
     unsigned distance_prices[kNumLenToPosStates][kNumFullDistances];
 
-    BYTE needed_random_test;
-
     Match matches[kMatchLenMax-kMatchLenMin];
     size_t match_count;
 
@@ -217,7 +219,6 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create()
     enc->match_price_count = kDistanceRepriceFrequency;
     enc->align_price_count = kAlignRepriceFrequency;
     enc->dist_price_table_size = kDistTableSizeMax;
-    enc->needed_random_test = 0;
     enc->hash_buf = NULL;
     enc->hash_dict_3 = 0;
     enc->chain_mask_3 = 0;
@@ -1817,48 +1818,85 @@ static BYTE GetLcLpPbCode(FL2_lzmaEncoderCtx* enc)
 }
 
 BYTE IsChunkRandom(FL2_matchTable* tbl,
-    const FL2_dataBlock block, size_t start, size_t len)
+    const FL2_dataBlock block, size_t start, size_t len,
+	unsigned strategy)
 {
-#if 0
-	static const size_t max_dist_table[] = { 0, 0, 1 << 8, 1 << 16, 1 << 24 };
-	size_t end = MIN(start + len, block.end);
-	size_t count = 0;
-	if (tbl->isStruct)
-	{
-		for (size_t index = start; index < end; ) {
-			U32 link = GetMatchLink(tbl->table, index);
-			if (link == RADIX_NULL_LINK) {
-				++index;
-				++count;
-				continue;
+	if (RMF_wordCount(tbl) >= kMaybeRandomWordCount && len >= kMinTestChunkSize) {
+		static const size_t max_dist_table[][5] = {
+			{ 0, 0, 0, 1U << 6, 1U << 14 }, /* fast */
+			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 }, /* opt */
+			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 } }; /* ultra */
+		static const size_t margin_divisor[3] = { 60U, 45U, 120U };
+		static const double dev_table[3] = { 6.0, 6.0, 5.0 };
+		size_t end = MIN(start + len, block.end);
+		size_t chunk_size = end - start;
+		size_t count = 0;
+		size_t margin = chunk_size / margin_divisor[strategy];
+		size_t terminator = start + margin;
+		S32 char_count[256];
+		memset(char_count, 0, sizeof(char_count));
+		if (tbl->isStruct)
+		{
+			size_t prev_dist = 0;
+			for (size_t index = start; index < end && count + terminator > index; ) {
+				size_t next = index;
+				U32 link = GetMatchLink(tbl->table, index);
+				if (link == RADIX_NULL_LINK) {
+					++next;
+					++count;
+					prev_dist = 0;
+				}
+				else {
+					size_t length = GetMatchLength(tbl->table, index);
+					size_t dist = index - GetMatchLink(tbl->table, index);
+					if (length > 4)
+						count += dist != prev_dist;
+					else
+						count += (dist < max_dist_table[strategy][length]) ? 1 : length;
+					next += length;
+					prev_dist = dist;
+				}
+				for (; index < next; ++index)
+					++char_count[block.data[index]];
 			}
-			size_t length = GetMatchLength(tbl->table, index);
-			if (length > 4)
-				++count;
-			else
-				count += (index - GetMatchLink(tbl->table, index) < max_dist_table[length]) ? 1 : length;
-			index += length;
 		}
-	}
-	else {
-		for (size_t index = start; index < end; ) {
-			U32 link = tbl->table[index];
-			if (link == RADIX_NULL_LINK) {
-				++index;
-				++count;
-				continue;
+		else {
+			size_t prev_dist = 0;
+			for (size_t index = start; index < end && count + terminator > index; ) {
+				size_t next = index;
+				U32 link = tbl->table[index];
+				if (link == RADIX_NULL_LINK) {
+					++next;
+					++count;
+					prev_dist = 0;
+				}
+				else {
+					size_t length = link >> RADIX_LINK_BITS;
+					size_t dist = index - (link & RADIX_LINK_MASK);
+					if (length > 4)
+						count += dist != prev_dist;
+					else
+						count += (dist < max_dist_table[strategy][length]) ? 1 : length;
+					next += length;
+					prev_dist = dist;
+				}
+				for (; index < next; ++index)
+					++char_count[block.data[index]];
 			}
-			size_t length = link >> RADIX_LINK_BITS;
-			if (length > 4)
-				++count;
-			else
-				count += (index - (link & RADIX_LINK_MASK) < max_dist_table[length]) ? 1 : length;
-			index += length;
 		}
+		if (count < chunk_size - margin)
+			return 0;
+		float char_total = 0.0f;
+		/* Expected normal character count */
+		float avg = (float)chunk_size / 256.0f;
+		/* Sum the deviations */
+		for (size_t i = 0; i < 256; ++i) {
+			float delta = (float)char_count[i] - avg;
+			char_total += delta * delta;
+		}
+		double deviation = sqrt(char_total) / sqrt((double)chunk_size);
+		return deviation <= dev_table[strategy];
 	}
-	size_t chunk = end - start;
-    return count > (chunk - chunk / 64U);
-#endif
 	return 0;
 }
 
@@ -1872,12 +1910,13 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     const FL2_lzma2Parameters* options,
-    BYTE do_random_check,
     FL2_progressFn progress, void* opaque, size_t base, U32 weight)
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
-    BYTE encode_properties = 1;
+	/* Each encoder writes a properties byte because the upstream encoder(s) could */
+	/* write only uncompressed chunks with no properties. */
+	BYTE encode_properties = 1;
     BYTE next_is_random = 0;
 
     if (block.end <= block.start) {
@@ -1905,26 +1944,18 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         }
         enc->hash_prev_index = (start >= (size_t)enc->hash_dict_3) ? start - enc->hash_dict_3 : -1;
     }
-    /* Each encoder writes a properties byte because the upstream encoder(s) could */
-    /* write only uncompressed chunks with no properties. */
-    enc->needed_random_test = 0;
-    if (do_random_check) {
-        /* Check if the next chunk is compressible */
-        next_is_random = IsChunkRandom(tbl, block, start, kChunkSize);
-    }
     enc->len_end_max = kOptimizerBufferSize - 1;
     RMF_limitLengths(tbl, block.end);
     for (size_t index = start; index < block.end;)
     {
         unsigned header_size = encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize;
         EncoderStates saved_states;
-        BYTE try_encoding = !next_is_random;
         size_t next_index;
         size_t compressed_size;
         size_t uncompressed_size;
         RangeEncReset(&enc->rc);
         SetOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
-        if (try_encoding) {
+        if (!next_is_random) {
             saved_states = enc->states;
             if (index == 0) {
                 EncodeLiteral(enc, 0, block.data[0], 0);
@@ -1973,7 +2004,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
             memcpy(out_dest + 3, block.data + index, uncompressed_size);
             compressed_size = uncompressed_size;
             header_size = 3;
-            if (try_encoding) {
+            if (!next_is_random) {
                 enc->states = saved_states;
             }
         }
@@ -1998,12 +2029,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         }
         if (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size)
         {
-            if (block.end - index < kChunkSize * 2u) {
-                /* Record that this encoder may have had incompressible data at the end */
-                enc->needed_random_test |= 1;
-            }
             /* Test the next chunk for compressibility */
-            next_is_random = IsChunkRandom(tbl, block, next_index, kChunkSize);
+            next_is_random = IsChunkRandom(tbl, block, next_index, kChunkSize, enc->strategy);
         }
         if (index == start) {
             /* After the first chunk we can write data to the match table because the */

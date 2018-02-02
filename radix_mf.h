@@ -49,7 +49,6 @@ int RMF_buildTable(FL2_matchTable* const tbl,
     FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
-U32 RMF_wordCount(FL2_matchTable* const tbl);
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);
 size_t RMF_memoryUsage(unsigned const dict_log, unsigned const buffer_log, unsigned const depth, unsigned thread_count);
 

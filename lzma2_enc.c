@@ -75,14 +75,13 @@ Public domain
 #define kChunkStateReset (1U << kChunkResetShift)
 #define kChunkStatePropertiesReset (2U << kChunkResetShift)
 #define kChunkAllReset (3U << kChunkResetShift)
-#define kRandomFilterMarginBits 8U
 
 #define kMaxHashDictBits 14U
 #define kHash3Bits 14U
 #define kNullLink -1
 
-#define kMaybeRandomWordCount 0xF800U
-#define kMinTestChunkSize 0x4000
+#define kMinTestChunkSize 0x4000U
+#define kRandomFilterMarginBits 8U
 
 static const BYTE kLiteralNextStates[kNumStates] = { 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 4, 5 };
 #define LiteralNextState(s) kLiteralNextStates[s]
@@ -1817,32 +1816,30 @@ static BYTE GetLcLpPbCode(FL2_lzmaEncoderCtx* enc)
     return (BYTE)((enc->pb * 5 + enc->lp) * 9 + enc->lc);
 }
 
-BYTE IsChunkRandom(FL2_matchTable* tbl,
-    const FL2_dataBlock block, size_t start, size_t len,
-	unsigned strategy)
+BYTE IsChunkRandom(const FL2_matchTable* const tbl,
+    const FL2_dataBlock block, size_t const start,
+	unsigned const strategy)
 {
-	if (RMF_wordCount(tbl) >= kMaybeRandomWordCount && len >= kMinTestChunkSize) {
+	if (block.end - start >= kMinTestChunkSize) {
 		static const size_t max_dist_table[][5] = {
 			{ 0, 0, 0, 1U << 6, 1U << 14 }, /* fast */
 			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 }, /* opt */
 			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 } }; /* ultra */
 		static const size_t margin_divisor[3] = { 60U, 45U, 120U };
 		static const double dev_table[3] = { 6.0, 6.0, 5.0 };
-		size_t end = MIN(start + len, block.end);
-		size_t chunk_size = end - start;
+
+		size_t const end = MIN(start + kChunkSize, block.end);
+		size_t const chunk_size = end - start;
 		size_t count = 0;
-		size_t margin = chunk_size / margin_divisor[strategy];
-		size_t terminator = start + margin;
-		S32 char_count[256];
-		memset(char_count, 0, sizeof(char_count));
-		if (tbl->isStruct)
-		{
+		size_t const margin = chunk_size / margin_divisor[strategy];
+		size_t const terminator = start + margin;
+
+		if (tbl->isStruct) {
 			size_t prev_dist = 0;
-			for (size_t index = start; index < end && count + terminator > index; ) {
-				size_t next = index;
-				U32 link = GetMatchLink(tbl->table, index);
+			for (size_t index = start; index < end; ) {
+				U32 const link = GetMatchLink(tbl->table, index);
 				if (link == RADIX_NULL_LINK) {
-					++next;
+					++index;
 					++count;
 					prev_dist = 0;
 				}
@@ -1853,20 +1850,19 @@ BYTE IsChunkRandom(FL2_matchTable* tbl,
 						count += dist != prev_dist;
 					else
 						count += (dist < max_dist_table[strategy][length]) ? 1 : length;
-					next += length;
+					index += length;
 					prev_dist = dist;
 				}
-				for (; index < next; ++index)
-					++char_count[block.data[index]];
+				if (count + terminator <= index)
+					return 0;
 			}
 		}
 		else {
 			size_t prev_dist = 0;
-			for (size_t index = start; index < end && count + terminator > index; ) {
-				size_t next = index;
-				U32 link = tbl->table[index];
+			for (size_t index = start; index < end; ) {
+				U32 const link = tbl->table[index];
 				if (link == RADIX_NULL_LINK) {
-					++next;
+					++index;
 					++count;
 					prev_dist = 0;
 				}
@@ -1877,25 +1873,29 @@ BYTE IsChunkRandom(FL2_matchTable* tbl,
 						count += dist != prev_dist;
 					else
 						count += (dist < max_dist_table[strategy][length]) ? 1 : length;
-					next += length;
+					index += length;
 					prev_dist = dist;
 				}
-				for (; index < next; ++index)
-					++char_count[block.data[index]];
+				if (count + terminator <= index)
+					return 0;
 			}
 		}
-		if (count < chunk_size - margin)
-			return 0;
-		float char_total = 0.0f;
-		/* Expected normal character count */
-		float avg = (float)chunk_size / 256.0f;
-		/* Sum the deviations */
-		for (size_t i = 0; i < 256; ++i) {
-			float delta = (float)char_count[i] - avg;
-			char_total += delta * delta;
+
+		{	U32 char_count[256];
+			double char_total = 0.0;
+			/* Expected normal character count */
+			double const avg = (double)chunk_size / 256.0;
+
+			memset(char_count, 0, sizeof(char_count));
+			for (size_t index = start; index < end; ++index)
+				++char_count[block.data[index]];
+			/* Sum the deviations */
+			for (size_t i = 0; i < 256; ++i) {
+				double delta = (double)char_count[i] - avg;
+				char_total += delta * delta;
+			}
+			return sqrt(char_total) / sqrt((double)chunk_size) <= dev_table[strategy];
 		}
-		double deviation = sqrt(char_total) / sqrt((double)chunk_size);
-		return deviation <= dev_table[strategy];
 	}
 	return 0;
 }
@@ -2030,7 +2030,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         if (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size)
         {
             /* Test the next chunk for compressibility */
-            next_is_random = IsChunkRandom(tbl, block, next_index, kChunkSize, enc->strategy);
+            next_is_random = IsChunkRandom(tbl, block, next_index, enc->strategy);
         }
         if (index == start) {
             /* After the first chunk we can write data to the match table because the */

@@ -942,7 +942,7 @@ RMF_structuredBuildTable
             }
             if (total >= update) {
                 if (progress((size_t)((total * enc_size / block.end * weight) >> 4), opaque)) {
-                    tbl->st_index = tbl->end_index;
+					FL2_atomic_add(tbl->st_index, RADIX16_TABLE_SIZE);
                     return 1;
                 }
                 update = total + UPDATE_INTERVAL;

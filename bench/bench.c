@@ -221,7 +221,7 @@ int __cdecl main(int argc, char** argv)
             return 1;
         fseek(f, 0, 2);
         size = ftell(f);
-        if (size > 1UL << 30) size = 1UL << 30;
+        if (size > 3UL << 29) size = 3UL << 29;
         fseek(f, 0, 0);
         src = malloc(size);
         size = fread(src, 1, size, f);

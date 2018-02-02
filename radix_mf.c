@@ -655,11 +655,6 @@ void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index)
     }
 }
 
-U32 RMF_wordCount(FL2_matchTable * const tbl)
-{
-	return tbl->end_index;
-}
-
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 {
     if (tbl->isStruct) {

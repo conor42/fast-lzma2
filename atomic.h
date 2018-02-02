@@ -36,9 +36,10 @@ extern "C" {
 #include <windows.h>
 
 
-typedef LONG FL2_atomic;
+typedef LONG volatile FL2_atomic;
 #define ATOMIC_INITIAL_VALUE -1
 #define FL2_atomic_increment(n) InterlockedIncrement(&n)
+#define FL2_atomic_add(n, a) InterlockedAdd(&n, a)
 #define FL2_nonAtomic_increment(n) (++n)
 
 #elif !defined(FL2_SINGLETHREAD) && defined(__GNUC__)
@@ -46,6 +47,7 @@ typedef LONG FL2_atomic;
 typedef long FL2_atomic;
 #define ATOMIC_INITIAL_VALUE 0
 #define FL2_atomic_increment(n) __sync_fetch_and_add(&n, 1)
+#define FL2_atomic_add(n, a) __sync_fetch_and_add(&n, a)
 #define FL2_nonAtomic_increment(n) (n++)
 
 #elif !defined(FL2_SINGLETHREAD) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__) /* C11 */
@@ -55,6 +57,7 @@ typedef long FL2_atomic;
 typedef _Atomic long FL2_atomic;
 #define ATOMIC_INITIAL_VALUE 0
 #define FL2_atomic_increment(n) atomic_fetch_add(&n, 1)
+#define FL2_atomic_add(n, a) atomic_fetch_add(&n, a)
 #define FL2_nonAtomic_increment(n) (n++)
 
 #else  /* No atomics */
@@ -62,6 +65,7 @@ typedef _Atomic long FL2_atomic;
 typedef long FL2_atomic;
 #define ATOMIC_INITIAL_VALUE 0
 #define FL2_atomic_increment(n) (n++)
+#define FL2_atomic_add(n, a) (n += (a))
 #define FL2_nonAtomic_increment(n) (n++)
 
 #endif /* FL2_SINGLETHREAD */

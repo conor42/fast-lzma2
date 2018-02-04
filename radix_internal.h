@@ -48,10 +48,15 @@ typedef struct
     U32 count;
 } RMF_tableHead;
 
+union src_data_u {
+	BYTE chars[4];
+	U32 u32;
+};
+
 typedef struct
 {
     U32 from;
-    BYTE chars[4];
+	union src_data_u src;
     U32 next;
 } RMF_buildMatch;
 

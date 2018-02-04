@@ -241,7 +241,7 @@ static void RecurseListsBuffered(RMF_builder* const tbl,
             /* Pre-load next link */
             size_t const next_link = GetMatchLink(link);
             /* Get 4 data characters for later. This doesn't block on a cache miss. */
-            *(U32*)tbl->match_buffer[count].chars = MEM_read32(data_src + link);
+            tbl->match_buffer[count].src.u32 = MEM_read32(data_src + link);
             /* Record the actual location of this suffix */
             tbl->match_buffer[count].from = (U32)link;
             /* Initialize the next link */
@@ -274,7 +274,7 @@ static void RecurseListsBuffered(RMF_builder* const tbl,
             size_t dest = 0;
             for (size_t src = list_count - overlap; src < list_count; ++src) {
                 tbl->match_buffer[dest].from = tbl->match_buffer[src].from;
-                *(U32*)tbl->match_buffer[dest].chars = MEM_read32(data_src + tbl->match_buffer[src].from);
+                tbl->match_buffer[dest].src.u32 = MEM_read32(data_src + tbl->match_buffer[src].from);
                 tbl->match_buffer[dest].next = (U32)(dest + 1) | ((U32)depth << 24);
                 ++dest;
             }

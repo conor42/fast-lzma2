@@ -37,7 +37,9 @@ extern "C" {
 
 /* ======   Calling convention   ======*/
 
-#if defined(__GNUC__)
+#if !defined _WIN32 || defined __x86_64__s || defined _M_X64 || (defined __SIZEOF_POINTER__ && __SIZEOF_POINTER__ == 8)
+#  define FL2LIB_CALL
+#elif defined(__GNUC__)
 #  define FL2LIB_CALL __attribute__((cdecl))
 #elif defined(_MSC_VER)
 #  define FL2LIB_CALL __cdecl

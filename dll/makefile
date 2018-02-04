@@ -16,7 +16,7 @@ CFLAGS := -Wall -O3 -DFL2_DLL_EXPORT=1 -pthread
 CC := gcc
 
 libflzma2-x64 : $(objects)
-	$(CC) -shared -pthread -o libflzma2-x64.dll $(objects)
+	$(CC) -shared -pthread -o libflzma2-x64.dll $(objects) -lm
 
 error_private.o : ..\error_private.h
 fl2_common.o : ..\fast-lzma2.h ..\error_private.h ..\fl2_internal.h

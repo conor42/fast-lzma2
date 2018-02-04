@@ -18,7 +18,7 @@ CFLAGS := -Wall -O3 -pthread
 CC := gcc
 
 bench : $(objects)
-	$(CC) -pthread -o bench.exe $(objects)
+	$(CC) -pthread -o bench.exe $(objects) -lm
 
 error_private.o : ../error_private.h
 fl2_common.o : ../fast-lzma2.h ../error_private.h ../fl2_internal.h

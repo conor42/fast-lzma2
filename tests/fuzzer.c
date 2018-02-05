@@ -997,7 +997,7 @@ int main(int argc, const char** argv)
     }   }   }   }   /* for (argNb=1; argNb<argc; argNb++) */
 
     /* Get Seed */
-    DISPLAY("Starting zstd tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), FL2_VERSION_STRING);
+    DISPLAY("Starting fast-lzma2 tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), FL2_VERSION_STRING);
 
     if (!seedset) {
         time_t const t = time(NULL);

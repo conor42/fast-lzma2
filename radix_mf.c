@@ -421,12 +421,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 size_t const radix_8 = tbl->match_buffer[index].src.chars[3];
                 size_t const next_index = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
                 /* Pre-load the next link and data bytes to avoid waiting for RAM access */
-                if (depth < max_depth - 2) {
-                    tbl->match_buffer[index].src.u32 = MEM_read32(data_src + link);
-                }
-                else {
-                    tbl->match_buffer[index].src.u32 = MEM_read16(data_src + link);
-                }
+                tbl->match_buffer[index].src.u32 = MEM_read32(data_src + link);
                 size_t const next_link = tbl->match_buffer[next_index].from;
                 U32 const prev = tbl->tails_8[radix_8].prev_index;
                 if (prev!=RADIX_NULL_LINK) {

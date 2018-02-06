@@ -37,6 +37,12 @@ contributed a CMake file. If anyone would like to help improve the build methods
 
 A significant amount of testing has already been done, but the library is in beta and is unsuitable for production environments.
 
+Changes in v0.9.1:
+
+- Fixed a bug in compression of very small files when using a high search depth.
+- Added an incompressibility checker which processes high-entropy (e.g. encrypted or
+  already compressed) data about twice as fast as before.
+
 ### License
 
 Fast LZMA2 is dual-licensed under [BSD](LICENSE) and [GPLv2](COPYING).

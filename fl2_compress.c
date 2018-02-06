@@ -158,7 +158,6 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
             return NULL;
         }
         cctx->jobs[u].cctx = cctx;
-        cctx->jobs[u].num = u;
     }
     cctx->dictMax = 0;
 

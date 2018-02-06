@@ -309,7 +309,7 @@ static void RecurseListsBound(RMF_builder* const tbl,
         return;
 
     list_count = MIN((U32)bounded_size, list_count);
-    list_count = MIN(list_count, (U32)tbl->match_buffer_limit);
+    list_count = MIN(list_count, (U32)tbl->match_buffer_size);
     for (; count < list_count && extra_count; ++count) {
         ptrdiff_t next_link = GetMatchLink(link);
         if (link >= bounded_start) {

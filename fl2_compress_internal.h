@@ -59,7 +59,6 @@ typedef struct {
     FL2_lzmaEncoderCtx* enc;
     FL2_dataBlock block;
     size_t cSize;
-    unsigned num;
 } FL2_job;
 
 struct FL2_CCtx_s {

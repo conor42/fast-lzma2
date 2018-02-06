@@ -18,6 +18,12 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\bench.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tests\datagen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\error_private.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -25,6 +31,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\fl2_compress.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\fl2_decompress.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\lzma2_dec.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\lzma2_enc.c">
@@ -48,19 +60,7 @@
     <ClCompile Include="..\..\threading.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\bench.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\fl2_decompress.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\tests\datagen.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\xxhash.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\lzma2_dec.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

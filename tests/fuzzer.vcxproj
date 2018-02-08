@@ -18,8 +18,17 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="datagen.c" />
+    <ClCompile Include="fuzzer.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\fast-lzma2.h" />
+    <ClInclude Include="..\fl2_errors.h" />
+    <ClInclude Include="datagen.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{E49A84FD-DE73-4A88-8968-F3B1C328B238}</ProjectGuid>
+    <ProjectGuid>{A236F110-80EE-4502-A67C-C1BD0CCFAB15}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>bench</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
@@ -93,6 +102,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(SolutionDir)$(Configuration)\libflzma2-x86.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -108,6 +118,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\libflzma2-x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -127,6 +138,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(SolutionDir)$(Configuration)\libflzma2-x86.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -145,48 +157,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\libflzma2-x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\error_private.c" />
-    <ClCompile Include="..\..\fl2_common.c" />
-    <ClCompile Include="..\..\fl2_compress.c" />
-    <ClCompile Include="..\..\fl2_decompress.c" />
-    <ClCompile Include="..\..\lzma2_dec.c" />
-    <ClCompile Include="..\..\lzma2_enc.c" />
-    <ClCompile Include="..\..\pool.c" />
-    <ClCompile Include="..\..\radix_bitpack.c" />
-    <ClCompile Include="..\..\radix_mf.c" />
-    <ClCompile Include="..\..\radix_struct.c" />
-    <ClCompile Include="..\..\range_enc.c" />
-    <ClCompile Include="..\..\tests\datagen.c" />
-    <ClCompile Include="..\..\threading.c" />
-    <ClCompile Include="..\..\xxhash.c" />
-    <ClCompile Include="..\fuzzer.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\atomic.h" />
-    <ClInclude Include="..\..\compiler.h" />
-    <ClInclude Include="..\..\count.h" />
-    <ClInclude Include="..\..\data_block.h" />
-    <ClInclude Include="..\..\error_private.h" />
-    <ClInclude Include="..\..\fast-lzma2.h" />
-    <ClInclude Include="..\..\fl2_compress_internal.h" />
-    <ClInclude Include="..\..\fl2_errors.h" />
-    <ClInclude Include="..\..\fl2_internal.h" />
-    <ClInclude Include="..\..\lzma2_dec.h" />
-    <ClInclude Include="..\..\lzma2_enc.h" />
-    <ClInclude Include="..\..\mem.h" />
-    <ClInclude Include="..\..\platform.h" />
-    <ClInclude Include="..\..\pool.h" />
-    <ClInclude Include="..\..\radix_engine.h" />
-    <ClInclude Include="..\..\radix_internal.h" />
-    <ClInclude Include="..\..\radix_mf.h" />
-    <ClInclude Include="..\..\range_enc.h" />
-    <ClInclude Include="..\..\threading.h" />
-    <ClInclude Include="..\..\util.h" />
-    <ClInclude Include="..\..\xxhash.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

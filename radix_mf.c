@@ -153,6 +153,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
 {
     int isStruct;
     size_t dictionary_size;
+	size_t table_bytes;
     FL2_matchTable* tbl;
     RMF_parameters params = RMF_clampParams(*p);
 
@@ -162,8 +163,10 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
 
     DEBUGLOG(3, "RMF_createMatchTable : isStruct %d, dict %u", isStruct, (U32)dictionary_size);
 
+	table_bytes = isStruct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
+		: dictionary_size * sizeof(U32);
     tbl = (FL2_matchTable*)malloc(
-        sizeof(FL2_matchTable) + (isStruct ? dictionary_size * sizeof(RMF_unit) : dictionary_size * sizeof(U32)) - sizeof(U32));
+        sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
     if (!tbl) return NULL;
 
     tbl->isStruct = isStruct;

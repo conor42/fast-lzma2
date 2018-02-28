@@ -62,6 +62,10 @@ typedef _Atomic long FL2_atomic;
 
 #else  /* No atomics */
 
+#	ifndef FL2_SINGLETHREAD
+#		error  No atomic operations available. Change compiler config or define FL2_SINGLETHREAD for the entire build.
+#	endif
+
 typedef long FL2_atomic;
 #define ATOMIC_INITIAL_VALUE 0
 #define FL2_atomic_increment(n) (n++)

@@ -55,7 +55,7 @@ Introduction
 /*------   Version   ------*/
 #define FL2_VERSION_MAJOR    0
 #define FL2_VERSION_MINOR    9
-#define FL2_VERSION_RELEASE  1
+#define FL2_VERSION_RELEASE  2
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -156,7 +156,13 @@ typedef struct {
 
 typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
 
+/* Get the size of the overlap section. */
+FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* ctx);
+
+/* Copy the overlap section to the start to prepare for more data */
 FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* ctx, FL2_blockBuffer *block);
+/* Copy the overlap to a different buffer. This allows a dual-buffer configuration where
+ * data is read into one block while the other is compressed. */
 FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* ctx, FL2_blockBuffer *block, unsigned char *dst);
 
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);

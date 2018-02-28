@@ -12,6 +12,7 @@
 #include <string.h>
 #include "fast-lzma2.h"
 #include "fl2_internal.h"
+#include "platform.h"
 #include "mem.h"
 #include "util.h"
 #include "fl2_compress_internal.h"
@@ -21,6 +22,12 @@
 #include "lzma2_enc.h"
 
 #define MIN_BYTES_PER_THREAD 0x10000
+
+#ifdef __64BIT__
+#define ALIGNMENT_MASK ~((size_t)7)
+#else
+#define ALIGNMENT_MASK ~((size_t)3)
+#endif
 
 /*-=====  Pre-defined compression levels  =====-*/
 
@@ -443,16 +450,25 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     return dstBuf - (BYTE*)dst;
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* cctx)
+{
+	return OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+}
+
 FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* cctx, FL2_blockBuffer *block)
 {
     FL2_shiftBlock_switch(cctx, block, NULL);
 }
 
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_blockBuffer *block, BYTE *dst)
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_blockBuffer *block, unsigned char *dst)
 {
     size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
-    if (block->end > block_overlap) {
+	if (block_overlap == 0) {
+		block->start = 0;
+		block->end = 0;
+	}
+	else if (block->end > block_overlap) {
         size_t const from = (block->end - block_overlap) & ~(sizeof(size_t) - 1);
         size_t const overlap = block->end - from;
 
@@ -460,7 +476,7 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_bloc
             DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
             memcpy(dst ? dst : block->data, block->data + from, overlap);
         }
-        else {
+		else if (from != 0) {
             DEBUGLOG(5, "Move overlap data : %u bytes", (U32)overlap);
             memmove(block->data, block->data + from, overlap);
         }

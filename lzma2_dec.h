@@ -44,59 +44,85 @@ Returns:
 
 #define LZMA_REQUIRED_INPUT_MAX 20
 
-#define kNumPosBitsMax 4U
-#define kNumPosStatesMax (1U << kNumPosBitsMax)
+#define kNumPosBitsMax 4
+#define kNumPosStatesMax (1 << kNumPosBitsMax)
 
-#define kLenNumLowBits 3U
-#define kLenNumLowSymbols (1U << kLenNumLowBits)
-#define kLenNumMidBits 3U
-#define kLenNumMidSymbols (1U << kLenNumMidBits)
-#define kLenNumHighBits 8U
-#define kLenNumHighSymbols (1U << kLenNumHighBits)
+#define kLenNumLowBits 3
+#define kLenNumLowSymbols (1 << kLenNumLowBits)
+#define kLenNumHighBits 8
+#define kLenNumHighSymbols (1 << kLenNumHighBits)
 
-#define LenChoice 0U
-#define LenChoice2 (LenChoice + 1U)
-#define LenLow (LenChoice2 + 1U)
-#define LenMid (LenLow + (kNumPosStatesMax << kLenNumLowBits))
-#define LenHigh (LenMid + (kNumPosStatesMax << kLenNumMidBits))
+#define LenLow 0
+#define LenHigh (LenLow + 2 * (kNumPosStatesMax << kLenNumLowBits))
 #define kNumLenProbs (LenHigh + kLenNumHighSymbols)
 
+#define LenChoice LenLow
+#define LenChoice2 (LenLow + (1 << kLenNumLowBits))
 
-#define kNumStates 12U
-#define kNumLitStates 7U
+#define kNumStates 12
+#define kNumStates2 16
+#define kNumLitStates 7
 
-#define kStartPosModelIndex 4U
-#define kEndPosModelIndex 14U
-#define kNumFullDistances (1U << (kEndPosModelIndex >> 1))
+#define kStartPosModelIndex 4
+#define kEndPosModelIndex 14
+#define kNumFullDistances (1 << (kEndPosModelIndex >> 1))
 
-#define kNumPosSlotBits 6U
-#define kNumLenToPosStates 4U
+#define kNumPosSlotBits 6
+#define kNumLenToPosStates 4
 
-#define kNumAlignBits 4U
-#define kAlignTableSize (1U << kNumAlignBits)
+#define kNumAlignBits 4
+#define kAlignTableSize (1 << kNumAlignBits)
 
-#define kMatchMinLen 2U
-#define kMatchSpecLenStart (kMatchMinLen + kLenNumLowSymbols + kLenNumMidSymbols + kLenNumHighSymbols)
+#define kMatchMinLen 2
+#define kMatchSpecLenStart (kMatchMinLen + kLenNumLowSymbols * 2 + kLenNumHighSymbols)
 
-#define IsMatch 0U
-#define IsRep (IsMatch + (kNumStates << kNumPosBitsMax))
+/* External ASM code needs same CLzmaProb array layout. So don't change it. */
+
+/* (probs_1664) is faster and better for code size at some platforms */
+/*
+#ifdef MY_CPU_X86_OR_AMD64
+*/
+#define kStartOffset 1664
+#define GET_PROBS p->probs_1664
+/*
+#define GET_PROBS p->probs + kStartOffset
+#else
+#define kStartOffset 0
+#define GET_PROBS p->probs
+#endif
+*/
+
+#define SpecPos (-kStartOffset)
+#define IsRep0Long (SpecPos + kNumFullDistances)
+#define RepLenCoder (IsRep0Long + (kNumStates2 << kNumPosBitsMax))
+#define LenCoder (RepLenCoder + kNumLenProbs)
+#define IsMatch (LenCoder + kNumLenProbs)
+#define Align (IsMatch + (kNumStates2 << kNumPosBitsMax))
+#define IsRep (Align + kAlignTableSize)
 #define IsRepG0 (IsRep + kNumStates)
 #define IsRepG1 (IsRepG0 + kNumStates)
 #define IsRepG2 (IsRepG1 + kNumStates)
-#define IsRep0Long (IsRepG2 + kNumStates)
-#define PosSlot (IsRep0Long + (kNumStates << kNumPosBitsMax))
-#define SpecPos (PosSlot + (kNumLenToPosStates << kNumPosSlotBits))
-#define Align (SpecPos + kNumFullDistances - kEndPosModelIndex)
-#define LenCoder (Align + kAlignTableSize)
-#define RepLenCoder (LenCoder + kNumLenProbs)
-#define Literal (RepLenCoder + kNumLenProbs)
+#define PosSlot (IsRepG2 + kNumStates)
+#define Literal (PosSlot + (kNumLenToPosStates << kNumPosSlotBits))
+#define NUM_BASE_PROBS (Literal + kStartOffset)
 
-#define LZMA_BASE_SIZE 1846U
+#if Align != 0 && kStartOffset != 0
+#error Stop_Compiling_Bad_LZMA_kAlign
+#endif
+
+#if NUM_BASE_PROBS != 1984
+#error Stop_Compiling_Bad_LZMA_PROBS
+#endif
+
+
 #define LZMA_LIT_SIZE 0x300
 
-#if Literal != LZMA_BASE_SIZE
-StopCompilingDueBUG
-#endif
+#define LzmaProps_GetNumProbs(p) (NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << ((p)->lc + (p)->lp)))
+
+
+#define CALC_POS_STATE(processedPos, pbMask) (((processedPos) & (pbMask)) << 4)
+#define COMBINED_PS_STATE (posState + state)
+#define GET_LEN_STATE (posState)
 
 #define LZMA2_LCLP_MAX 4U
 
@@ -124,7 +150,8 @@ typedef struct CLzma2Dec_s
     BYTE needInitState2;
     BYTE needInitProp;
     BYTE extDic;
-    Probability probs[Literal + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
+	Probability *probs_1664;
+    Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
 } CLzma2Dec;
 
 typedef struct

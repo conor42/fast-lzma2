@@ -24,10 +24,13 @@ extern "C" {
 
 /* ---------- LZMA Properties ---------- */
 
-typedef struct _CLzmaProps
+typedef struct CLzmaProps_s
 {
-  unsigned lc, lp, pb;
-  U32 dicSize;
+	BYTE lc;
+	BYTE lp;
+	BYTE pb;
+	BYTE pad_;
+	U32 dicSize;
 } CLzmaProps;
 
 /* LzmaProps_Decode - decodes properties
@@ -126,31 +129,33 @@ Returns:
 
 #define LZMA2_LCLP_MAX 4U
 
+
 typedef struct CLzma2Dec_s
 {
     CLzmaProps prop;
     BYTE *dic;
-    const BYTE *buf;
-    U32 range, code;
-    size_t dicPos;
-    size_t dicBufSize;
+	size_t dicPos;
+	size_t dicBufSize;
+	const BYTE *buf;
+	Probability *probs_1664;
+	U32 range;
+	U32 code;
     U32 processedPos;
     U32 checkDicSize;
-    unsigned state;
     U32 reps[4];
-    unsigned remainLen;
-    int needFlush;
-    int needInitState;
-    U32 numProbs;
+	unsigned state;
+	unsigned state2;
+	unsigned remainLen;
     U32 packSize;
     U32 unpackSize;
-    unsigned state2;
     BYTE control;
     BYTE needInitDic;
-    BYTE needInitState2;
+	BYTE needInitState;
+	BYTE needInitState2;
     BYTE needInitProp;
-    BYTE extDic;
-	Probability *probs_1664;
+	BYTE needFlush;
+	BYTE extDic;
+	BYTE pad_;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
 } CLzma2Dec;
 

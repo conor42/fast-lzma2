@@ -292,7 +292,7 @@ static int basicUnitTests(U32 seed, double compressibility)
     size_t cSize;
 
     /* Create compressible noise */
-    if (!CNBuffer || !compressedBuffer || !decodedBuffer || !dstream) {
+    if (!CNBuffer || !compressedBuffer || !decodedBuffer || !cstream || !dstream) {
         DISPLAY("Not enough memory, aborting\n");
         testResult = 1;
         goto _end;
@@ -610,6 +610,90 @@ _output_error:
     goto _end;
 }
 
+static int decompressionTests(U32 seed, U32 nbTests, unsigned startTest, U32 const maxDurationS, double compressibility)
+{
+    size_t const CNBuffSize = 5 MB;
+    void* const CNBuffer = malloc(CNBuffSize);
+    size_t const compressedBufferSize = FL2_compressBound(CNBuffSize);
+    void* const compressedBuffer = malloc(compressedBufferSize);
+    void* const decodedBuffer = malloc(CNBuffSize);
+    FL2_DStream *const dstream = FL2_createDStream();
+    clock_t const startClock = clock();
+    clock_t const maxClockSpan = maxDurationS * CLOCKS_PER_SEC;
+    int testResult = 0;
+    U32 testNb = 0;
+    U32 coreSeed = seed, lseed = 0;
+    size_t cSize;
+
+    /* Create compressible noise */
+    if (!CNBuffer || !compressedBuffer || !decodedBuffer || !dstream) {
+        DISPLAY("Not enough memory, aborting\n");
+        testResult = 1;
+        goto _end;
+    }
+    RDG_genBuffer(CNBuffer, CNBuffSize, compressibility, 0., seed);
+
+    {   FL2_CCtx* cctx = FL2_createCCtxMt(0);
+        if (cctx == NULL) goto _output_error;
+        CHECKPLUS(r,
+            FL2_compressCCtx(cctx, compressedBuffer, compressedBufferSize, CNBuffer, CNBuffSize, 4),
+            cSize = r);
+
+        FL2_freeCCtx(cctx);
+    }
+
+
+    /* catch up testNb */
+    for (testNb = 1; testNb < startTest; testNb++) FUZ_rand(&coreSeed);
+
+    /* main test loop */
+    for (; (testNb <= nbTests) || (FUZ_clockSpan(startClock) < maxClockSpan); testNb++) {
+        FL2_inBuffer in = { compressedBuffer, 0, 0 };
+        FL2_outBuffer out = { decodedBuffer, 0, 0 };
+        BYTE *send = (BYTE*)compressedBuffer + cSize;
+        BYTE *oend = (BYTE*)decodedBuffer + CNBuffSize;
+        size_t r;
+        size_t total = 0;
+        unsigned in_bits = 10 + FUZ_rand(&seed) % 11;
+        size_t in_size = 0x100 + (FUZ_rand(&seed) & ((1U << in_bits) - 1));
+        unsigned out_bits = 10 + FUZ_rand(&seed) % 13;
+        size_t out_size = 0x400 + (FUZ_rand(&seed) & ((1U << out_bits) - 1));
+
+        /* notification */
+        if (nbTests >= testNb) { DISPLAYUPDATE(2, "\r%6u/%6u    ", testNb, nbTests); }
+        else { DISPLAYUPDATE(2, "\r%6u          ", testNb); }
+
+        CHECK(FL2_initDStream(dstream));
+
+        do {
+            if (in.pos + LZMA_REQUIRED_INPUT_MAX >= in.size) {
+                in.src = (BYTE*)in.src + in.pos;
+                in.size = MIN(in_size, send - (BYTE*)in.src);
+                in.pos = 0;
+            }
+            out.dst = (BYTE*)out.dst + out.pos;
+            out.size = MIN(out_size, oend - (BYTE*)out.dst);
+            out.pos = 0;
+            r = FL2_decompressStream(dstream, &out, &in);
+            total += out.pos;
+            if (FL2_isError(r)) goto _output_error;
+        } while (r);
+        if (findDiff(CNBuffer, decodedBuffer, total) < CNBuffSize) goto _output_error;
+    }
+    DISPLAY("\r%u streaming decompression tests completed   \n", testNb - 1);
+
+_end:
+    free(CNBuffer);
+    free(compressedBuffer);
+    free(decodedBuffer);
+    FL2_freeDStream(dstream);
+    return testResult;
+
+_output_error:
+    testResult = 1;
+    DISPLAY("Error detected in Unit tests ! \n");
+    goto _end;
+}
 
 static size_t FUZ_rLogLength(U32* seed, U32 logLength)
 {
@@ -866,6 +950,7 @@ static int FUZ_usage(const char* programName)
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
     DISPLAY( " -P#    : Select compressibility in %% (default:%u%%)\n", FUZ_compressibility_default);
+    DISPLAY( " -d     : Perform streaming decompression tests\n");
     DISPLAY( " -v     : verbose\n");
     DISPLAY( " -p     : pause at the end\n");
     DISPLAY( " -h     : display help and exit\n");
@@ -919,6 +1004,7 @@ int main(int argc, const char** argv)
     U32 maxDuration = 0;
     int bigTests = 1;
     U32 memTestsOnly = 0;
+    int decompTests = 0;
     const char* const programName = argv[0];
 
     /* Check command line */
@@ -940,6 +1026,11 @@ int main(int argc, const char** argv)
                 {
                 case 'h':
                     return FUZ_usage(programName);
+
+                case 'd':
+                    argument++;
+                    decompTests = 1;
+                    break;
 
                 case 'v':
                     argument++;
@@ -1017,6 +1108,8 @@ int main(int argc, const char** argv)
 
     if (testNb==0)
         result = basicUnitTests(0, ((double)proba) / 100);  /* constant seed for predictability */
+    if (!result && decompTests)
+        result = decompressionTests(seed, nbTests, testNb, maxDuration, ((double)proba) / 100);
     if (!result)
         result = fuzzerTests(nbThreads, seed, nbTests, testNb, maxDuration, ((double)proba) / 100, bigTests);
     if (mainPause) {

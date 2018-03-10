@@ -33,9 +33,6 @@
     <ClCompile Include="..\lzma2_enc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\pool.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\radix_bitpack.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -52,6 +49,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\xxhash.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fl2pool.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -98,9 +98,6 @@
     <ClInclude Include="..\platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\pool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\radix_engine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -120,6 +117,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\xxhash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fl2pool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

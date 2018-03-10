@@ -21,7 +21,7 @@
 #include "lzma2_enc.h"
 #include "fast-lzma2.h"
 #include "threading.h"
-#include "pool.h"
+#include "fl2pool.h"
 #include "xxhash.h"
 
 #if defined (__cplusplus)
@@ -64,7 +64,7 @@ typedef struct {
 struct FL2_CCtx_s {
     FL2_CCtx_params params;
 #ifndef FL2_SINGLETHREAD
-    POOL_ctx* factory;
+    FL2POOL_ctx* factory;
 #endif
     FL2_dataBlock curBlock;
     size_t dictMax;

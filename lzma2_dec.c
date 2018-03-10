@@ -777,35 +777,36 @@ static void LzmaDec_WriteRem(CLzma2Dec *p, size_t limit)
 
 static size_t LzmaDec_DecodeReal2(CLzma2Dec *p, size_t limit, const BYTE *bufLimit)
 {
-  do
-  {
-    size_t limit2 = limit;
-    if (p->checkDicSize == 0)
+    if (p->buf == bufLimit && !LzmaDec_TryDummy(p))
+        return FL2_ERROR(corruption_detected);
+    do
     {
-      U32 rem = p->prop.dicSize - p->processedPos;
-      if (limit - p->dicPos > rem)
-        limit2 = p->dicPos + rem;
-	  if (p->processedPos == 0)
-		  if (p->code >= kBadRepCode)
-			  return FL2_ERROR(corruption_detected);
-	}
-    
-	do {
-		if(LzmaDec_DecodeReal(p, limit2, bufLimit) != 0)
-			return FL2_ERROR(corruption_detected);
-	} while (p->dicPos < limit2 && p->buf == bufLimit && LzmaDec_TryDummy(p));
+        size_t limit2 = limit;
+        if (p->checkDicSize == 0)
+        {
+            U32 rem = p->prop.dicSize - p->processedPos;
+            if (limit - p->dicPos > rem)
+                limit2 = p->dicPos + rem;
+            if (p->processedPos == 0)
+                if (p->code >= kBadRepCode)
+                    return FL2_ERROR(corruption_detected);
+        }
 
-    if (p->checkDicSize == 0 && p->processedPos >= p->prop.dicSize)
-      p->checkDicSize = p->prop.dicSize;
-    
-    LzmaDec_WriteRem(p, limit);
-  }
-  while (p->dicPos < limit && p->buf < bufLimit && p->remainLen < kMatchSpecLenStart);
+        do {
+            if (LzmaDec_DecodeReal(p, limit2, bufLimit) != 0)
+                return FL2_ERROR(corruption_detected);
+        } while (p->dicPos < limit2 && p->buf == bufLimit && LzmaDec_TryDummy(p));
 
-  if (p->remainLen > kMatchSpecLenStart)
-    p->remainLen = kMatchSpecLenStart;
+        if (p->checkDicSize == 0 && p->processedPos >= p->prop.dicSize)
+            p->checkDicSize = p->prop.dicSize;
 
-  return FL2_error_no_error;
+        LzmaDec_WriteRem(p, limit);
+    } while (p->dicPos < limit && p->buf < bufLimit && p->remainLen < kMatchSpecLenStart);
+
+    if (p->remainLen > kMatchSpecLenStart)
+        p->remainLen = kMatchSpecLenStart;
+
+    return FL2_error_no_error;
 }
 
 
@@ -878,10 +879,7 @@ size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit, const BYTE *src, size
             if (p->remainLen == 0 && p->code == 0) {
                 return LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK;
             }
-            if (finishMode == LZMA_FINISH_ANY) {
                 return LZMA_STATUS_NOT_FINISHED;
-            }
-            return FL2_ERROR(corruption_detected);
         }
 
         if (p->needInitState)
@@ -1026,9 +1024,10 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
     if (len <= 0)
         return LZMA2_STATE_CONTROL;
     *control = *src;
-    *srcLen = 1;
-    if (*control == 0)
+    if (*control == 0) {
+        *srcLen = 1;
         return LZMA2_STATE_FINISHED;
+    }
     if (len < 3)
         return LZMA2_STATE_CONTROL;
     if (LZMA2_IS_UNCOMPRESSED_STATE(*control)) {
@@ -1109,9 +1108,9 @@ size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
             if (outCur >= p->unpackSize)
             {
                 outCur = (size_t)p->unpackSize;
-                if(inCur >= p->packSize)
-                    curFinishMode = LZMA_FINISH_END;
             }
+            if (inCur >= p->packSize)
+                curFinishMode = LZMA_FINISH_END;
 
             if (LZMA2_IS_UNCOMPRESSED_STATE(p->control))
             {

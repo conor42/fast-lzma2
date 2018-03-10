@@ -17,7 +17,7 @@
 #include "util.h"
 #include "fl2_compress_internal.h"
 #include "threading.h"
-#include "pool.h"
+#include "fl2pool.h"
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 
@@ -151,7 +151,7 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
     cctx->matchTable = NULL;
 
 #ifndef FL2_SINGLETHREAD
-    cctx->factory = POOL_create(nbThreads - 1);
+    cctx->factory = FL2POOL_create(nbThreads - 1);
     if (nbThreads > 1 && cctx->factory == NULL) {
         FL2_freeCCtx(cctx);
         return NULL;
@@ -183,7 +183,7 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx)
     }
 
 #ifndef FL2_SINGLETHREAD
-    POOL_free(cctx->factory);
+    FL2POOL_free(cctx->factory);
 #endif
 
     RMF_freeMatchTable(cctx->matchTable);
@@ -195,7 +195,7 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* cctx)
     return cctx->jobCount;
 }
 
-/* FL2_buildRadixTable() : POOL_function type */
+/* FL2_buildRadixTable() : FL2POOL_function type */
 static void FL2_buildRadixTable(void* const jobDescription, size_t n)
 {
     const FL2_job* const job = (FL2_job*)jobDescription;
@@ -204,7 +204,7 @@ static void FL2_buildRadixTable(void* const jobDescription, size_t n)
     RMF_buildTable(cctx->matchTable, n, 1, cctx->curBlock, NULL, NULL, 0, 0);
 }
 
-/* FL2_compressRadixChunk() : POOL_function type */
+/* FL2_compressRadixChunk() : FL2POOL_function type */
 static void FL2_compressRadixChunk(void* const jobDescription, size_t n)
 {
     const FL2_job* const job = (FL2_job*)jobDescription;
@@ -299,7 +299,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 #ifndef FL2_SINGLETHREAD
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
     for (size_t u = 1; u < mfThreads; ++u) {
-		POOL_add(cctx->factory, FL2_buildRadixTable, &cctx->jobs[u], u);
+		FL2POOL_add(cctx->factory, FL2_buildRadixTable, &cctx->jobs[u], u);
     }
 #endif
 
@@ -307,7 +307,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 
 #ifndef FL2_SINGLETHREAD
 
-    POOL_waitAll(cctx->factory);
+    FL2POOL_waitAll(cctx->factory);
 
     if (err)
         return FL2_ERROR(canceled);
@@ -319,11 +319,11 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 #endif
 
     for (size_t u = 1; u < nbThreads; ++u) {
-		POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
+		FL2POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
     }
 
     cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);
-    POOL_waitAll(cctx->factory);
+    FL2POOL_waitAll(cctx->factory);
 
 #else /* FL2_SINGLETHREAD */
 

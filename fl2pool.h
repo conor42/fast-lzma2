@@ -9,8 +9,8 @@
 * You may select, at your option, one of the above-listed licenses.
 */
 
-#ifndef POOL_H
-#define POOL_H
+#ifndef FL2POOL_H
+#define FL2POOL_H
 
 #if defined (__cplusplus)
 extern "C" {
@@ -19,39 +19,39 @@ extern "C" {
 
 #include <stddef.h>   /* size_t */
 
-typedef struct POOL_ctx_s POOL_ctx;
+typedef struct FL2POOL_ctx_s FL2POOL_ctx;
 
-/*! POOL_create() :
+/*! FL2POOL_create() :
 *  Create a thread pool with at most `numThreads` threads.
 * `numThreads` must be at least 1.
-* @return : POOL_ctx pointer on success, else NULL.
+* @return : FL2POOL_ctx pointer on success, else NULL.
 */
-POOL_ctx *POOL_create(size_t numThreads);
+FL2POOL_ctx *FL2POOL_create(size_t numThreads);
 
 
-/*! POOL_free() :
-Free a thread pool returned by POOL_create().
+/*! FL2POOL_free() :
+Free a thread pool returned by FL2POOL_create().
 */
-void POOL_free(POOL_ctx *ctx);
+void FL2POOL_free(FL2POOL_ctx *ctx);
 
-/*! POOL_sizeof() :
-return memory usage of pool returned by POOL_create().
+/*! FL2POOL_sizeof() :
+return memory usage of pool returned by FL2POOL_create().
 */
-size_t POOL_sizeof(POOL_ctx *ctx);
+size_t FL2POOL_sizeof(FL2POOL_ctx *ctx);
 
-/*! POOL_function :
+/*! FL2POOL_function :
 The function type that can be added to a thread pool.
 */
-typedef void(*POOL_function)(void *, size_t);
+typedef void(*FL2POOL_function)(void *, size_t);
 
-/*! POOL_add() :
+/*! FL2POOL_add() :
 Add the job `function(opaque)` to the thread pool.
 Possibly blocks until there is room in the queue.
 Note : The function may be executed asynchronously, so `opaque` must live until the function has been completed.
 */
-void POOL_add(void *ctx, POOL_function function, void *opaque, size_t n);
+void FL2POOL_add(void *ctx, FL2POOL_function function, void *opaque, size_t n);
 
-void POOL_waitAll(void *ctx);
+void FL2POOL_waitAll(void *ctx);
 
 #if defined (__cplusplus)
 }

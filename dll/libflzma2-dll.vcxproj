@@ -162,7 +162,7 @@
     <ClCompile Include="..\fl2_decompress.c" />
     <ClCompile Include="..\lzma2_dec.c" />
     <ClCompile Include="..\lzma2_enc.c" />
-    <ClCompile Include="..\pool.c" />
+    <ClCompile Include="..\fl2pool.c" />
     <ClCompile Include="..\radix_bitpack.c" />
     <ClCompile Include="..\radix_mf.c" />
     <ClCompile Include="..\radix_struct.c" />
@@ -185,7 +185,7 @@
     <ClInclude Include="..\lzma2_enc.h" />
     <ClInclude Include="..\mem.h" />
     <ClInclude Include="..\platform.h" />
-    <ClInclude Include="..\pool.h" />
+    <ClInclude Include="..\fl2pool.h" />
     <ClInclude Include="..\radix_engine.h" />
     <ClInclude Include="..\radix_internal.h" />
     <ClInclude Include="..\radix_mf.h" />

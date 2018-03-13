@@ -1,5 +1,5 @@
 /* lzma2_dec.c -- LZMA2 Decoder
-2017-04-03 : Igor Pavlov : Public domain
+2018-02-28 : Igor Pavlov : Public domain
 Modified for FL2 by Conor McCarthy */
 
 #include <stdlib.h>

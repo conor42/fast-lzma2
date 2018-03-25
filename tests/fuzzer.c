@@ -503,14 +503,15 @@ static int basicUnitTests(U32 seed, double compressibility)
     DISPLAYLEVEL(4, "test%3i : compress stream < dictionary_size with flush : ", testNb++);
     {
         FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
-        FL2_inBuffer in = { CNBuffer, 128 KB, 0 };
+        FL2_inBuffer in = { CNBuffer, 128 KB - 1, 0 };
         size_t r;
+        FL2_CStream_setParameter(cstream, FL2_p_posBits, 4);
         CHECK(FL2_initCStream(cstream, 4));
         CHECK(FL2_compressStream(cstream, &out, &in));
         CHECK(FL2_flushStream(cstream, &out));
-        in.src = (BYTE*)CNBuffer + 128 KB;
+        in.src = (BYTE*)CNBuffer + 128 KB - 1;
         in.pos = 0;
-        in.size = 512 KB;
+        in.size = 1 MB;
         CHECK(FL2_compressStream(cstream, &out, &in));
         r = FL2_endStream(cstream, &out);
         if (r != 0) goto _output_error;
@@ -520,7 +521,7 @@ static int basicUnitTests(U32 seed, double compressibility)
 
     DISPLAYLEVEL(4, "test%3i : decompress stream < dictionary_size with flush : ", testNb++);
     {   size_t const r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, cSize);
-        if (r != 640 KB) goto _output_error; }
+        if (r != 128 KB + 1 MB - 1) goto _output_error; }
     DISPLAYLEVEL(4, "OK \n");
 
     DISPLAYLEVEL(4, "test%3i : compress empty stream : ", testNb++);
@@ -668,11 +669,11 @@ static int decompressionTests(U32 seed, U32 nbTests, unsigned startTest, U32 con
         do {
             if (in.pos + LZMA_REQUIRED_INPUT_MAX >= in.size) {
                 in.src = (BYTE*)in.src + in.pos;
-                in.size = MIN(in_size, send - (BYTE*)in.src);
+                in.size = MIN(in_size, (size_t)(send - (BYTE*)in.src));
                 in.pos = 0;
             }
             out.dst = (BYTE*)out.dst + out.pos;
-            out.size = MIN(out_size, oend - (BYTE*)out.dst);
+            out.size = MIN(out_size, (size_t)(oend - (BYTE*)out.dst));
             out.pos = 0;
             r = FL2_decompressStream(dstream, &out, &in);
             total += out.pos;

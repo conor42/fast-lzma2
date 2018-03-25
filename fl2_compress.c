@@ -23,11 +23,7 @@
 
 #define MIN_BYTES_PER_THREAD 0x10000
 
-#ifdef __64BIT__
-#define ALIGNMENT_MASK ~((size_t)7)
-#else
-#define ALIGNMENT_MASK ~((size_t)3)
-#endif
+#define ALIGNMENT_MASK ~15
 
 /*-=====  Pre-defined compression levels  =====-*/
 
@@ -469,7 +465,7 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_bloc
 		block->end = 0;
 	}
 	else if (block->end > block_overlap) {
-        size_t const from = (block->end - block_overlap) & ~(sizeof(size_t) - 1);
+        size_t const from = (block->end - block_overlap) & ALIGNMENT_MASK;
         size_t const overlap = block->end - from;
 
         if (overlap <= from || dst != NULL) {

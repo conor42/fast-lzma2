@@ -99,6 +99,7 @@ void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* c
     rParams->dictionary_log = MIN(params->dictionaryLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
     rParams->match_buffer_log = params->bufferLog;
     rParams->overlap_fraction = params->overlapFraction;
+    rParams->block_size_log = rParams->dictionary_log + 2;
     rParams->divide_and_conquer = params->divideAndConquer;
     rParams->depth = params->searchDepth;
 }
@@ -163,6 +164,7 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
         cctx->jobs[u].cctx = cctx;
     }
     cctx->dictMax = 0;
+    cctx->block_total = 0;
 
     return cctx;
 }
@@ -341,6 +343,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx)
 {
     cctx->dictMax = 0;
+    cctx->block_total = 0;
 }
 
 static size_t FL2_compressBlock(FL2_CCtx* const cctx,
@@ -391,8 +394,15 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
             }
         }
         srcStart += cctx->curBlock.end - cctx->curBlock.start;
-        cctx->curBlock.data += cctx->curBlock.end - block_overlap;
-        cctx->curBlock.start = block_overlap;
+        cctx->block_total += cctx->curBlock.end - cctx->curBlock.start;
+        if (cctx->params.rParams.block_size_log && cctx->block_total + MIN(cctx->curBlock.end - block_overlap, srcEnd - srcStart) > ((U64)1 << cctx->params.rParams.block_size_log)) {
+            cctx->curBlock.start = 0;
+            cctx->block_total = 0;
+        }
+        else {
+            cctx->curBlock.start = block_overlap;
+        }
+        cctx->curBlock.data += cctx->curBlock.end - cctx->curBlock.start;
     }
     return (writeFn != NULL) ? outSize : dstBuf - (const BYTE*)dst;
 }
@@ -451,12 +461,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* cctx)
 	return OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 }
 
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* cctx, FL2_blockBuffer *block)
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(FL2_CCtx* cctx, FL2_blockBuffer *block)
 {
     FL2_shiftBlock_switch(cctx, block, NULL);
 }
 
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_blockBuffer *block, unsigned char *dst)
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(FL2_CCtx* cctx, FL2_blockBuffer *block, unsigned char *dst)
 {
     size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
@@ -466,9 +476,14 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* cctx, FL2_bloc
 	}
 	else if (block->end > block_overlap) {
         size_t const from = (block->end - block_overlap) & ALIGNMENT_MASK;
-        size_t const overlap = block->end - from;
+        size_t overlap = block->end - from;
 
-        if (overlap <= from || dst != NULL) {
+        cctx->block_total += block->end - block->start;
+        if (cctx->params.rParams.block_size_log && cctx->block_total + from > ((U64)1 << cctx->params.rParams.block_size_log)) {
+            overlap = 0;
+            cctx->block_total = 0;
+        }
+        else if (overlap <= from || dst != NULL) {
             DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
             memcpy(dst ? dst : block->data, block->data + from, overlap);
         }
@@ -597,6 +612,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
             cctx->params.rParams.overlap_fraction = value;
         }
         return cctx->params.rParams.overlap_fraction;
+
+    case FL2_p_blockSize:
+        if ((int)value >= 0) {  /* < 0 : does not change current overlapFraction */
+            CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
+            cctx->params.rParams.block_size_log = value;
+        }
+        return cctx->params.rParams.block_size_log;
+
     case FL2_p_bufferLog:
         if (value) {  /* 0 : does not change current bufferLog */
             CLAMPCHECK(value, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);

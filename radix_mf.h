@@ -29,6 +29,7 @@ typedef struct
     unsigned dictionary_log;
     unsigned match_buffer_log;
     unsigned overlap_fraction;
+    unsigned block_size_log;
     unsigned divide_and_conquer;
     unsigned depth;
 #ifdef RMF_REFERENCE

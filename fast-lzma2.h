@@ -160,10 +160,10 @@ typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
 FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* ctx);
 
 /* Copy the overlap section to the start to prepare for more data */
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(const FL2_CCtx* ctx, FL2_blockBuffer *block);
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(FL2_CCtx* ctx, FL2_blockBuffer *block);
 /* Copy the overlap to a different buffer. This allows a dual-buffer configuration where
  * data is read into one block while the other is compressed. */
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(const FL2_CCtx* ctx, FL2_blockBuffer *block, unsigned char *dst);
+FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(FL2_CCtx* ctx, FL2_blockBuffer *block, unsigned char *dst);
 
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
 
@@ -352,6 +352,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
+#define FL2_BLOCK_LOG_MIN 12
+#define FL2_BLOCK_LOG_MAX 32
 #define FL2_SEARCH_DEPTH_MIN 6
 #define FL2_SEARCH_DEPTH_MAX 254
 #define FL2_BUFFER_SIZE_LOG_MIN 6
@@ -379,6 +381,7 @@ typedef enum {
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
+    FL2_p_blockSize,
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
                              * 2 ^ (dictionaryLog - bufferLog). Lower number = slower, better compression,
                              * higher memory usage. */

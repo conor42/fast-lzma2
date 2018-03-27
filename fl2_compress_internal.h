@@ -68,6 +68,7 @@ struct FL2_CCtx_s {
 #endif
     FL2_dataBlock curBlock;
     size_t dictMax;
+    U64 block_total;
     FL2_matchTable* matchTable;
     unsigned jobCount;
     FL2_job jobs[1];

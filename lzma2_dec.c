@@ -1054,8 +1054,8 @@ static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *pack
             lp = b % 5;
             if (lc + lp > LZMA2_LCLP_MAX)
                 return LZMA2_STATE_ERROR;
-            prop->lc = lc;
-            prop->lp = lp;
+            prop->lc = (BYTE)lc;
+            prop->lp = (BYTE)lp;
         }
     }
     return LZMA2_STATE_DATA;

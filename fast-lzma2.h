@@ -411,9 +411,11 @@ typedef enum {
                              * The higher the value of the selected strategy, the more complex it is,
                              * resulting in stronger and slower compression.
                              * Special: value 0 means "do not change strategy". */
+#ifndef NO_XXHASH
     FL2_p_doXXHash,         /* Calculate a 32-bit xxhash value from the input data and store it 
                              * after the stream terminator. The value will be checked on decompression.
                              * 0 = do not calculate; 1 = calculate (default) */
+#endif
     FL2_p_omitProperties,   /* Omit the property byte at the start of the stream. For use within 7-zip */
                             /* or other containers which store the property byte elsewhere. */
                             /* Cannot be decoded by this library. */

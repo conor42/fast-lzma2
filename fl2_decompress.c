@@ -15,7 +15,9 @@
 #include "mem.h"
 #include "util.h"
 #include "lzma2_dec.h"
-#include "xxhash.h"
+#ifndef NO_XXHASH
+#  include "xxhash.h"
+#endif
 
 FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize)
 {
@@ -88,6 +90,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
 
     dicPos = dctx->dicPos - dicPos;
 
+#ifndef NO_XXHASH
     if (do_hash) {
         XXH32_canonical_t canonical;
         U32 hash;
@@ -101,6 +104,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
         if (hash != XXH32(dst, dicPos, 0))
             return FL2_ERROR(checksum_wrong);
     }
+#endif
     return dicPos;
 }
 
@@ -138,7 +142,9 @@ struct FL2_DStream_s
     Lzma2DecMt *decmt;
 #endif
     CLzma2Dec dec;
+#ifndef NO_XXHASH
     XXH32_state_t *xxh;
+#endif
     DecoderStage stage;
     BYTE do_hash;
 };
@@ -150,7 +156,9 @@ FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)
     if (fds) {
         LzmaDec_Construct(&fds->dec);
         fds->stage = FL2DEC_STAGE_INIT;
+#ifndef NO_XXHASH
         fds->xxh = NULL;
+#endif
         fds->do_hash = 0;
     }
     return fds;
@@ -161,7 +169,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
     if (fds != NULL) {
         DEBUGLOG(3, "FL2_freeDStream");
         FLzmaDec_Free(&fds->dec);
+#ifndef NO_XXHASH
         XXH32_freeState(fds->xxh);
+#endif
         free(fds);
     }
     return 0;
@@ -186,6 +196,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 
             CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
 
+#ifndef NO_XXHASH
             if (fds->do_hash) {
                 if (fds->xxh == NULL) {
                     DEBUGLOG(3, "Creating hash state");
@@ -195,6 +206,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
                 }
                 XXH32_reset(fds->xxh, 0);
             }
+#endif
             fds->stage = FL2DEC_STAGE_DECOMP;
         }
         if (fds->stage == FL2DEC_STAGE_DECOMP) {
@@ -204,8 +216,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 
             DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
 
+#ifndef NO_XXHASH
             if(fds->do_hash)
                 XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, destSize);
+#endif
 
             output->pos += destSize;
             input->pos += srcSize;
@@ -218,6 +232,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
             }
         }
         if (fds->stage == FL2DEC_STAGE_HASH) {
+#ifndef NO_XXHASH
             XXH32_canonical_t canonical;
             U32 hash;
 
@@ -229,6 +244,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
             hash = XXH32_hashFromCanonical(&canonical);
             if (hash != XXH32_digest(fds->xxh))
                 return FL2_ERROR(checksum_wrong);
+#endif
             fds->stage = FL2DEC_STAGE_FINISHED;
         }
     }

@@ -22,7 +22,9 @@
 #include "fast-lzma2.h"
 #include "threading.h"
 #include "fl2pool.h"
-#include "xxhash.h"
+#ifndef NO_XXHASH
+#  include "xxhash.h"
+#endif
 
 #if defined (__cplusplus)
 extern "C" {
@@ -50,7 +52,9 @@ typedef struct {
     RMF_parameters rParams;
     unsigned compressionLevel;
     BYTE highCompression;
+#ifndef NO_XXHASH
     BYTE doXXH;
+#endif
     BYTE omitProp;
 } FL2_CCtx_params;
 
@@ -77,7 +81,9 @@ struct FL2_CCtx_s {
 struct FL2_CStream_s {
     FL2_CCtx* cctx;
     FL2_blockBuffer inBuff;
+#ifndef NO_XXHASH
     XXH32_state_t *xxh;
+#endif
     size_t thread_count;
     size_t out_thread;
     size_t out_pos;

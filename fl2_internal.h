@@ -27,7 +27,9 @@ extern "C" {
 
 #define FL2_PROP_HASH_BIT 7
 #define FL2_LZMA_PROP_MASK 0x3FU
-#define XXHASH_SIZEOF sizeof(XXH32_canonical_t)
+#ifndef NO_XXHASH
+#  define XXHASH_SIZEOF sizeof(XXH32_canonical_t)
+#endif
 
 /*-*************************************
 *  Debug

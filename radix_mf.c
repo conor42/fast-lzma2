@@ -171,7 +171,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
 
     tbl->isStruct = isStruct;
     tbl->allocStruct = isStruct;
-    tbl->thread_count = thread_count;
+    tbl->thread_count = thread_count + !thread_count;
     tbl->params = params;
     tbl->builders = NULL;
 

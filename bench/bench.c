@@ -255,7 +255,7 @@ int FL2LIB_CALL main(int argc, char** argv)
         FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, level + 1);
         printf("%u\r\n", level);
         g_nbSeconds += 5;
-      }
+    }
     free(compressedBuffer);
     free(src);
     return 0;

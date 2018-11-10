@@ -381,7 +381,8 @@ typedef enum {
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
-    FL2_p_blockSize,
+    FL2_p_blockSizeLog,     /* Block size for multithreaded decompression. A dictionary reset will occur
+                               after each 2 ^ blockSizeLog bytes of input. */
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
                              * 2 ^ (dictionaryLog - bufferLog). Lower number = slower, better compression,
                              * higher memory usage. */

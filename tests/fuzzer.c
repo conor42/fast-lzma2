@@ -445,6 +445,7 @@ static int basicUnitTests(U32 seed, double compressibility)
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
+        FL2_CStream_setParameter(cstream, FL2_p_blockSizeLog, 21);
         CHECK(FL2_compressStream(cstream, &out, &in));
         r = FL2_endStream(cstream, &out);
         if (r != 0) goto _output_error;

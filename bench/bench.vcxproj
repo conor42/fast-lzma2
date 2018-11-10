@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\tests\datagen.c" />
+    <ClCompile Include="..\util.c" />
     <ClCompile Include="bench.c" />
   </ItemGroup>
   <ItemGroup>

@@ -168,6 +168,7 @@
     <ClCompile Include="..\radix_struct.c" />
     <ClCompile Include="..\range_enc.c" />
     <ClCompile Include="..\threading.c" />
+    <ClCompile Include="..\util.c" />
     <ClCompile Include="..\xxhash.c" />
   </ItemGroup>
   <ItemGroup>

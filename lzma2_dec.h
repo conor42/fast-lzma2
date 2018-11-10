@@ -248,15 +248,14 @@ enum ParseResult
     CHUNK_CONTINUE,
     CHUNK_DICT_RESET,
     CHUNK_FINAL,
-    CHUNK_ERROR,
-    CHUNK_NO_MEMORY
+    CHUNK_ERROR
 };
 
 #define LZMA2_MT_INPUT_SIZE 0x40000
 
 InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
 
-int FLzma2Dec_ParseInput(InputBlock *inBlock);
+int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode* node);
 
 #if defined (__cplusplus)
 }

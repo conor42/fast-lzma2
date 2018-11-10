@@ -340,6 +340,8 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 
 #endif
 
+    cctx->block_total += encodeSize;
+
     return nbThreads;
 }
 
@@ -397,7 +399,6 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
             }
         }
         srcStart += cctx->curBlock.end - cctx->curBlock.start;
-        cctx->block_total += cctx->curBlock.end - cctx->curBlock.start;
         if (cctx->params.rParams.block_size_log && cctx->block_total + MIN(cctx->curBlock.end - block_overlap, srcEnd - srcStart) > ((U64)1 << cctx->params.rParams.block_size_log)) {
             /* periodically reset the dictionary for mt decompression */
             cctx->curBlock.start = 0;
@@ -488,7 +489,6 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(FL2_CCtx* cctx, FL2_blockBuffe
         size_t const from = (block->end - block_overlap) & ALIGNMENT_MASK;
         size_t overlap = block->end - from;
 
-        cctx->block_total += block->end - block->start;
         if (cctx->params.rParams.block_size_log && cctx->block_total + from > ((U64)1 << cctx->params.rParams.block_size_log)) {
             /* periodically reset the dictionary for mt decompression */
             overlap = 0;

@@ -1276,17 +1276,18 @@ InBufNode * FLzma2Dec_CreateInbufNode(InBufNode *prev)
     node->next = NULL;
     node->length = 0;
     if (prev) {
-        memcpy(node->inBuf, prev->inBuf, sizeof(node->inBuf));
+        memcpy(node->inBuf, prev->inBuf + prev->length - LZMA_REQUIRED_INPUT_MAX, LZMA_REQUIRED_INPUT_MAX);
         prev->next = node;
+        node->length = LZMA_REQUIRED_INPUT_MAX;
     }
     return node;
 }
 
-int FLzma2Dec_ParseInput(InputBlock *inBlock)
+int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode* node)
 {
     size_t pos = inBlock->endPos;
-    BYTE* inBuf = inBlock->last->inBuf;
-    ptrdiff_t len = inBlock->last->length - pos;
+    BYTE* inBuf = node->inBuf;
+    ptrdiff_t len = node->length - pos;
     BYTE control;
     if (len <= 0)
         return CHUNK_ERROR;

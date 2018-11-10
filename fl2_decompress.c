@@ -168,16 +168,19 @@ static Lzma2DecMt *FL2_Lzma2DecMt_Create(unsigned numThreads)
 static int FL2_ParseMt(Lzma2DecMt* decmt, InputBlock* inBlock)
 {
     int res = CHUNK_MORE_DATA;
+    ChunkParseInfo inf;
     InBufNode* node = inBlock->last;
+    int first = inBlock->unpackSize == 0;
     if (node == NULL)
         return res;
-    int first = inBlock->unpackSize == 0;
     while (inBlock->endPos < node->length) {
-        res = FLzma2Dec_ParseInput(inBlock, node);
+        res = FLzma2Dec_ParseInput(inBlock, node, &inf);
         if (first && res == CHUNK_DICT_RESET)
             res = CHUNK_CONTINUE;
         if (res != CHUNK_CONTINUE)
             break;
+        inBlock->endPos += inf.packSize;
+        inBlock->unpackSize += inf.unpackSize;
         first = 0;
     }
     return res;
@@ -185,7 +188,8 @@ static int FL2_ParseMt(Lzma2DecMt* decmt, InputBlock* inBlock)
 
 static int FL2_AllocThread(Lzma2DecMt* decmt)
 {
-    decmt->threads[decmt->numThreads - 1].outBuf = malloc(decmt->threads[decmt->numThreads - 1].inBlock.unpackSize);
+    decmt->threads[decmt->numThreads - 1].bufSize = decmt->threads[decmt->numThreads - 1].inBlock.unpackSize;
+    decmt->threads[decmt->numThreads - 1].outBuf = malloc(decmt->threads[decmt->numThreads - 1].bufSize);
     if (!decmt->threads[decmt->numThreads - 1].outBuf)
         return 1;
     ++decmt->numThreads;
@@ -202,9 +206,10 @@ static size_t FL2_decompressBlockMt(FL2_DStream* fds, size_t thread)
 
     InBufNode *node = ti->inBlock.first;
     size_t inPos = ti->inBlock.startPos;
+    int last = (thread == fds->decmt->numThreads - 1);
     while (1) {
         size_t srcSize = node->length - inPos;
-        size_t const res = FLzma2Dec_DecodeToDic(&fds->dec, ti->bufSize - dec.dicPos, node->inBuf + inPos, &srcSize, node == ti->inBlock.last ? LZMA_FINISH_END : LZMA_FINISH_ANY);
+        size_t const res = FLzma2Dec_DecodeToDic(&dec, ti->bufSize, node->inBuf + inPos, &srcSize, last && node == ti->inBlock.last ? LZMA_FINISH_END : LZMA_FINISH_ANY);
 
         if (FL2_isError(res))
             return res;
@@ -213,10 +218,13 @@ static size_t FL2_decompressBlockMt(FL2_DStream* fds, size_t thread)
         }
         if (node == ti->inBlock.last)
             break;
-        inPos = srcSize - node->length + LZMA_REQUIRED_INPUT_MAX;
-        node = node->next;
+        inPos += srcSize;
+        if (inPos + LZMA_REQUIRED_INPUT_MAX >= node->length) {
+            inPos -= node->length - LZMA_REQUIRED_INPUT_MAX;
+            node = node->next;
+        }
     }
-
+    return 0;
 }
 
 static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
@@ -226,6 +234,11 @@ static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
 
 static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
 {
+    for (size_t thread = 0; thread < fds->decmt->numThreads; ++thread) {
+        size_t const res = FL2_decompressBlockMt(fds, thread);
+        if (FL2_isError(res))
+            return res;
+    }
     return 0;
 }
 
@@ -243,7 +256,7 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
     }
     if (!decmt->isWriting) {
         int res = FL2_LoadInputMt(decmt, input);
-        if ((res == CHUNK_DICT_RESET && decmt->numThreads == decmt->maxThreads) || res == CHUNK_FINAL) {
+        if (res > 0) {
             CHECK_F(FL2_decompressBlocksMt(fds));
             FL2_writeStreamBlocks(fds, output);
         }
@@ -254,21 +267,24 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
 static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
 {
     InputBlock *inBlock = &decmt->threads[decmt->numThreads - 1].inBlock;
-    int res = FL2_error_no_error;
-    while (input->pos < input->size) {
-        if (inBlock->last->length == LZMA2_MT_INPUT_SIZE) {
+    int res = CHUNK_CONTINUE;
+    while (input->pos < input->size || inBlock->endPos < inBlock->last->length) {
+        if (inBlock->endPos < inBlock->last->length) {
             res = FL2_ParseMt(decmt, inBlock);
-            if (res == CHUNK_FINAL || res == CHUNK_ERROR)
+            if (res == CHUNK_FINAL)
                 break;
+            if (res == CHUNK_ERROR)
+                return FL2_ERROR(corruption_detected);
             if (res == CHUNK_DICT_RESET) {
                 if (decmt->numThreads == decmt->maxThreads)
-                    break;
+                    return 1;
                 if (FL2_AllocThread(decmt) != 0)
                     return FL2_ERROR(memory_allocation);
                 inBlock = &decmt->threads[decmt->numThreads - 1].inBlock;
                 inBlock->first = decmt->threads[decmt->numThreads - 2].inBlock.last;
                 inBlock->last = inBlock->first;
                 inBlock->endPos = decmt->threads[decmt->numThreads - 2].inBlock.endPos;
+                inBlock->startPos = inBlock->endPos;
             }
             if (inBlock->endPos >= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX) {
                 InBufNode* prev = inBlock->last;
@@ -286,7 +302,7 @@ static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
             input->pos += toread;
         }
     }
-    return res;
+    return res == CHUNK_FINAL;
 }
 
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)

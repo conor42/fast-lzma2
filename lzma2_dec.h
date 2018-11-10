@@ -251,11 +251,17 @@ enum ParseResult
     CHUNK_ERROR
 };
 
+typedef struct
+{
+    size_t packSize;
+    size_t unpackSize;
+} ChunkParseInfo;
+
 #define LZMA2_MT_INPUT_SIZE 0x40000
 
 InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
 
-int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode* node);
+int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode *node, ChunkParseInfo *inf);
 
 #if defined (__cplusplus)
 }

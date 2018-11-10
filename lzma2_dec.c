@@ -1283,8 +1283,10 @@ InBufNode * FLzma2Dec_CreateInbufNode(InBufNode *prev)
     return node;
 }
 
-int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode* node)
+int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode *node, ChunkParseInfo *inf)
 {
+    inf->packSize = 0;
+    inf->unpackSize = 0;
     size_t pos = inBlock->endPos;
     BYTE* inBuf = node->inBuf;
     ptrdiff_t len = node->length - pos;
@@ -1293,27 +1295,24 @@ int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode* node)
         return CHUNK_ERROR;
     control = inBuf[pos];
     if (control == 0) {
-        ++inBlock->endPos;
+        inf->packSize = 1;
         return CHUNK_FINAL;
     }
     if (len < 3)
         return CHUNK_MORE_DATA;
     if (LZMA2_IS_UNCOMPRESSED_STATE(control)) {
-        size_t unpackSize;
         if (control > 2)
             return CHUNK_ERROR;
-        unpackSize = (((U32)inBuf[pos + 1] << 8) | inBuf[pos + 2]) + 1;
-        inBlock->unpackSize += unpackSize;
-        inBlock->endPos += 3 + unpackSize;
+        inf->unpackSize = (((U32)inBuf[pos + 1] << 8) | inBuf[pos + 2]) + 1;
+        inf->packSize = 3 + inf->unpackSize;
     }
     else {
         size_t packSize;
         S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(control));
         if (len < 5 + hasProp)
             return CHUNK_MORE_DATA;
-        inBlock->unpackSize += ((U32)(control & 0x1F) << 16) + ((U32)inBuf[pos + 1] << 8) + inBuf[pos + 2] + 1;
-        packSize = ((U32)inBuf[pos + 3] << 8) + inBuf[pos + 4] + 1;
-        inBlock->endPos += 5 + hasProp + packSize;
+        inf->unpackSize = ((U32)(control & 0x1F) << 16) + ((U32)inBuf[pos + 1] << 8) + inBuf[pos + 2] + 1;
+        inf->packSize = 5 + hasProp + ((U32)inBuf[pos + 3] << 8) + inBuf[pos + 4] + 1;
         if (LZMA2_GET_LZMA_MODE(control) == 3)
             return CHUNK_DICT_RESET;
     }

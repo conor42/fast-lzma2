@@ -132,6 +132,7 @@ typedef struct
     size_t srcThread;
     size_t srcPos;
     int isWriting;
+    int isFinal;
     BYTE prop;
     ThreadInfo threads[1];
 } Lzma2DecMt;
@@ -192,7 +193,6 @@ static int FL2_AllocThread(Lzma2DecMt* decmt)
     decmt->threads[decmt->numThreads - 1].outBuf = malloc(decmt->threads[decmt->numThreads - 1].bufSize);
     if (!decmt->threads[decmt->numThreads - 1].outBuf)
         return 1;
-    ++decmt->numThreads;
     return 0;
 }
 
@@ -229,7 +229,18 @@ static size_t FL2_decompressBlockMt(FL2_DStream* fds, size_t thread)
 
 static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
 {
-
+    Lzma2DecMt *decmt = fds->decmt;
+    for (; decmt->srcThread < fds->decmt->numThreads; ++decmt->srcThread) {
+        ThreadInfo *thread = decmt->threads + decmt->srcThread;
+        size_t towrite = MIN(thread->bufSize - decmt->srcPos, output->size - output->pos);
+        memcpy((BYTE*)output->dst + output->pos, thread->outBuf + decmt->srcPos, towrite);
+        decmt->srcPos += towrite;
+        output->pos += towrite;
+        if (output->pos == output->size)
+            break;
+        decmt->srcPos = 0;
+    }
+    decmt->isWriting = decmt->srcThread < fds->decmt->numThreads;
 }
 
 static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
@@ -239,12 +250,17 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
         if (FL2_isError(res))
             return res;
     }
+    fds->decmt->srcThread = 0;
+    fds->decmt->srcPos = 0;
+    fds->decmt->isWriting = 1;
     return 0;
 }
 
 static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
     Lzma2DecMt *decmt = fds->decmt;
+    if (decmt->isFinal && !decmt->isWriting)
+        return 0;
     if (decmt->head->length == 0) {
         decmt->prop = ((const BYTE*)input->src)[input->pos];
         ++input->pos;
@@ -261,7 +277,7 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
             FL2_writeStreamBlocks(fds, output);
         }
     }
-    return 1;
+    return !decmt->isFinal;
 }
 
 static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
@@ -271,15 +287,15 @@ static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
     while (input->pos < input->size || inBlock->endPos < inBlock->last->length) {
         if (inBlock->endPos < inBlock->last->length) {
             res = FL2_ParseMt(decmt, inBlock);
-            if (res == CHUNK_FINAL)
-                break;
             if (res == CHUNK_ERROR)
                 return FL2_ERROR(corruption_detected);
-            if (res == CHUNK_DICT_RESET) {
-                if (decmt->numThreads == decmt->maxThreads)
-                    return 1;
+            if (res == CHUNK_DICT_RESET || res == CHUNK_FINAL) {
                 if (FL2_AllocThread(decmt) != 0)
                     return FL2_ERROR(memory_allocation);
+                decmt->isFinal = (res == CHUNK_FINAL);
+                if (decmt->numThreads == decmt->maxThreads || res == CHUNK_FINAL)
+                    return 1;
+                ++decmt->numThreads;
                 inBlock = &decmt->threads[decmt->numThreads - 1].inBlock;
                 inBlock->first = decmt->threads[decmt->numThreads - 2].inBlock.last;
                 inBlock->last = inBlock->first;
@@ -339,6 +355,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
+    fds->decmt->isFinal = 0;
     return 0;
 }
 

@@ -1283,6 +1283,15 @@ InBufNode * FLzma2Dec_CreateInbufNode(InBufNode *prev)
     return node;
 }
 
+void FLzma2Dec_FreeInbufNodeChain(InBufNode *node)
+{
+    while (node) {
+        InBufNode *next = node->next;
+        free(node);
+        node = next;
+    }
+}
+
 int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode *node, ChunkParseInfo *inf)
 {
     inf->packSize = 0;

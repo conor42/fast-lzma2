@@ -15,6 +15,7 @@
 #include "mem.h"
 #include "util.h"
 #include "lzma2_dec.h"
+#include "fl2pool.h"
 #ifndef NO_XXHASH
 #  include "xxhash.h"
 #endif
@@ -121,12 +122,13 @@ typedef struct
     InputBlock inBlock;
     BYTE *outBuf;
     size_t bufSize;
+    size_t res;
 } ThreadInfo;
 
 typedef struct
 {
+    FL2POOL_ctx* factory;
     InBufNode *head;
-    InBufNode *first;
     size_t numThreads;
     size_t maxThreads;
     size_t srcThread;
@@ -150,13 +152,38 @@ struct FL2_DStream_s
     BYTE do_hash;
 };
 
+static void FL2_FreeMtBuffers(Lzma2DecMt *decmt)
+{
+    for (size_t thread = 0; thread < decmt->numThreads; ++thread) {
+        free(decmt->threads[thread].outBuf);
+        decmt->threads[thread].outBuf = NULL;
+    }
+    decmt->numThreads = 1;
+    FLzma2Dec_FreeInbufNodeChain(decmt->head->next);
+    decmt->head->next = NULL;
+}
+
+static void FL2_Lzma2DecMtFree(Lzma2DecMt *decmt)
+{
+    if (decmt) {
+        FL2_FreeMtBuffers(decmt);
+        FLzma2Dec_FreeInbufNodeChain(decmt->head);
+        FL2POOL_free(decmt->factory);
+        free(decmt);
+    }
+}
+
 static Lzma2DecMt *FL2_Lzma2DecMt_Create(unsigned numThreads)
 {
     Lzma2DecMt *decmt = malloc(sizeof(Lzma2DecMt) + (numThreads - 1) * sizeof(ThreadInfo));
     if (!decmt)
         return NULL;
     decmt->head = FLzma2Dec_CreateInbufNode(NULL);
-    decmt->first = decmt->head;
+    decmt->factory = FL2POOL_create(numThreads - 1);
+    if (numThreads > 1 && decmt->factory == NULL) {
+        FL2_Lzma2DecMtFree(decmt);
+        return NULL;
+    }
     decmt->numThreads = 1;
     decmt->maxThreads = numThreads;
     decmt->isWriting = 0;
@@ -241,15 +268,26 @@ static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
         decmt->srcPos = 0;
     }
     decmt->isWriting = decmt->srcThread < fds->decmt->numThreads;
+    if(!decmt->isWriting)
+        FL2_FreeMtBuffers(fds->decmt);
+}
+
+/* FL2_decompressBlock() : FL2POOL_function type */
+static void FL2_decompressBlock(void* const jobDescription, size_t n)
+{
+    FL2_DStream* const fds = (FL2_DStream*)jobDescription;
+    fds->decmt->threads[n].res = FL2_decompressBlockMt(fds, n);
 }
 
 static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
 {
-    for (size_t thread = 0; thread < fds->decmt->numThreads; ++thread) {
-        size_t const res = FL2_decompressBlockMt(fds, thread);
-        if (FL2_isError(res))
-            return res;
+    for (size_t thread = 1; thread < fds->decmt->numThreads; ++thread) {
+        FL2POOL_add(fds->decmt->factory, FL2_decompressBlock, fds, thread);
     }
+    fds->decmt->threads[0].res = FL2_decompressBlockMt(fds, 0);
+    FL2POOL_waitAll(fds->decmt->factory);
+    if (FL2_isError(fds->decmt->threads[0].res))
+        return fds->decmt->threads[0].res;
     fds->decmt->srcThread = 0;
     fds->decmt->srcPos = 0;
     fds->decmt->isWriting = 1;
@@ -356,6 +394,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
     fds->decmt->isFinal = 0;
+    FL2_FreeMtBuffers(fds->decmt);
     return 0;
 }
 

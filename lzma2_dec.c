@@ -1292,13 +1292,10 @@ void FLzma2Dec_FreeInbufNodeChain(InBufNode *node)
     }
 }
 
-int FLzma2Dec_ParseInput(InputBlock *inBlock, InBufNode *node, ChunkParseInfo *inf)
+int FLzma2Dec_ParseInput(BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkParseInfo *inf)
 {
     inf->packSize = 0;
     inf->unpackSize = 0;
-    size_t pos = inBlock->endPos;
-    BYTE* inBuf = node->inBuf;
-    ptrdiff_t len = node->length - pos;
     BYTE control;
     if (len <= 0)
         return CHUNK_ERROR;

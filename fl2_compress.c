@@ -16,8 +16,8 @@
 #include "mem.h"
 #include "util.h"
 #include "fl2_compress_internal.h"
-#include "threading.h"
-#include "fl2pool.h"
+#include "fl2_threading.h"
+#include "fl2_pool.h"
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 

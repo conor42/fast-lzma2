@@ -15,7 +15,7 @@
 #include "mem.h"
 #include "util.h"
 #include "lzma2_dec.h"
-#include "fl2pool.h"
+#include "fl2_pool.h"
 #ifndef NO_XXHASH
 #  include "xxhash.h"
 #endif

@@ -9,7 +9,7 @@
 */
 
 #include "mem.h"          /* U32, U64 */
-#include "threading.h"
+#include "fl2_threading.h"
 #include "fl2_internal.h"
 #include "radix_internal.h"
 

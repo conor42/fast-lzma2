@@ -20,8 +20,8 @@
 #include "radix_internal.h"
 #include "lzma2_enc.h"
 #include "fast-lzma2.h"
-#include "threading.h"
-#include "fl2pool.h"
+#include "fl2_threading.h"
+#include "fl2_pool.h"
 #ifndef NO_XXHASH
 #  include "xxhash.h"
 #endif

@@ -13,7 +13,7 @@
 /* ======   Dependencies   ======= */
 #include <stddef.h>  /* size_t */
 #include <stdlib.h>  /* malloc, calloc */
-#include "fl2pool.h"
+#include "fl2_pool.h"
 #include "fl2_internal.h"
 
 /* ======   Compiler specifics   ====== */
@@ -24,7 +24,7 @@
 
 #ifndef FL2_SINGLETHREAD
 
-#include "threading.h"   /* pthread adaptation */
+#include "fl2_threading.h"   /* pthread adaptation */
 
 /* A job is a function and an opaque argument */
 typedef struct FL2POOL_job_s {

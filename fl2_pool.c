@@ -13,7 +13,7 @@
 /* ======   Dependencies   ======= */
 #include <stddef.h>  /* size_t */
 #include <stdlib.h>  /* malloc, calloc */
-#include "fl2pool.h"
+#include "fl2_pool.h"
 #include "fl2_internal.h"
 
 /* ======   Compiler specifics   ====== */

@@ -45,16 +45,16 @@
     <ClCompile Include="..\range_enc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\threading.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\xxhash.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\fl2pool.c">
+    <ClCompile Include="..\util.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util.c">
+    <ClCompile Include="..\fl2_pool.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fl2_threading.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -160,14 +160,14 @@
     <ClCompile Include="..\fl2_common.c" />
     <ClCompile Include="..\fl2_compress.c" />
     <ClCompile Include="..\fl2_decompress.c" />
+    <ClCompile Include="..\fl2_pool.c" />
+    <ClCompile Include="..\fl2_threading.c" />
     <ClCompile Include="..\lzma2_dec.c" />
     <ClCompile Include="..\lzma2_enc.c" />
-    <ClCompile Include="..\fl2pool.c" />
     <ClCompile Include="..\radix_bitpack.c" />
     <ClCompile Include="..\radix_mf.c" />
     <ClCompile Include="..\radix_struct.c" />
     <ClCompile Include="..\range_enc.c" />
-    <ClCompile Include="..\threading.c" />
     <ClCompile Include="..\util.c" />
     <ClCompile Include="..\xxhash.c" />
   </ItemGroup>

@@ -11,7 +11,7 @@
 
 /* The purpose of this file is to have a single list of error strings embedded in binary */
 
-#include "error_private.h"
+#include "fl2_error_private.h"
 
 const char* ERR_getErrorString(ERR_enum code)
 {

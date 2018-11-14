@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\error_private.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\fl2_common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -55,6 +52,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\fl2_threading.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fl2_error_private.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

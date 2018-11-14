@@ -1,7 +1,7 @@
-objects = ..\error_private.o \
-..\fl2_common.o \
+objects = ..\fl2_common.o \
 ..\fl2_compress.o \
 ..\fl2_decompress.o \
+..\fl2_error_private.o \
 ..\fl2_pool.o \
 ..\fl2_threading.o \
 ..\lzma2_dec.o \
@@ -18,10 +18,10 @@ CC := gcc
 libflzma2-x64 : $(objects)
 	$(CC) -shared -pthread -o libflzma2-x64.dll $(objects) -lm
 
-error_private.o : ..\error_private.h
-fl2_common.o : ..\fast-lzma2.h ..\error_private.h ..\fl2_internal.h
+fl2_common.o : ..\fast-lzma2.h ..\fl2_error_private.h ..\fl2_internal.h
 fl2_compress.o : ..\fast-lzma2.h ..\fl2_internal.h ..\mem.h ..\util.h ..\fl2_compress_internal.h ..\fl2_threading.h ..\fl2_pool.h ..\radix_mf.h ..\lzma2_enc.h
 fl2_decompress.o : ..\fast-lzma2.h ..\fl2_internal.h ..\mem.h ..\util.h ..\lzma2_dec.h ..\xxhash.h
+fl2_error_private.o : ..\fl2_error_private.h
 fl2_pool.o : ..\fl2_pool.h ..\fl2_internal.h
 fl2_threading.o : ..\fl2_threading.h
 lzma2_dec.o : ..\lzma2_dec.h ..\fl2_internal.h

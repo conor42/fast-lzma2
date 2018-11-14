@@ -17,7 +17,7 @@
 #include <stdlib.h>      /* malloc, calloc, free */
 #include <string.h>      /* memset */
 #include "fast-lzma2.h"
-#include "error_private.h"
+#include "fl2_error_private.h"
 #include "fl2_internal.h"
 
 

@@ -224,40 +224,6 @@ size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
 size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-typedef struct InBufNode_s InBufNode;
-
-struct InBufNode_s
-{
-    InBufNode *next;
-    size_t length;
-    BYTE inBuf[LZMA_REQUIRED_INPUT_MAX];
-};
-
-typedef struct
-{
-    InBufNode *first;
-    InBufNode *last;
-    size_t startPos;
-    size_t endPos;
-    size_t unpackSize;
-} InputBlock;
-
-enum ParseResult
-{
-    CHUNK_MORE_DATA,
-    CHUNK_CONTINUE,
-    CHUNK_DICT_RESET,
-    CHUNK_FINAL,
-    CHUNK_ERROR,
-    CHUNK_NO_MEMORY
-};
-
-#define LZMA2_MT_INPUT_SIZE 0x40000
-
-InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
-
-int FLzma2Dec_ParseInput(InputBlock *inBlock);
-
 #if defined (__cplusplus)
 }
 #endif

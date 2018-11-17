@@ -10,6 +10,7 @@ objects = ../fl2_common.o \
 ../radix_mf.o \
 ../radix_struct.o \
 ../range_enc.o \
+../util.o \
 ../xxhash.o \
 datagen.o \
 fuzzer.o
@@ -32,5 +33,6 @@ radix_bitpack.o : ../fast-lzma2.h ../mem.h ../fl2_threading.h ../fl2_internal.h 
 radix_mf.o : ../fast-lzma2.h ../mem.h ../fl2_internal.h ../radix_internal.h
 radix_struct.o : ../fast-lzma2.h ../mem.h ../fl2_threading.h ../fl2_internal.h ../radix_internal.h ../radix_engine.h
 range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
+util.o : ../util.h
 xxhash.o : ../xxhash.h
 fuzzer.o : ../fast-lzma2.h ../fl2_errors.h ../mem.h ../xxhash.h datagen.h

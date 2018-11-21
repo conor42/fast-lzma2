@@ -352,7 +352,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
-#define FL2_BLOCK_LOG_MIN 12
+#define FL2_BLOCK_LOG_MIN (FL2_DICTLOG_MIN + 2)
 #define FL2_BLOCK_LOG_MAX 32
 #define FL2_SEARCH_DEPTH_MIN 6
 #define FL2_SEARCH_DEPTH_MAX 254

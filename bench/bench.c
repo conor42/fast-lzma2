@@ -197,6 +197,9 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
         else if (strcmp(param, "x") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_highCompression, value);
         }
+        else if (strcmp(param, "s") == 0) {
+            FL2_CCtx_setParameter(fcs, FL2_p_blockSizeLog, value);
+        }
         else if (strcmp(param, "e") == 0) {
             end_level = value;
         }
@@ -239,7 +242,7 @@ int FL2LIB_CALL main(int argc, char** argv)
     }
     FL2_CCtx* fcs = FL2_createCCtxMt(threads);
     FL2_DCtx* dctx = FL2_createDCtx();
-    if (fcs == NULL)
+    if (fcs == NULL || dctx == NULL)
         return 1;
     int end_level = parse_params(fcs, argc, argv);
     int level = (int)FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, 0);

@@ -625,8 +625,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         return cctx->params.rParams.overlap_fraction;
 
     case FL2_p_blockSizeLog:
-        if ((int)value > 0) {  /* 0 : does not change current blockSizeLog */
-            CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
+        if ((int)value >= 0) {  /* < 0 : does not change current blockSizeLog */
+            if(value)
+                CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
             cctx->params.rParams.block_size_log = value;
         }
         return cctx->params.rParams.block_size_log;

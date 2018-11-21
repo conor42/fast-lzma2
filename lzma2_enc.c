@@ -963,7 +963,7 @@ size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
 
     {   size_t hash = GET_HASH_3(data);
         first_3 = tbl->table_3[hash];
-        tbl->table_3[hash] = (S32)(index);
+        tbl->table_3[hash] = (S32)index;
     }
     if (first_3 >= 0) {
         int cycles = enc->match_cycles;
@@ -1224,8 +1224,6 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
             size_t dist_slot = GetDistSlot(match.dist);
             size_t len_test = length;
             len_end = MAX(len_end, cur + length);
-            /* Pre-load rep0 data bytes */
-/*            unsigned rep_0_bytes = MEM_read16(data - cur_dist + length); */
             for (; len_test >= start_len; --len_test) {
                 OptimalNode *opt;
                 U32 cur_and_len_price = normal_match_price + enc->states.len_states.prices[pos_state][len_test - kMatchLenMin];

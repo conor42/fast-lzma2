@@ -1292,7 +1292,7 @@ void FLzma2Dec_FreeInbufNodeChain(InBufNode *node)
     }
 }
 
-int FLzma2Dec_ParseInput(BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkParseInfo *inf)
+int FLzma2Dec_ParseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkParseInfo *inf)
 {
     inf->packSize = 0;
     inf->unpackSize = 0;

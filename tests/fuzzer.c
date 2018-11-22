@@ -384,7 +384,7 @@ static int basicUnitTests(U32 seed, double compressibility)
     DISPLAYLEVEL(4, "OK \n");
 
     /* streaming tests */
-#if 0
+
     DISPLAYLEVEL(4, "test%3i : compress stream in many chunks : ", testNb++);
     {   BYTE cBuf[0x8101];
         FL2_outBuffer out = { cBuf, sizeof(cBuf), 0 };
@@ -439,7 +439,7 @@ static int basicUnitTests(U32 seed, double compressibility)
             if(diff < CNBuffSize) goto _output_error;
     }   }
     DISPLAYLEVEL(4, "OK \n");
-#endif
+
     DISPLAYLEVEL(4, "test%3i : compress stream in one chunk : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };

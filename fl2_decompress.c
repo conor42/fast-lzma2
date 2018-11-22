@@ -413,7 +413,7 @@ static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
         memcpy((BYTE*)output->dst + output->pos, thread->outBuf + decmt->srcPos, towrite);
         decmt->srcPos += towrite;
         output->pos += towrite;
-        if (output->pos == output->size)
+        if (decmt->srcPos < thread->bufSize)
             break;
         decmt->srcPos = 0;
     }
@@ -444,31 +444,7 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
     return 0;
 }
 
-static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
-{
-    Lzma2DecMt *decmt = fds->decmt;
-    if (decmt->isFinal && !decmt->isWriting)
-        return 0;
-    if (decmt->head->length == 0) {
-        decmt->prop = ((const BYTE*)input->src)[input->pos];
-        ++input->pos;
-        fds->do_hash = decmt->prop >> FL2_PROP_HASH_BIT;
-        decmt->prop &= FL2_LZMA_PROP_MASK;
-    }
-    if (decmt->isWriting) {
-        FL2_writeStreamBlocks(fds, output);
-    }
-    if (!decmt->isWriting) {
-        int res = FL2_LoadInputMt(decmt, input);
-        if (res > 0) {
-            CHECK_F(FL2_decompressBlocksMt(fds));
-            FL2_writeStreamBlocks(fds, output);
-        }
-    }
-    return !decmt->isFinal;
-}
-
-static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
+static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
 {
     InputBlock *inBlock = &decmt->threads[decmt->numThreads].inBlock;
     int res = CHUNK_CONTINUE;
@@ -490,13 +466,13 @@ static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
                 inBlock->endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
                 inBlock->startPos = inBlock->endPos;
             }
-            if (inBlock->endPos >= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX) {
-                InBufNode* prev = inBlock->last;
-                inBlock->last = FLzma2Dec_CreateInbufNode(inBlock->last);
-                if (!inBlock->last)
-                    return FL2_ERROR(memory_allocation);
-                inBlock->endPos -= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX;
-            }
+        }
+        if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE) {
+            InBufNode* prev = inBlock->last;
+            inBlock->last = FLzma2Dec_CreateInbufNode(inBlock->last);
+            if (!inBlock->last)
+                return FL2_ERROR(memory_allocation);
+            inBlock->endPos -= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX;
         }
 
         {
@@ -507,6 +483,31 @@ static int FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
         }
     }
     return res == CHUNK_FINAL;
+}
+
+static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
+{
+    Lzma2DecMt *decmt = fds->decmt;
+    if (decmt->isFinal && !decmt->isWriting)
+        return 0;
+    if (decmt->head->length == 0) {
+        decmt->prop = ((const BYTE*)input->src)[input->pos];
+        ++input->pos;
+        fds->do_hash = decmt->prop >> FL2_PROP_HASH_BIT;
+        decmt->prop &= FL2_LZMA_PROP_MASK;
+    }
+    if (decmt->isWriting) {
+        FL2_writeStreamBlocks(fds, output);
+    }
+    if (!decmt->isFinal && !decmt->isWriting) {
+        size_t res = FL2_LoadInputMt(decmt, input);
+        CHECK_F(res);
+        if (res > 0) {
+            CHECK_F(FL2_decompressBlocksMt(fds));
+            FL2_writeStreamBlocks(fds, output);
+        }
+    }
+    return !decmt->isFinal || decmt->isWriting;
 }
 
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)

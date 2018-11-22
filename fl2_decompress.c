@@ -121,6 +121,7 @@ size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
     BYTE prop)
 {
     size_t srcSize = *srcLen;
+    *srcLen = 0;
     size_t pos = 0;
     size_t unpackSize = 0;
     unsigned thread = 0;
@@ -145,8 +146,8 @@ size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
                 return res;
             assert(res == blocks[thread - 1].unpackPos + blocks[thread - 1].unpackSize);
             unpackSize += res;
-            dctx->dicPos = res;
-            *srcLen = blocks[thread - 1].packPos + blocks[thread - 1].packSize;
+            dctx->dicPos = unpackSize;
+            *srcLen += blocks[thread - 1].packPos + blocks[thread - 1].packSize;
             if (type == CHUNK_FINAL)
                 return LZMA_STATUS_FINISHED_WITH_MARK;
             src = (BYTE*)src + pos;
@@ -300,22 +301,34 @@ struct FL2_DStream_s
     BYTE do_hash;
 };
 
-static void FL2_FreeMtBuffers(Lzma2DecMt *decmt)
+static void FL2_FreeInputBuffersUnfinished(Lzma2DecMt *decmt)
+{
+    if(decmt->numThreads == 0)
+        return;
+    InBufNode *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
+    FLzma2Dec_FreeInbufNodeChain(decmt->head, keep);
+    decmt->head = keep;
+    decmt->threads[0].inBlock.first = keep;
+    decmt->threads[0].inBlock.last = keep;
+    decmt->threads[0].inBlock.endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
+    decmt->threads[0].inBlock.startPos = decmt->threads[0].inBlock.endPos;
+    decmt->threads[0].inBlock.unpackSize = 0;
+}
+
+static void FL2_FreeOutputBuffers(Lzma2DecMt *decmt)
 {
     for (size_t thread = 0; thread < decmt->numThreads; ++thread) {
         free(decmt->threads[thread].outBuf);
         decmt->threads[thread].outBuf = NULL;
     }
     decmt->numThreads = 0;
-    FLzma2Dec_FreeInbufNodeChain(decmt->head->next);
-    decmt->head->next = NULL;
 }
 
 static void FL2_Lzma2DecMtFree(Lzma2DecMt *decmt)
 {
     if (decmt) {
-        FL2_FreeMtBuffers(decmt);
-        FLzma2Dec_FreeInbufNodeChain(decmt->head);
+        FL2_FreeOutputBuffers(decmt);
+        FLzma2Dec_FreeInbufNodeChain(decmt->head, NULL);
         FL2POOL_free(decmt->factory);
         free(decmt);
     }
@@ -418,8 +431,10 @@ static void FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
         decmt->srcPos = 0;
     }
     decmt->isWriting = decmt->srcThread < fds->decmt->numThreads;
-    if(!decmt->isWriting)
-        FL2_FreeMtBuffers(fds->decmt);
+    if (!decmt->isWriting) {
+        FL2_FreeOutputBuffers(fds->decmt);
+        fds->decmt->numThreads = 0;
+    }
 }
 
 /* FL2_decompressBlock() : FL2POOL_function type */
@@ -436,11 +451,16 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
     }
     fds->decmt->threads[0].res = FL2_decompressBlockMt(fds, 0);
     FL2POOL_waitAll(fds->decmt->factory);
+
+    FL2_FreeInputBuffersUnfinished(fds->decmt);
+
     if (FL2_isError(fds->decmt->threads[0].res))
         return fds->decmt->threads[0].res;
+
     fds->decmt->srcThread = 0;
     fds->decmt->srcPos = 0;
     fds->decmt->isWriting = 1;
+
     return 0;
 }
 
@@ -465,9 +485,10 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
                 inBlock->last = inBlock->first;
                 inBlock->endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
                 inBlock->startPos = inBlock->endPos;
+                inBlock->unpackSize = 0;
             }
         }
-        if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE) {
+        if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE && inBlock->endPos >= inBlock->last->length) {
             InBufNode* prev = inBlock->last;
             inBlock->last = FLzma2Dec_CreateInbufNode(inBlock->last);
             if (!inBlock->last)
@@ -547,7 +568,13 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
     if (fds->decmt) {
         fds->decmt->isWriting = 0;
         fds->decmt->isFinal = 0;
-        FL2_FreeMtBuffers(fds->decmt);
+        FL2_FreeOutputBuffers(fds->decmt);
+        FLzma2Dec_FreeInbufNodeChain(fds->decmt->head->next, NULL);
+        fds->decmt->head->length = 0;
+        fds->decmt->threads[0].inBlock.first = fds->decmt->head;
+        fds->decmt->threads[0].inBlock.last = fds->decmt->head;
+        fds->decmt->threads[0].inBlock.startPos = 0;
+        fds->decmt->threads[0].inBlock.endPos = 0;
     }
     return 0;
 }

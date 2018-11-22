@@ -1283,11 +1283,14 @@ InBufNode * FLzma2Dec_CreateInbufNode(InBufNode *prev)
     return node;
 }
 
-void FLzma2Dec_FreeInbufNodeChain(InBufNode *node)
+void FLzma2Dec_FreeInbufNodeChain(InBufNode *node, InBufNode *keep)
 {
     while (node) {
         InBufNode *next = node->next;
-        free(node);
+        if(node != keep)
+            free(node);
+        else 
+            node->next = NULL;
         node = next;
     }
 }

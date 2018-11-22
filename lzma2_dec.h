@@ -260,7 +260,7 @@ typedef struct
 #define LZMA2_MT_INPUT_SIZE 0x40000
 
 InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
-void FLzma2Dec_FreeInbufNodeChain(InBufNode *node);
+void FLzma2Dec_FreeInbufNodeChain(InBufNode *node, InBufNode *keep);
 
 int FLzma2Dec_ParseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkParseInfo *inf);
 

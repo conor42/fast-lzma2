@@ -280,7 +280,7 @@ static int callback(const void *src, size_t size, void *opaque)
 
 static int basicUnitTests(U32 seed, double compressibility)
 {
-    size_t const CNBuffSize = 5 MB;
+    size_t const CNBuffSize = 20 MB;
     void* const CNBuffer = malloc(CNBuffSize);
     size_t const compressedBufferSize = FL2_compressBound(CNBuffSize);
     void* const compressedBuffer = malloc(compressedBufferSize);

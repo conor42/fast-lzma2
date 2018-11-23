@@ -230,7 +230,7 @@ struct InBufNode_s
 {
     InBufNode *next;
     size_t length;
-    BYTE inBuf[LZMA_REQUIRED_INPUT_MAX];
+    BYTE inBuf[1];
 };
 
 typedef struct

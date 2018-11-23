@@ -81,8 +81,10 @@ static void FL2_decompressCtxBlock(void* const jobDescription, size_t n)
         blocks[n].res = blocks[n].dctx->dicPos;
 }
 
-static size_t FL2_decompressCtxBlocksMt(BlockInfo* const blocks, const BYTE *src, BYTE *dst, BYTE prop, FL2POOL_ctx * const factory, size_t numThreads)
+static size_t FL2_decompressCtxBlocksMt(BlockInfo* const blocks, const BYTE *src, BYTE *dst, size_t dstCapacity, BYTE prop, FL2POOL_ctx * const factory, size_t numThreads)
 {
+    if (dstCapacity < blocks[0].unpackSize)
+        return FL2_ERROR(dstSize_tooSmall);
     blocks[0].packPos = 0;
     blocks[0].unpackPos = 0;
     blocks[0].src = src;
@@ -91,6 +93,10 @@ static size_t FL2_decompressCtxBlocksMt(BlockInfo* const blocks, const BYTE *src
         blocks[thread].unpackPos = blocks[thread - 1].unpackPos + blocks[thread - 1].unpackSize;
         blocks[thread].src = src + blocks[thread].packPos;
         CHECK_F(FLzma2Dec_Init(blocks[thread].dctx, prop, dst + blocks[thread].unpackPos, blocks[thread].unpackSize));
+    }
+    if (dstCapacity < blocks[numThreads - 1].unpackPos + blocks[numThreads - 1].unpackSize)
+        return FL2_ERROR(dstSize_tooSmall);
+    for (size_t thread = 1; thread < numThreads; ++thread) {
         FL2POOL_add(factory, FL2_decompressCtxBlock, blocks, thread);
     }
     CHECK_F(FLzma2Dec_Init(blocks[0].dctx, prop, dst + blocks[0].unpackPos, blocks[0].unpackSize));
@@ -129,7 +135,7 @@ size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
     while (pos < srcSize) {
         ChunkParseInfo inf;
         int type = FLzma2Dec_ParseInput(src, pos, srcSize - pos, &inf);
-        if (type == CHUNK_ERROR)
+        if (type == CHUNK_ERROR || type == CHUNK_MORE_DATA)
             return FL2_ERROR(corruption_detected);
         if (pos == 0 && type == CHUNK_DICT_RESET)
             type = CHUNK_CONTINUE;
@@ -141,7 +147,7 @@ size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
             ++thread;
         }
         if (type == CHUNK_FINAL || (type == CHUNK_DICT_RESET && thread == numThreads)) {
-            size_t res = FL2_decompressCtxBlocksMt(blocks, (BYTE*)src, dst, prop, factory, thread);
+            size_t res = FL2_decompressCtxBlocksMt(blocks, (BYTE*)src, dst, dstCapacity, prop, factory, thread);
             if (FL2_isError(res))
                 return res;
             assert(res == blocks[thread - 1].unpackPos + blocks[thread - 1].unpackSize);
@@ -379,6 +385,7 @@ static int FL2_ParseMt(Lzma2DecMt* decmt, InputBlock* inBlock)
         inBlock->unpackSize += inf.unpackSize;
         first = 0;
     }
+    inBlock->endPos += (res == CHUNK_FINAL);
     return res;
 }
 
@@ -495,7 +502,7 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
                 inBlock->unpackSize = 0;
             }
         }
-        if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE && inBlock->endPos >= inBlock->last->length) {
+        if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE && inBlock->endPos + LZMA_REQUIRED_INPUT_MAX >= inBlock->last->length) {
             InBufNode* prev = inBlock->last;
             inBlock->last = FLzma2Dec_CreateInbufNode(inBlock->last);
             if (!inBlock->last)
@@ -508,6 +515,8 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
             memcpy(inBlock->last->inBuf + inBlock->last->length, (BYTE*)input->src + input->pos, toread);
             inBlock->last->length += toread;
             input->pos += toread;
+            if (res == CHUNK_MORE_DATA && toread == 0)
+                break;
         }
     }
     return res == CHUNK_FINAL;
@@ -518,28 +527,25 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
     Lzma2DecMt *decmt = fds->decmt;
     if (fds->stage == FL2DEC_STAGE_DECOMP) {
         size_t res;
-        do
-        {
-            res = FL2_LoadInputMt(decmt, input);
-            CHECK_F(res);
-            if (res > 0) {
-                CHECK_F(FL2_decompressBlocksMt(fds));
-                res = FL2_writeStreamBlocks(fds, output);
-            }
-        } while (fds->stage == FL2DEC_STAGE_DECOMP && !decmt->isFinal && res);
-        fds->stage = FL2DEC_STAGE_MT_WRITE;
+        res = FL2_LoadInputMt(decmt, input);
+        CHECK_F(res);
+        if (res > 0) {
+            CHECK_F(FL2_decompressBlocksMt(fds));
+            fds->stage = FL2DEC_STAGE_MT_WRITE;
+        }
     }
-    else if (fds->stage == FL2DEC_STAGE_MT_WRITE) {
+    if (fds->stage == FL2DEC_STAGE_MT_WRITE) {
         if (FL2_writeStreamBlocks(fds, output))
-            fds->stage = decmt->isFinal ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_DECOMP;
+            fds->stage = decmt->isFinal ? (fds->do_hash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED)
+                : FL2DEC_STAGE_DECOMP;
     }
     if (fds->stage == FL2DEC_STAGE_HASH) {
         if (decmt->hashPos == 0) {
             size_t pos = decmt->threads[0].inBlock.endPos;
-            decmt->hashPos = my_min(XXHASH_SIZEOF, decmt->head->length - pos);
+            decmt->hashPos = MIN(XXHASH_SIZEOF, decmt->head->length - pos);
             memcpy(&decmt->hash, decmt->head->inBuf + pos, decmt->hashPos);
         }
-        size_t to_read = my_min(XXHASH_SIZEOF - decmt->hashPos, input->size - input->pos);
+        size_t to_read = MIN(XXHASH_SIZEOF - decmt->hashPos, input->size - input->pos);
         memcpy(&decmt->hash + decmt->hashPos, (BYTE*)input->src + input->pos, to_read);
         decmt->hashPos += to_read;
         if (decmt->hashPos == XXHASH_SIZEOF) {
@@ -608,14 +614,17 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
-    if (input->pos < input->size) {
+    if (input->pos < input->size || fds->decmt) {
         if (fds->stage == FL2DEC_STAGE_INIT) {
             BYTE prop = ((const BYTE*)input->src)[input->pos];
             ++input->pos;
             fds->do_hash = prop >> FL2_PROP_HASH_BIT;
             prop &= FL2_LZMA_PROP_MASK;
 
-            CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
+            if (fds->decmt)
+                fds->decmt->prop = prop;
+            else
+                CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
 
 #ifndef NO_XXHASH
             if (fds->do_hash) {

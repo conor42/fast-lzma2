@@ -1270,7 +1270,7 @@ size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
 
 InBufNode * FLzma2Dec_CreateInbufNode(InBufNode *prev)
 {
-    InBufNode *node = malloc(sizeof(InBufNode) + LZMA2_MT_INPUT_SIZE);
+    InBufNode *node = malloc(sizeof(InBufNode) + LZMA2_MT_INPUT_SIZE - 1);
     if(!node)
         return NULL;
     node->next = NULL;

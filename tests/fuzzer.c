@@ -445,7 +445,6 @@ static int basicUnitTests(U32 seed, double compressibility)
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
-        FL2_CStream_setParameter(cstream, FL2_p_blockSizeLog, 21);
         CHECK(FL2_compressStream(cstream, &out, &in));
         r = FL2_endStream(cstream, &out);
         if (r != 0) goto _output_error;
@@ -456,8 +455,12 @@ static int basicUnitTests(U32 seed, double compressibility)
     DISPLAYLEVEL(4, "test%3i : decompress stream in one chunk : ", testNb++);
     {   FL2_inBuffer in = { compressedBuffer, cSize, 0 };
         FL2_outBuffer out = { decodedBuffer, CNBuffSize, 0 };
+        size_t r;
         CHECK(FL2_initDStream(dstream));
-        CHECK(FL2_decompressStream(dstream, &out, &in));
+        do {
+            r = FL2_decompressStream(dstream, &out, &in);
+            if (FL2_isError(r)) goto _output_error;
+        } while (r);
         {   size_t diff = findDiff(CNBuffer, decodedBuffer, out.pos);
             if (diff < CNBuffSize) goto _output_error;
         }
@@ -743,6 +746,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
     BYTE* const mirrorBuffer = (BYTE*) malloc (dstBufferSize);
     FL2_CCtx* const cctx = FL2_createCCtxMt(nbThreads);
     FL2_DCtx* const dctx = FL2_createDCtx();
+    FL2_DStream *const dstream = FL2_createDStream();
     U32 result = 0;
     U32 testNb = 0;
     U32 coreSeed = seed, lseed = 0;
@@ -757,7 +761,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
     cNoiseBuffer[3] = (BYTE*)malloc (srcBufferSize);
     cNoiseBuffer[4] = (BYTE*)malloc (srcBufferSize);
     CHECK (!cNoiseBuffer[0] || !cNoiseBuffer[1] || !cNoiseBuffer[2] || !cNoiseBuffer[3] || !cNoiseBuffer[4]
-           || !dstBuffer || !mirrorBuffer || !cBuffer || !cctx || !dctx,
+           || !dstBuffer || !mirrorBuffer || !cBuffer || !cctx || !dctx || !dstream,
            "Not enough memory, fuzzer tests cancelled");
 
     /* Create initial samples */
@@ -857,6 +861,32 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                 CHECK(diff < sampleSize, "decompression result corrupted (pos %u / %u)", (U32)diff, (U32)sampleSize);
         }   }
 
+        /* streaming decompression test */
+        {   FL2_inBuffer in = { cBuffer, 0, 0 };
+            FL2_outBuffer out = { dstBuffer, 0, 0 };
+            BYTE *send = (BYTE*)cBuffer + cSize;
+            BYTE *oend = (BYTE*)dstBuffer + sampleSize;
+            ptrdiff_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
+            size_t r;
+            size_t total = 0;
+            CHECK(FL2_isError(FL2_initDStream(dstream)), "FL2_initDStream failed");
+            do {
+                if (in.pos + LZMA_REQUIRED_INPUT_MAX >= in.size) {
+                    in.src = (BYTE*)in.src + in.pos;
+                    in.size = MIN(bufSize, send - (BYTE*)in.src);
+                    in.pos = 0;
+                }
+                out.dst = (BYTE*)out.dst + out.pos;
+                out.size = MIN(bufSize, oend - (BYTE*)out.dst);
+                out.pos = 0;
+                r = FL2_decompressStream(dstream, &out, &in);
+                total += out.pos;
+                CHECK(FL2_isError(r), "FL2_decompressStream failed (%s) (srcSize : %u ; cSize : %u)", FL2_getErrorName(r), (U32)sampleSize, (U32)cSize);
+            } while (r);
+            {   size_t diff = findDiff(sampleBuffer, dstBuffer, sampleSize);
+                CHECK(diff < sampleSize, "decompression result corrupted (pos %u / %u)", (U32)diff, (U32)sampleSize);
+        }   }
+        
         free(sampleBuffer);   /* no longer useful after this point */
         sampleBuffer = NULL;
 
@@ -923,6 +953,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
 _cleanup:
     FL2_freeCCtx(cctx);
     FL2_freeDCtx(dctx);
+    FL2_freeDStream(dstream);
     free(cNoiseBuffer[0]);
     free(cNoiseBuffer[1]);
     free(cNoiseBuffer[2]);

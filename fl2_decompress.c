@@ -313,28 +313,18 @@ struct FL2_DStream_s
 
 static void FL2_FreeInputBuffersUnfinished(Lzma2DecMt *decmt)
 {
-    if(decmt->numThreads == 0)
-        return;
-    InBufNode *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
-    FLzma2Dec_FreeInbufNodeChain(decmt->head, keep);
-    decmt->head = keep;
-    decmt->threads[0].inBlock.first = keep;
-    decmt->threads[0].inBlock.last = keep;
-    decmt->threads[0].inBlock.endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
-    decmt->threads[0].inBlock.startPos = decmt->threads[0].inBlock.endPos;
-    decmt->threads[0].inBlock.unpackSize = 0;
 }
 
 static void FL2_FreeOutputBuffers(Lzma2DecMt *decmt)
 {
-    for (size_t thread = 0; thread < decmt->numThreads; ++thread) {
+    for (size_t thread = 0; thread < decmt->maxThreads; ++thread) {
         free(decmt->threads[thread].outBuf);
         decmt->threads[thread].outBuf = NULL;
     }
     decmt->numThreads = 0;
 }
 
-static void FL2_Lzma2DecMtFree(Lzma2DecMt *decmt)
+static void FL2_Lzma2DecMt_Free(Lzma2DecMt *decmt)
 {
     if (decmt) {
         FL2_FreeOutputBuffers(decmt);
@@ -344,26 +334,40 @@ static void FL2_Lzma2DecMtFree(Lzma2DecMt *decmt)
     }
 }
 
-static Lzma2DecMt *FL2_Lzma2DecMt_Create(unsigned numThreads)
+static FL2_Lzma2DecMt_Init(Lzma2DecMt *decmt)
 {
-    numThreads += !numThreads;
-    Lzma2DecMt *decmt = malloc(sizeof(Lzma2DecMt) + (numThreads - 1) * sizeof(ThreadInfo));
+    if (decmt) {
+        decmt->isFinal = 0;
+        decmt->hashPos = 0;
+        FL2_FreeOutputBuffers(decmt);
+        FLzma2Dec_FreeInbufNodeChain(decmt->head->next, NULL);
+        decmt->head->length = 0;
+        decmt->threads[0].inBlock.first = decmt->head;
+        decmt->threads[0].inBlock.last = decmt->head;
+        decmt->threads[0].inBlock.startPos = 0;
+        decmt->threads[0].inBlock.endPos = 0;
+    }
+}
+
+static Lzma2DecMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
+{
+    maxThreads += !maxThreads;
+    Lzma2DecMt *decmt = malloc(sizeof(Lzma2DecMt) + (maxThreads - 1) * sizeof(ThreadInfo));
     if (!decmt)
         return NULL;
     decmt->head = FLzma2Dec_CreateInbufNode(NULL);
-    decmt->factory = FL2POOL_create(numThreads - 1);
-    if (numThreads > 1 && decmt->factory == NULL) {
-        FL2_Lzma2DecMtFree(decmt);
+    decmt->factory = FL2POOL_create(maxThreads - 1);
+    if (maxThreads > 1 && decmt->factory == NULL) {
+        FL2_Lzma2DecMt_Free(decmt);
         return NULL;
     }
     decmt->numThreads = 0;
-    decmt->maxThreads = numThreads;
-    decmt->isFinal = 0;
-    memset(decmt->threads, 0, numThreads * sizeof(ThreadInfo));
-    for(size_t n = 0; n < numThreads; ++n)
+    decmt->maxThreads = maxThreads;
+    for (size_t n = 0; n < maxThreads; ++n) {
+        decmt->threads[n].outBuf = NULL;
         LzmaDec_Construct(&decmt->threads[n].dec);
-    decmt->threads[0].inBlock.first = decmt->head;
-    decmt->threads[0].inBlock.last = decmt->head;
+    }
+    FL2_Lzma2DecMt_Init(decmt);
     return decmt;
 }
 
@@ -387,15 +391,6 @@ static int FL2_ParseMt(Lzma2DecMt* decmt, InputBlock* inBlock)
     }
     inBlock->endPos += (res == CHUNK_FINAL);
     return res;
-}
-
-static int FL2_AllocThread(Lzma2DecMt* decmt)
-{
-    decmt->threads[decmt->numThreads].bufSize = decmt->threads[decmt->numThreads].inBlock.unpackSize;
-    decmt->threads[decmt->numThreads].outBuf = malloc(decmt->threads[decmt->numThreads].bufSize);
-    if (!decmt->threads[decmt->numThreads].outBuf)
-        return 1;
-    return 0;
 }
 
 static size_t FL2_decompressBlockMt(FL2_DStream* fds, size_t thread)
@@ -461,13 +456,23 @@ static void FL2_decompressBlock(void* const jobDescription, size_t n)
 
 static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
 {
+    Lzma2DecMt * const decmt = fds->decmt;
     for (size_t thread = 1; thread < fds->decmt->numThreads; ++thread) {
         FL2POOL_add(fds->decmt->factory, FL2_decompressBlock, fds, thread);
     }
     fds->decmt->threads[0].res = FL2_decompressBlockMt(fds, 0);
     FL2POOL_waitAll(fds->decmt->factory);
 
-    FL2_FreeInputBuffersUnfinished(fds->decmt);
+    if (decmt->numThreads > 0) {
+        InBufNode *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
+        FLzma2Dec_FreeInbufNodeChain(decmt->head, keep);
+        decmt->head = keep;
+        decmt->threads[0].inBlock.first = keep;
+        decmt->threads[0].inBlock.last = keep;
+        decmt->threads[0].inBlock.endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
+        decmt->threads[0].inBlock.startPos = decmt->threads[0].inBlock.endPos;
+        decmt->threads[0].inBlock.unpackSize = 0;
+    }
 
     if (FL2_isError(fds->decmt->threads[0].res))
         return fds->decmt->threads[0].res;
@@ -488,16 +493,24 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
             if (res == CHUNK_ERROR)
                 return FL2_ERROR(corruption_detected);
             if (res == CHUNK_DICT_RESET || res == CHUNK_FINAL) {
-                if (FL2_AllocThread(decmt) != 0)
+                ThreadInfo * const done = decmt->threads + decmt->numThreads;
+
+                done->bufSize = done->inBlock.unpackSize;
+                done->outBuf = malloc(done->bufSize);
+
+                if (!done->outBuf)
                     return FL2_ERROR(memory_allocation);
+
                 decmt->isFinal = (res == CHUNK_FINAL);
+
                 ++decmt->numThreads;
                 if (decmt->numThreads == decmt->maxThreads || res == CHUNK_FINAL)
                     return 1;
+
                 inBlock = &decmt->threads[decmt->numThreads].inBlock;
-                inBlock->first = decmt->threads[decmt->numThreads - 1].inBlock.last;
+                inBlock->first = done->inBlock.last;
                 inBlock->last = inBlock->first;
-                inBlock->endPos = decmt->threads[decmt->numThreads - 1].inBlock.endPos;
+                inBlock->endPos = done->inBlock.endPos;
                 inBlock->startPos = inBlock->endPos;
                 inBlock->unpackSize = 0;
             }
@@ -598,17 +611,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
-    if (fds->decmt) {
-        fds->decmt->isFinal = 0;
-        fds->decmt->hashPos = 0;
-        FL2_FreeOutputBuffers(fds->decmt);
-        FLzma2Dec_FreeInbufNodeChain(fds->decmt->head->next, NULL);
-        fds->decmt->head->length = 0;
-        fds->decmt->threads[0].inBlock.first = fds->decmt->head;
-        fds->decmt->threads[0].inBlock.last = fds->decmt->head;
-        fds->decmt->threads[0].inBlock.startPos = 0;
-        fds->decmt->threads[0].inBlock.endPos = 0;
-    }
+    FL2_Lzma2DecMt_Init(fds->decmt);
     return 0;
 }
 

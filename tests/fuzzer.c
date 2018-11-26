@@ -377,7 +377,7 @@ static int basicUnitTests(U32 seed, double compressibility)
         BYTE prop = FL2_dictSizeProp(cctx);
         callback(&prop, 1, &out);
         CHECK(FL2_compressCCtxBlock_toFn(cctx, callback, &out, &in, NULL));
-        CHECK(FL2_endFrame_toFn(cctx, callback, &out));
+        CHECK(FL2_endFrame_toFn(callback, &out));
         FL2_freeCCtx(cctx);
         CHECK(FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, compressedBufferSize));
     }

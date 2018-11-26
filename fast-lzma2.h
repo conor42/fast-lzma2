@@ -185,8 +185,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.
  *  Must be called after compressing with FL2_compressCCtxBlock() */
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
-    void* dst, size_t dstCapacity);
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity);
 
 typedef int (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
 
@@ -203,8 +202,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
 /*! FL2_endFrame() :
  *  Write the end marker to a callback function to terminate the LZMA2 stream.
  *  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_CCtx* ctx,
-    FL2_writerFn writeFn, void* opaque);
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_writerFn writeFn, void* opaque);
 
 /*! FL2_dictSizeProp() :
  *  Get the dictionary size property.
@@ -354,7 +352,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
-#define FL2_BLOCK_LOG_MIN 12
+#define FL2_BLOCK_LOG_MIN 21
 #define FL2_BLOCK_LOG_MAX 32
 #define FL2_SEARCH_DEPTH_MIN 6
 #define FL2_SEARCH_DEPTH_MAX 254

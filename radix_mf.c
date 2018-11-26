@@ -103,7 +103,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
     }
     CLAMP(params.dictionary_log, DICTIONARY_LOG_MIN, MEM_64bits() ? DICTIONARY_LOG_MAX_64 : DICTIONARY_LOG_MAX_32);
     CLAMP(params.match_buffer_log, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);
-    CLAMP(params.overlap_fraction, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
+    CLAMP(/* silence warning */(int)params.overlap_fraction, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
     CLAMP(params.depth, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
     return params;
 }

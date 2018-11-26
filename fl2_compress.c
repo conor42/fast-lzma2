@@ -84,7 +84,7 @@ static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL +
     { 28, 3, 14, 5, 128, 160, 0, 9, FL2_ultra } /* 9 */
 };
 
-void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* const params)
+static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* const params)
 {
     FL2_lzma2Parameters* const cParams = &cctx->params.cParams;
     RMF_parameters* const rParams = &cctx->params.rParams;
@@ -414,11 +414,12 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
 
 static BYTE FL2_getProp(FL2_CCtx* cctx, size_t dictionary_size)
 {
-    return FL2_getDictSizeProp(dictionary_size)
 #ifndef NO_XXHASH
-        | (BYTE)((cctx->params.doXXH != 0) << FL2_PROP_HASH_BIT)
+    return FL2_getDictSizeProp(dictionary_size) | (BYTE)((cctx->params.doXXH != 0) << FL2_PROP_HASH_BIT);
+#else
+    (void)cctx;
+    return FL2_getDictSizeProp(dictionary_size);
 #endif
-        ;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
@@ -518,8 +519,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* cctx,
     return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, NULL, opaque, progress);
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(FL2_CCtx* ctx,
-    void* dst, size_t dstCapacity)
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity)
 {
     if (!dstCapacity)
         return FL2_ERROR(dstSize_tooSmall);
@@ -535,8 +535,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
     return FL2_compressBlock(cctx, block->data, block->start, block->end, NULL, 0, writeFn, opaque, progress);
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_CCtx* ctx,
-    FL2_writerFn writeFn, void* opaque)
+FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_writerFn writeFn, void* opaque)
 {
     BYTE c = LZMA2_END_MARKER;
     if(writeFn(&c, 1, opaque))
@@ -571,6 +570,11 @@ FL2LIB_API BYTE FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* cctx)
 {
     return FL2_getDictSizeProp(cctx->dictMax ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log);
 }
+
+#define MAXCHECK(val,max) {            \
+    if ((val)>(max)) {     \
+        return FL2_ERROR(parameter_outOfBound);  \
+}   }
 
 #define CLAMPCHECK(val,min,max) {            \
     if (((val)<(min)) | ((val)>(max))) {     \
@@ -619,14 +623,15 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_overlapFraction:
         if ((int)value >= 0) {  /* < 0 : does not change current overlapFraction */
-            CLAMPCHECK(value, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
+            MAXCHECK(value, FL2_BLOCK_OVERLAP_MAX);
             cctx->params.rParams.overlap_fraction = value;
         }
         return cctx->params.rParams.overlap_fraction;
 
     case FL2_p_blockSizeLog:
-        if ((int)value > 0) {  /* 0 : does not change current blockSizeLog */
-            CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
+        if ((int)value >= 0) {  /* < 0 : does not change current blockSizeLog */
+            if(value != 0)
+                CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
             cctx->params.rParams.block_size_log = value;
         }
         return cctx->params.rParams.block_size_log;
@@ -647,14 +652,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_searchLog:
         if ((int)value >= 0) { /* < 0 : does not change current searchLog */
-            CLAMPCHECK(value, FL2_SEARCHLOG_MIN, FL2_SEARCHLOG_MAX);
+            MAXCHECK(value, FL2_SEARCHLOG_MAX);
             cctx->params.cParams.match_cycles = 1U << value;
         }
         return value;
 
     case FL2_p_literalCtxBits:
         if ((int)value >= 0) { /* < 0 : does not change current lc */
-            CLAMPCHECK(value, FL2_LC_MIN, FL2_LC_MAX);
+            MAXCHECK(value, FL2_LC_MAX);
             if(value + cctx->params.cParams.lp > FL2_LCLP_MAX)
                 return FL2_ERROR(parameter_outOfBound);
             cctx->params.cParams.lc = value;
@@ -663,7 +668,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_literalPosBits:
         if ((int)value >= 0) { /* < 0 : does not change current lp */
-            CLAMPCHECK(value, FL2_LP_MIN, FL2_LP_MAX);
+            MAXCHECK(value, FL2_LP_MAX);
             if (cctx->params.cParams.lc + value > FL2_LCLP_MAX)
                 return FL2_ERROR(parameter_outOfBound);
             cctx->params.cParams.lp = value;
@@ -672,7 +677,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_posBits:
         if ((int)value >= 0) { /* < 0 : does not change current pb */
-            CLAMPCHECK(value, FL2_PB_MIN, FL2_PB_MAX);
+            MAXCHECK(value, FL2_PB_MAX);
             cctx->params.cParams.pb = value;
         }
         return cctx->params.cParams.pb;
@@ -699,7 +704,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_strategy:
         if ((int)value >= 0) { /* < 0 : does not change current strategy */
-            CLAMPCHECK(value, (unsigned)FL2_fast, (unsigned)FL2_ultra);
+            MAXCHECK(value, (unsigned)FL2_ultra);
             cctx->params.cParams.strategy = (FL2_strategy)value;
         }
         return (size_t)cctx->params.cParams.strategy;

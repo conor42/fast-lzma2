@@ -36,33 +36,33 @@ Modified for FL2 by Conor McCarthy */
 #define UPDATE_COND(p) range=(code < bound) ? r0 : r1; *p = (Probability)((code < bound) ? p0 : p1)
 #define UPDATE_CODE code = code - ((code < bound) ? 0 : bound)
 
-#define TREE_GET_BIT(probs, i) { Probability *p = (probs)+(i); PREP_BIT(p); \
+#define TREE_GET_BIT(probs, i) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
   UPDATE_PREP_0; unsigned i0 = (i + i); \
   UPDATE_PREP_1; unsigned i1 = (i + i) + 1; \
-  UPDATE_COND(p); \
+  UPDATE_COND(pp); \
   i = (code < bound) ? i0 : i1; \
   UPDATE_CODE; \
 }
 
-#define REV_BIT_VAR(probs, i, m) { Probability *p = (probs)+(i); PREP_BIT(p); \
+#define REV_BIT_VAR(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
   UPDATE_PREP_0; U32 i0 = i + m; U32 m2 = m + m; \
   UPDATE_PREP_1; U32 i1 = i + m2; \
-  UPDATE_COND(p); \
+  UPDATE_COND(pp); \
   i = (code < bound) ? i0 : i1; \
   m = m2; \
   UPDATE_CODE; \
 }
-#define REV_BIT_CONST(probs, i, m) { Probability *p = (probs)+(i); PREP_BIT(p); \
+#define REV_BIT_CONST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
   UPDATE_PREP_0; \
   UPDATE_PREP_1; \
-  UPDATE_COND(p); \
+  UPDATE_COND(pp); \
   i += m + (code < bound ? 0 : m); \
   UPDATE_CODE; \
 }
-#define REV_BIT_LAST(probs, i, m) { Probability *p = (probs)+(i); PREP_BIT(p); \
+#define REV_BIT_LAST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
   UPDATE_PREP_0; \
   UPDATE_PREP_1; \
-  UPDATE_COND(p); \
+  UPDATE_COND(pp); \
   i -= code < bound ? m : 0; \
   UPDATE_CODE; \
 }
@@ -1014,8 +1014,6 @@ static void LzmaDec_UpdateWithUncompressed(CLzma2Dec *p, const BYTE *src, size_t
         p->checkDicSize = p->prop.dicSize;
     p->processedPos += (U32)size;
 }
-
-void LzmaDec_InitDicAndState(CLzma2Dec *p, BYTE initDic, BYTE initState);
 
 static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSize, CLzmaProps *prop, const BYTE *src, ptrdiff_t *srcLen)
 {

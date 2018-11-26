@@ -47,8 +47,6 @@ void RangeEncReset(RangeEncoder* const rc);
 
 void SetOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer, size_t chunk_size);
 
-void RangeEncReset(RangeEncoder* const rc);
-
 void ShiftLow(RangeEncoder* const rc);
 
 void EncodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol);
@@ -106,15 +104,15 @@ void EncodeBit(RangeEncoder* const rc, Probability *const rprob, unsigned const 
 	}
 }
 
-#define GET_PRICE(rc, prob, symbol) \
+#define GET_PRICE(prob, symbol) \
   price_table[((prob) ^ ((-(int)(symbol)) & (kBitModelTotal - 1))) >> kNumMoveReducingBits];
 
-#define GET_PRICE_0(rc, prob) price_table[(prob) >> kNumMoveReducingBits]
+#define GET_PRICE_0(prob) price_table[(prob) >> kNumMoveReducingBits]
 
-#define GET_PRICE_1(rc, prob) price_table[((prob) ^ (kBitModelTotal - 1)) >> kNumMoveReducingBits]
+#define GET_PRICE_1(prob) price_table[((prob) ^ (kBitModelTotal - 1)) >> kNumMoveReducingBits]
 
 HINT_INLINE
-unsigned GetTreePrice(RangeEncoder* const rc, const Probability* const prob_table, unsigned const bit_count, size_t symbol)
+unsigned GetTreePrice(const Probability* const prob_table, unsigned const bit_count, size_t symbol)
 {
 	unsigned price = 0;
 	symbol |= ((size_t)1 << bit_count);
@@ -122,14 +120,14 @@ unsigned GetTreePrice(RangeEncoder* const rc, const Probability* const prob_tabl
 		size_t next_symbol = symbol >> 1;
 		unsigned prob = prob_table[next_symbol];
 		unsigned bit = (unsigned)symbol & 1;
-		price += GET_PRICE(rc, prob, bit);
+		price += GET_PRICE(prob, bit);
 		symbol = next_symbol;
 	}
 	return price;
 }
 
 HINT_INLINE
-unsigned GetReverseTreePrice(RangeEncoder* const rc, const Probability* const prob_table, unsigned const bit_count, size_t symbol)
+unsigned GetReverseTreePrice(const Probability* const prob_table, unsigned const bit_count, size_t symbol)
 {
 	unsigned price = 0;
 	size_t m = 1;
@@ -137,7 +135,7 @@ unsigned GetReverseTreePrice(RangeEncoder* const rc, const Probability* const pr
 		unsigned prob = prob_table[m];
 		unsigned bit = symbol & 1;
 		symbol >>= 1;
-		price += GET_PRICE(rc, prob, bit);
+		price += GET_PRICE(prob, bit);
 		m = (m << 1) | bit;
 	}
 	return price;

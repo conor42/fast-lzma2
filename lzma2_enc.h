@@ -35,7 +35,7 @@ typedef struct
 } FL2_lzma2Parameters;
 
 
-FL2_lzmaEncoderCtx* FL2_lzma2Create();
+FL2_lzmaEncoderCtx* FL2_lzma2Create(void);
 
 void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc);
 

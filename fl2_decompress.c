@@ -111,7 +111,7 @@ static size_t FL2_decompressCtxBlocksMt(BlockInfo* const blocks, const BYTE *src
     return dSize;
 }
 
-static FL2_resetMtBlocks(BlockInfo *blocks, unsigned numThreads)
+static void FL2_resetMtBlocks(BlockInfo *blocks, unsigned numThreads)
 {
     for (size_t thread = 0; thread < numThreads; ++thread) {
         blocks[thread].finish = LZMA_FINISH_ANY;
@@ -120,7 +120,7 @@ static FL2_resetMtBlocks(BlockInfo *blocks, unsigned numThreads)
     }
 }
 
-size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
+static size_t FL2_processMtBlocks(FL2_DCtx* dctx,
     BlockInfo *blocks, FL2POOL_ctx *factory, unsigned numThreads,
     void* dst, size_t dstCapacity,
     const void* src, size_t *srcLen,
@@ -173,7 +173,7 @@ size_t FL2_process_MtBlocks(FL2_DCtx* dctx,
     return FL2_ERROR(srcSize_wrong);
 }
 
-size_t FL2_decompressDCtxMt(FL2_DCtx* dctx,
+static size_t FL2_decompressDCtxMt(FL2_DCtx* dctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t *srcLen,
     BYTE prop)
@@ -198,7 +198,7 @@ size_t FL2_decompressDCtxMt(FL2_DCtx* dctx,
             goto out;
         }
     }
-    res = FL2_process_MtBlocks(dctx, blocks, factory, numThreads, dst, dstCapacity, src, srcLen, prop);
+    res = FL2_processMtBlocks(dctx, blocks, factory, numThreads, dst, dstCapacity, src, srcLen, prop);
 out:
     for (unsigned thread = 1; thread < numThreads; ++thread) {
         FL2_freeDCtx(blocks[thread].dctx);
@@ -214,11 +214,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
 {
     size_t res;
     BYTE prop = *(const BYTE*)src;
+#ifndef NO_XXHASH
     BYTE const do_hash = prop >> FL2_PROP_HASH_BIT;
+#endif
     size_t dicPos = 0;
     const BYTE *srcBuf = src;
     size_t srcPos;
-    size_t const srcEnd = srcSize - 1;
 
     ++srcBuf;
     --srcSize;
@@ -253,7 +254,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
 
         DEBUGLOG(4, "Checking hash");
 
-        if (srcEnd - srcPos < XXHASH_SIZEOF)
+        if (srcSize - srcPos < XXHASH_SIZEOF)
             return FL2_ERROR(srcSize_wrong);
         memcpy(&canonical, srcBuf + srcPos, XXHASH_SIZEOF);
         hash = XXH32_hashFromCanonical(&canonical);
@@ -312,10 +313,6 @@ struct FL2_DStream_s
     DecoderStage stage;
     BYTE do_hash;
 };
-
-static void FL2_FreeInputBuffersUnfinished(Lzma2DecMt *decmt)
-{
-}
 
 static void FL2_FreeOutputBuffers(Lzma2DecMt *decmt)
 {

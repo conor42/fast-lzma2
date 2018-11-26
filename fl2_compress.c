@@ -43,7 +43,7 @@ FL2LIB_API int FL2LIB_CALL FL2_maxHighCLevel(void)
 }
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
-    { 0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0 },
     { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
     { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
     { 21, 2, 7, 0, 14, 32, 1, 8, FL2_fast }, /* 3 */
@@ -59,7 +59,7 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 };
 
 static const FL2_compressionParameters FL2_7zCParameters[FL2_MAX_7Z_CLEVEL + 1] = {
-    { 0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0 },
     { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
     { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
     { 21, 2, 7, 0, 16, 32, 1, 8, FL2_fast }, /* 3 */
@@ -72,7 +72,7 @@ static const FL2_compressionParameters FL2_7zCParameters[FL2_MAX_7Z_CLEVEL + 1] 
 };
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
-    { 0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0 },
     { 20, 3, 9, 1, 60, 128, 0, 8, FL2_ultra }, /* 1 */
     { 21, 3, 10, 1, 60, 128, 0, 8, FL2_ultra }, /* 2 */
     { 22, 3, 11, 2, 60, 128, 0, 8, FL2_ultra }, /* 3 */
@@ -655,6 +655,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_literalCtxBits:
         if ((int)value >= 0) { /* < 0 : does not change current lc */
             CLAMPCHECK(value, FL2_LC_MIN, FL2_LC_MAX);
+            if(value + cctx->params.cParams.lp > FL2_LCLP_MAX)
+                return FL2_ERROR(parameter_outOfBound);
             cctx->params.cParams.lc = value;
         }
         return cctx->params.cParams.lc;
@@ -662,6 +664,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_literalPosBits:
         if ((int)value >= 0) { /* < 0 : does not change current lp */
             CLAMPCHECK(value, FL2_LP_MIN, FL2_LP_MAX);
+            if (cctx->params.cParams.lc + value > FL2_LCLP_MAX)
+                return FL2_ERROR(parameter_outOfBound);
             cctx->params.cParams.lp = value;
         }
         return cctx->params.cParams.lp;
@@ -724,9 +728,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
     }
 }
 
-FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads)
 {
-    FL2_CCtx* const cctx = FL2_createCCtx();
+    FL2_CCtx* const cctx = FL2_createCCtxMt(nbThreads);
     FL2_CStream* const fcs = malloc(sizeof(FL2_CStream));
 
     DEBUGLOG(3, "FL2_createCStream");
@@ -751,6 +755,11 @@ FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
     fcs->end_marked = 0;
     fcs->wrote_prop = 0;
     return fcs;
+}
+
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
+{
+    return FL2_createCStreamMt(1);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs)
@@ -986,6 +995,21 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cPa
     return FL2_CCtx_setParameter(fcs->cctx, param, value);
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters * params)
+{
+    if (high) {
+        if (compressionLevel < 0 || compressionLevel > FL2_MAX_HIGH_CLEVEL)
+            return FL2_ERROR(parameter_outOfBound);
+        *params = FL2_highCParameters[compressionLevel];
+    }
+    else {
+        if (compressionLevel < 0 || compressionLevel > FL2_MAX_CLEVEL)
+            return FL2_ERROR(parameter_outOfBound);
+        *params = FL2_defaultCParameters[compressionLevel];
+    }
+    return FL2_error_no_error;
+}
+
 
 size_t FL2_memoryUsage_internal(unsigned const dictionaryLog, unsigned const bufferLog, unsigned const searchDepth,
     unsigned chainLog, FL2_strategy strategy,
@@ -1021,7 +1045,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsi
         + ((size_t)1 << FL2_defaultCParameters[compressionLevel].dictionaryLog);
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCCtx(const FL2_CStream* fcs)
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs)
 {
     return FL2_estimateCCtxSize_usingCCtx(fcs->cctx)
         + ((size_t)1 << fcs->cctx->params.rParams.dictionary_log);

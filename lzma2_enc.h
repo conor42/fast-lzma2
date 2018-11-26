@@ -22,12 +22,6 @@ extern "C" {
 
 typedef struct FL2_lzmaEncoderCtx_s FL2_lzmaEncoderCtx;
 
-typedef enum {
-    FL2_fast,
-    FL2_opt,
-    FL2_ultra
-} FL2_strategy;
-
 typedef struct
 {
     unsigned lc;

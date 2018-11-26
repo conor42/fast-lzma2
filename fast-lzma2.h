@@ -288,6 +288,7 @@ typedef struct FL2_CStream_s FL2_CStream;
 
 /*===== FL2_CStream management functions =====*/
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
 
 /*===== Streaming compression functions =====*/
@@ -328,6 +329,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
 /*===== Streaming decompression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds);
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned prop);
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************
@@ -364,6 +366,26 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_LP_MAX 4
 #define FL2_PB_MIN 0
 #define FL2_PB_MAX 4
+#define FL2_LCLP_MAX 4
+
+typedef enum {
+    FL2_fast,
+    FL2_opt,
+    FL2_ultra
+} FL2_strategy;
+
+typedef struct {
+    unsigned dictionaryLog;    /* largest match distance : larger == more compression, more memory needed during decompression; >= 27 == more memory, slower */
+    unsigned overlapFraction;  /* overlap between consecutive blocks in 1/16 units: larger == more compression, slower */
+    unsigned chainLog;         /* fully searched segment : larger == more compression, slower, more memory; hybrid mode only (ultra) */
+    unsigned searchLog;        /* nb of searches : larger == more compression, slower; hybrid mode only (ultra) */
+    unsigned searchDepth;      /* maximum depth for resolving string matches : larger == more compression, slower; >= 64 == more memory, slower */
+    unsigned fastLength;       /* acceptable match size for parser, not less than searchDepth : larger == more compression, slower; fast bytes parameter from 7-zip */
+    unsigned divideAndConquer; /* split long chains of 2-byte matches into shorter chains with a small overlap : faster, somewhat less compression; enabled by default */
+    unsigned bufferLog;        /* buffer size for processing match chains is (dictionaryLog - bufferLog) : when divideAndConquer enabled, affects compression; */
+                               /* when divideAndConquer disabled, affects speed in a hardware-dependent manner */
+    FL2_strategy strategy;     /* encoder strategy : fast, optimized or ultra (hybrid) */
+} FL2_compressionParameters;
 
 typedef enum {
     /* compression parameters */
@@ -433,6 +455,8 @@ typedef enum {
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
 FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
 
+FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters *params);
+
 /***************************************
 *  Context memory usage
 ***************************************/
@@ -447,7 +471,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cPa
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCCtx(const FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs);
 
 #endif  /* FAST_LZMA2_H */
 

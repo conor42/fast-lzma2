@@ -1316,7 +1316,6 @@ int FLzma2Dec_ParseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkPars
         inf->packSize = 3 + inf->unpackSize;
     }
     else {
-        size_t packSize;
         S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(control));
         if (len < 5 + hasProp)
             return CHUNK_MORE_DATA;

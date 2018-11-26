@@ -294,7 +294,9 @@ typedef struct
     size_t hashPos;
     int isFinal;
     BYTE prop;
+#ifndef NO_XXHASH
     XXH32_canonical_t hash;
+#endif
     ThreadInfo threads[1];
 } Lzma2DecMt;
 
@@ -334,7 +336,7 @@ static void FL2_Lzma2DecMt_Free(Lzma2DecMt *decmt)
     }
 }
 
-static FL2_Lzma2DecMt_Init(Lzma2DecMt *decmt)
+static void FL2_Lzma2DecMt_Init(Lzma2DecMt *decmt)
 {
     if (decmt) {
         decmt->isFinal = 0;
@@ -346,6 +348,7 @@ static FL2_Lzma2DecMt_Init(Lzma2DecMt *decmt)
         decmt->threads[0].inBlock.last = decmt->head;
         decmt->threads[0].inBlock.startPos = 0;
         decmt->threads[0].inBlock.endPos = 0;
+        decmt->threads[0].inBlock.unpackSize = 0;
     }
 }
 
@@ -502,7 +505,12 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
                     return FL2_ERROR(memory_allocation);
 
                 decmt->isFinal = (res == CHUNK_FINAL);
-
+                if (decmt->isFinal) {
+                    size_t rewind = inBlock->last->length - inBlock->endPos;
+                    if(input->pos < rewind)
+                        return FL2_ERROR(corruption_detected);
+                    input->pos -= rewind;
+                }
                 ++decmt->numThreads;
                 if (decmt->numThreads == decmt->maxThreads || res == CHUNK_FINAL)
                     return 1;
@@ -523,14 +531,14 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
             inBlock->endPos -= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX;
         }
 
-        {
-            size_t toread = MIN(input->size - input->pos, LZMA2_MT_INPUT_SIZE - inBlock->last->length);
-            memcpy(inBlock->last->inBuf + inBlock->last->length, (BYTE*)input->src + input->pos, toread);
-            inBlock->last->length += toread;
-            input->pos += toread;
-            if (res == CHUNK_MORE_DATA && toread == 0)
-                break;
-        }
+        size_t toread = MIN(input->size - input->pos, LZMA2_MT_INPUT_SIZE - inBlock->last->length);
+        memcpy(inBlock->last->inBuf + inBlock->last->length, (BYTE*)input->src + input->pos, toread);
+        inBlock->last->length += toread;
+        input->pos += toread;
+
+        /* Do not continue if we have an incomplete chunk header */
+        if (res == CHUNK_MORE_DATA && toread == 0)
+            break;
     }
     return res == CHUNK_FINAL;
 }
@@ -553,6 +561,7 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
                 : FL2DEC_STAGE_DECOMP;
     }
     if (fds->stage == FL2DEC_STAGE_HASH) {
+#ifndef NO_XXHASH
         if (decmt->hashPos == 0) {
             size_t pos = decmt->threads[0].inBlock.endPos;
             decmt->hashPos = MIN(XXHASH_SIZEOF, decmt->head->length - pos);
@@ -562,7 +571,6 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
         memcpy(&decmt->hash + decmt->hashPos, (BYTE*)input->src + input->pos, to_read);
         decmt->hashPos += to_read;
         if (decmt->hashPos == XXHASH_SIZEOF) {
-#ifndef NO_XXHASH
             U32 hash;
 
             DEBUGLOG(4, "Checking hash");
@@ -570,9 +578,11 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
             hash = XXH32_hashFromCanonical(&decmt->hash);
             if (hash != XXH32_digest(fds->xxh))
                 return FL2_ERROR(checksum_wrong);
-#endif
             fds->stage = FL2DEC_STAGE_FINISHED;
         }
+#else
+        fds->stage = FL2DEC_STAGE_FINISHED;
+#endif
     }
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
@@ -612,7 +622,39 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
     FL2_Lzma2DecMt_Init(fds->decmt);
-    return 0;
+    return FL2_error_no_error;
+}
+
+static size_t FL2_initDStream_prop(FL2_DStream* fds, BYTE prop)
+{
+    fds->do_hash = prop >> FL2_PROP_HASH_BIT;
+    prop &= FL2_LZMA_PROP_MASK;
+
+    if (fds->decmt)
+        fds->decmt->prop = prop;
+    else
+        CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
+
+#ifndef NO_XXHASH
+    if (fds->do_hash) {
+        if (fds->xxh == NULL) {
+            DEBUGLOG(3, "Creating hash state");
+            fds->xxh = XXH32_createState();
+            if (fds->xxh == NULL)
+                return FL2_ERROR(memory_allocation);
+        }
+        XXH32_reset(fds->xxh, 0);
+    }
+#endif
+    return FL2_error_no_error;
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned prop)
+{
+    FL2_initDStream(fds);
+    FL2_initDStream_prop(fds, (BYTE)prop);
+    fds->stage = FL2DEC_STAGE_DECOMP;
+    return FL2_error_no_error;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
@@ -621,25 +663,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
         if (fds->stage == FL2DEC_STAGE_INIT) {
             BYTE prop = ((const BYTE*)input->src)[input->pos];
             ++input->pos;
-            fds->do_hash = prop >> FL2_PROP_HASH_BIT;
-            prop &= FL2_LZMA_PROP_MASK;
-
-            if (fds->decmt)
-                fds->decmt->prop = prop;
-            else
-                CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
-
-#ifndef NO_XXHASH
-            if (fds->do_hash) {
-                if (fds->xxh == NULL) {
-                    DEBUGLOG(3, "Creating hash state");
-                    fds->xxh = XXH32_createState();
-                    if (fds->xxh == NULL)
-                        return FL2_ERROR(memory_allocation);
-                }
-                XXH32_reset(fds->xxh, 0);
-            }
-#endif
+            FL2_initDStream_prop(fds, prop);
             fds->stage = FL2DEC_STAGE_DECOMP;
         }
         if (fds->decmt)

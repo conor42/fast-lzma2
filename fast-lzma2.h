@@ -204,11 +204,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
  *  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_writerFn writeFn, void* opaque);
 
-/*! FL2_dictSizeProp() :
+/*! FL2_getCCtxDictProp() :
  *  Get the dictionary size property.
  *  Intended for use with the FL2_p_omitProperties parameter for creating a
- *  7-zip compatible LZMA2 stream. */
-FL2LIB_API unsigned char FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* ctx);
+ *  7-zip or XZ compatible LZMA2 stream. */
+FL2LIB_API unsigned char FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* ctx);
 
 /*= Decompression context
  *  When decompressing many times,
@@ -219,6 +219,11 @@ FL2LIB_API unsigned char FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* ctx);
 typedef struct CLzma2Dec_s FL2_DCtx;
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void);
 FL2LIB_API size_t    FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx);
+
+/*! FL2_initDCtx() :
+ *  Use only when a property byte is not present at input byte 0.
+ *  The caller must store the result from FL2_getCCtxDictProp() and pass it to this function. */
+FL2LIB_API size_t FL2LIB_CALL FL2_initDCtx(FL2_DCtx* dctx, unsigned char prop);
 
 /*! FL2_decompressDCtx() :
  *  Same as FL2_decompress(), requires an allocated FL2_DCtx (see FL2_createDCtx()) */
@@ -323,11 +328,12 @@ typedef struct FL2_DStream_s FL2_DStream;
 
 /*===== FL2_DStream management functions =====*/
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void);
+FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
 /*===== Streaming decompression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds);
-FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned prop);
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned char prop);
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************
@@ -470,6 +476,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigne
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads);
 
 #endif  /* FAST_LZMA2_H */
 

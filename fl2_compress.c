@@ -566,7 +566,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compress(void* dst, size_t dstCapacity,
     return FL2_compressMt(dst, dstCapacity, src, srcSize, compressionLevel, 1);
 }
 
-FL2LIB_API BYTE FL2LIB_CALL FL2_dictSizeProp(FL2_CCtx* cctx)
+FL2LIB_API BYTE FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx)
 {
     return FL2_getDictSizeProp(cctx->dictMax ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log);
 }

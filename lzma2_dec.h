@@ -155,7 +155,7 @@ typedef struct CLzma2Dec_s
     BYTE needInitProp;
 	BYTE needFlush;
 	BYTE extDic;
-	BYTE pad_;
+	BYTE lzma2prop;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
 } CLzma2Dec;
 
@@ -215,6 +215,8 @@ size_t FLzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
 size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
+
+size_t FLzma2Dec_MemUsage(size_t dictSize);
 
 size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
 

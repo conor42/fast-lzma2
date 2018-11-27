@@ -160,8 +160,6 @@ S - Props
 #define LZMA2_GET_LZMA_MODE(control) ((control >> 5) & 3)
 #define LZMA2_IS_THERE_PROP(mode) ((mode) >= 2)
 
-#define LZMA2_DIC_SIZE_FROM_PROP(p) (((U32)2 | ((p) & 1)) << ((p) / 2 + 11))
-
 #ifdef SHOW_DEBUG_INFO
 #define PRF(x) x
 #else
@@ -962,28 +960,46 @@ void FLzmaDec_Free(CLzma2Dec *p)
   LzmaDec_FreeDict(p);
 }
 
-size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
+static size_t FLzma2Dec_DictSizeFromProp(BYTE dictProp)
 {
-    U32 dictSize;
     if (dictProp > 40)
         return FL2_ERROR(corruption_detected);
-    dictSize = (dictProp == 40) ? 0xFFFFFFFF : LZMA2_DIC_SIZE_FROM_PROP(dictProp);
+    size_t dictSize = (dictProp == 40)
+        ? (size_t)-1
+        : (((size_t)2 | (dictProp & 1)) << (dictProp / 2 + 11));
+    return dictSize;
+}
+
+static size_t FLzma2Dec_DictBufSize(size_t dictSize)
+{
+    size_t mask = ((size_t)1 << 12) - 1;
+    if (dictSize >= ((size_t)1 << 30)) mask = ((size_t)1 << 22) - 1;
+    else if (dictSize >= ((size_t)1 << 22)) mask = ((size_t)1 << 20) - 1;
+    size_t dicBufSize = ((size_t)dictSize + mask) & ~mask;
+    if (dicBufSize < dictSize)
+        dicBufSize = dictSize;
+    return dicBufSize;
+}
+
+size_t FLzma2Dec_MemUsage(size_t dictSize)
+{
+    return sizeof(CLzma2Dec) + FLzma2Dec_DictBufSize(dictSize);
+}
+
+size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
+{
+    size_t dictSize = FLzma2Dec_DictSizeFromProp(dictProp);
+    if (FL2_isError(dictSize))
+        return dictSize;
 
     if (dic == NULL) {
-        size_t mask = ((U32)1 << 12) - 1;
-        if (dictSize >= ((U32)1 << 30)) mask = ((U32)1 << 22) - 1;
-        else if (dictSize >= ((U32)1 << 22)) mask = ((U32)1 << 20) - 1;;
-        dicBufSize = ((size_t)dictSize + mask) & ~mask;
-        if (dicBufSize < dictSize)
-            dicBufSize = dictSize;
+        dicBufSize = FLzma2Dec_DictBufSize(dictSize);
 
         if (!p->dic || dicBufSize != p->dicBufSize) {
             LzmaDec_FreeDict(p);
             p->dic = (BYTE *)malloc(dicBufSize);
             if (!p->dic)
-            {
                 return FL2_ERROR(memory_allocation);
-            }
             p->extDic = 0;
         }
     }
@@ -996,7 +1012,7 @@ size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
     p->prop.lc = 3;
     p->prop.lp = 0;
     p->prop.lc = 2;
-    p->prop.dicSize = dictSize;
+    p->prop.dicSize = (U32)dictSize;
 
     p->state2 = LZMA2_STATE_CONTROL;
     p->needInitDic = 1;

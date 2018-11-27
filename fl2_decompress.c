@@ -20,6 +20,10 @@
 #  include "xxhash.h"
 #endif
 
+
+#define LZMA2_PROP_UNINITIALIZED 0xFF
+
+
 FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize)
 {
     return FLzma2Dec_UnpackSize(src, srcSize);
@@ -45,6 +49,7 @@ FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void)
     FL2_DCtx* const dctx = malloc(sizeof(FL2_DCtx));
     if (dctx) {
         LzmaDec_Construct(dctx);
+        dctx->lzma2prop = LZMA2_PROP_UNINITIALIZED;
     }
     return dctx;
 }
@@ -208,22 +213,34 @@ out:
     return res;
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_initDCtx(FL2_DCtx * dctx, unsigned char prop)
+{
+    if((prop & FL2_LZMA_PROP_MASK) > 40)
+        return FL2_ERROR(corruption_detected);
+    dctx->lzma2prop = prop;
+    return FL2_error_no_error;
+}
+
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize)
 {
     size_t res;
-    BYTE prop = *(const BYTE*)src;
-#ifndef NO_XXHASH
-    BYTE const do_hash = prop >> FL2_PROP_HASH_BIT;
-#endif
+    BYTE prop = dctx->lzma2prop;
     size_t dicPos = 0;
     const BYTE *srcBuf = src;
     size_t srcPos;
 
-    ++srcBuf;
-    --srcSize;
+    if (prop == LZMA2_PROP_UNINITIALIZED) {
+        prop = *(const BYTE*)src;
+        ++srcBuf;
+        --srcSize;
+    }
+    dctx->lzma2prop = LZMA2_PROP_UNINITIALIZED;
 
+#ifndef NO_XXHASH
+    BYTE const do_hash = prop >> FL2_PROP_HASH_BIT;
+#endif
     prop &= FL2_LZMA_PROP_MASK;
 
     DEBUGLOG(4, "FL2_decompressDCtx : dict prop 0x%X, do hash %u", prop, do_hash);
@@ -313,6 +330,8 @@ struct FL2_DStream_s
     DecoderStage stage;
     BYTE do_hash;
 };
+
+#ifndef FL2_SINGLETHREAD
 
 static void FL2_FreeOutputBuffers(Lzma2DecMt *decmt)
 {
@@ -583,14 +602,26 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
     }
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
+#endif
 
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)
+{
+    return FL2_createDStreamMt(1);
+}
+
+FL2LIB_API FL2_DStream *FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads)
 {
     FL2_DStream* const fds = malloc(sizeof(FL2_DStream));
     DEBUGLOG(3, "FL2_createDStream");
     if (fds) {
         LzmaDec_Construct(&fds->dec);
-        fds->decmt = FL2_Lzma2DecMt_Create(UTIL_countPhysicalCores());
+#ifndef FL2_SINGLETHREAD
+        if (nbThreads == 0) {
+            nbThreads = UTIL_countPhysicalCores();
+            nbThreads += !nbThreads;
+        }
+        fds->decmt = (nbThreads > 1) ? FL2_Lzma2DecMt_Create(nbThreads) : NULL;
+#endif
         fds->stage = FL2DEC_STAGE_INIT;
 #ifndef NO_XXHASH
         fds->xxh = NULL;
@@ -618,7 +649,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
+#ifndef FL2_SINGLETHREAD
     FL2_Lzma2DecMt_Init(fds->decmt);
+#endif
     return FL2_error_no_error;
 }
 
@@ -627,9 +660,11 @@ static size_t FL2_initDStream_prop(FL2_DStream* fds, BYTE prop)
     fds->do_hash = prop >> FL2_PROP_HASH_BIT;
     prop &= FL2_LZMA_PROP_MASK;
 
+#ifndef FL2_SINGLETHREAD
     if (fds->decmt)
         fds->decmt->prop = prop;
     else
+#endif
         CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
 
 #ifndef NO_XXHASH
@@ -646,25 +681,31 @@ static size_t FL2_initDStream_prop(FL2_DStream* fds, BYTE prop)
     return FL2_error_no_error;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned prop)
+FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned char prop)
 {
     FL2_initDStream(fds);
-    FL2_initDStream_prop(fds, (BYTE)prop);
+    FL2_initDStream_prop(fds, prop);
     fds->stage = FL2DEC_STAGE_DECOMP;
     return FL2_error_no_error;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
-    if (input->pos < input->size || fds->decmt) {
+    if (input->pos < input->size
+#ifndef FL2_SINGLETHREAD
+        || fds->decmt
+#endif
+        ) {
         if (fds->stage == FL2DEC_STAGE_INIT) {
             BYTE prop = ((const BYTE*)input->src)[input->pos];
             ++input->pos;
             FL2_initDStream_prop(fds, prop);
             fds->stage = FL2DEC_STAGE_DECOMP;
         }
+#ifndef FL2_SINGLETHREAD
         if (fds->decmt)
             return FL2_decompressStreamMt(fds, output, input);
+#endif
         if (fds->stage == FL2DEC_STAGE_DECOMP) {
             size_t destSize = output->size - output->pos;
             size_t srcSize = input->size - input->pos;
@@ -707,3 +748,19 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads)
+{
+    if (nbThreads > 1) {
+        return nbThreads * (sizeof(BlockInfo) + sizeof(FL2_DCtx));
+    }
+    return sizeof(FL2_DCtx);
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads)
+{
+    if (nbThreads > 1) {
+        /* Estimate 50% compression and a block size of 4 * dictSize */
+        return nbThreads * sizeof(FL2_DCtx) + (dictSize + dictSize / 2) * 4 * nbThreads;
+    }
+    return FLzma2Dec_MemUsage(dictSize);
+}

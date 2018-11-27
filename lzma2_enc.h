@@ -19,6 +19,8 @@ extern "C" {
 
 #define LZMA2_END_MARKER '\0'
 #define LZMA_MIN_DICT_BITS 12
+#define ENC_MIN_BYTES_PER_THREAD 0x20000
+
 
 typedef struct FL2_lzmaEncoderCtx_s FL2_lzmaEncoderCtx;
 

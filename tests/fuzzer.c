@@ -745,7 +745,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
     BYTE* const dstBuffer = (BYTE*) malloc (dstBufferSize);
     BYTE* const mirrorBuffer = (BYTE*) malloc (dstBufferSize);
     FL2_CCtx* const cctx = FL2_createCCtxMt(nbThreads);
-    FL2_DCtx* const dctx = FL2_createDCtx();
+    FL2_DCtx* const dctx = FL2_createDCtxMt(nbThreads);
     FL2_DStream *const dstream = FL2_createDStream();
     U32 result = 0;
     U32 testNb = 0;

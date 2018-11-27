@@ -130,7 +130,7 @@ Returns:
 #define LZMA2_LCLP_MAX 4U
 
 
-typedef struct CLzma2Dec_s
+typedef struct
 {
     CLzmaProps prop;
     BYTE *dic;
@@ -155,7 +155,7 @@ typedef struct CLzma2Dec_s
     BYTE needInitProp;
 	BYTE needFlush;
 	BYTE extDic;
-	BYTE lzma2prop;
+	BYTE pad_;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
 } CLzma2Dec;
 

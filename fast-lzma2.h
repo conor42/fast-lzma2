@@ -95,6 +95,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressMt(void* dst, size_t dstCapacity,
  *            or an errorCode if it fails (which can be tested using FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize);
+FL2LIB_API size_t FL2LIB_CALL FL2_decompressMt(void* dst, size_t dstCapacity,
+    const void* src, size_t compressedSize,
+    unsigned nbThreads);
 
 /*! FL2_findDecompressedSize()
  *  `src` should point to the start of a LZMA2 encoded stream.
@@ -216,8 +219,9 @@ FL2LIB_API unsigned char FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* ctx);
  *  and re-use it for each successive compression operation.
  *  This will make the workload friendlier for the system's memory.
  *  Use one context per thread for parallel execution. */
-typedef struct CLzma2Dec_s FL2_DCtx;
+typedef struct FL2_DCtx_s FL2_DCtx;
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void);
+FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtxMt(unsigned nbThreads);
 FL2LIB_API size_t    FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx);
 
 /*! FL2_initDCtx() :
@@ -399,7 +403,6 @@ typedef enum {
                               * Special: value 0 means "do not change cLevel". */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
                               * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
-    FL2_p_7zLevel,          /* For use by the 7-zip fork employing this library. 1 - 9 */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                               * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
                               * Special: value 0 means "do not change dictionaryLog". */

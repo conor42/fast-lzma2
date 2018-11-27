@@ -29,6 +29,9 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void) { return FL2_VERSION_NUM
 FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void) { return FL2_VERSION_STRING; }
 
 
+/*-****************************************
+*  Compression helpers
+******************************************/
 FL2LIB_API size_t FL2LIB_CALL FL2_compressBound(size_t srcSize)
 {
     return FL2_COMPRESSBOUND(srcSize);

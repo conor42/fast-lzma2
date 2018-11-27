@@ -21,26 +21,52 @@
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 
-#define MIN_BYTES_PER_THREAD 0x10000
-
 #define ALIGNMENT_MASK (~(size_t)15)
 
 /*-=====  Pre-defined compression levels  =====-*/
 
-#define FL2_CLEVEL_DEFAULT   9
-#define FL2_MAX_CLEVEL      12
-#define FL2_MAX_7Z_CLEVEL   9
 #define FL2_MAX_HIGH_CLEVEL 9
 
-FL2LIB_API int FL2LIB_CALL FL2_maxCLevel(void)
-{ 
-    return FL2_MAX_CLEVEL;
-}
+#ifdef FL2_XZ_BUILD
 
-FL2LIB_API int FL2LIB_CALL FL2_maxHighCLevel(void)
-{
-    return FL2_MAX_HIGH_CLEVEL;
-}
+#define FL2_CLEVEL_DEFAULT  6
+#define FL2_MAX_CLEVEL      9
+
+static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
+    { 0,0,0,0,0,0,0,0,0 },
+    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
+    { 21, 2, 7, 0, 14, 32, 1, 8, FL2_fast }, /* 2 */
+    { 21, 2, 7, 0, 14, 40, 1, 8, FL2_opt }, /* 3 */
+    { 22, 2, 7, 0, 26, 40, 1, 8, FL2_opt }, /* 4 */
+    { 24, 2, 8, 0, 42, 48, 1, 8, FL2_opt }, /* 5 */
+    { 24, 2, 9, 0, 42, 48, 1, 8, FL2_ultra }, /* 6 */
+    { 25, 2, 10, 0, 50, 64, 1, 8, FL2_ultra }, /* 7 */
+    { 26, 2, 11, 1, 60, 64, 1, 9, FL2_ultra }, /* 8 */
+    { 27, 2, 12, 2, 126, 96, 1, 10, FL2_ultra }, /* 9 */
+};
+
+#elif defined(FL2_7ZIP_BUILD)
+
+#define FL2_CLEVEL_DEFAULT  5
+#define FL2_MAX_CLEVEL      9
+
+static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
+    { 0,0,0,0,0,0,0,0,0 },
+    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
+    { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
+    { 21, 2, 7, 0, 16, 32, 1, 8, FL2_fast }, /* 3 */
+    { 20, 2, 7, 0, 16, 32, 1, 8, FL2_opt }, /* 4 */
+    { 24, 2, 9, 0, 40, 48, 1, 8, FL2_ultra }, /* 5 */
+    { 25, 2, 10, 0, 48, 64, 1, 8, FL2_ultra }, /* 6 */
+    { 26, 2, 11, 1, 60, 96, 1, 9, FL2_ultra }, /* 7 */
+    { 27, 2, 12, 2, 128, 128, 1, 10, FL2_ultra }, /* 8 */
+    { 27, 3, 14, 3, 252, 160, 0, 10, FL2_ultra } /* 9 */
+};
+
+#else
+
+#define FL2_CLEVEL_DEFAULT   9
+#define FL2_MAX_CLEVEL      12
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
@@ -58,18 +84,7 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 28, 2, 14, 3, 254, 160, 1, 10, FL2_ultra } /* 12 */
 };
 
-static const FL2_compressionParameters FL2_7zCParameters[FL2_MAX_7Z_CLEVEL + 1] = {
-    { 0,0,0,0,0,0,0,0,0 },
-    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
-    { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
-    { 21, 2, 7, 0, 16, 32, 1, 8, FL2_fast }, /* 3 */
-    { 20, 2, 7, 0, 16, 32, 1, 8, FL2_opt }, /* 4 */
-    { 24, 2, 9, 0, 40, 48, 1, 8, FL2_ultra }, /* 5 */
-    { 25, 2, 10, 0, 48, 64, 1, 8, FL2_ultra }, /* 6 */
-    { 26, 2, 11, 1, 60, 96, 1, 9, FL2_ultra }, /* 7 */
-    { 27, 2, 12, 2, 128, 128, 1, 10, FL2_ultra }, /* 8 */
-    { 27, 3, 14, 3, 252, 160, 0, 10, FL2_ultra } /* 9 */
-};
+#endif
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
@@ -83,6 +98,16 @@ static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL +
     { 27, 3, 14, 4, 128, 160, 0, 8, FL2_ultra }, /* 8 */
     { 28, 3, 14, 5, 128, 160, 0, 9, FL2_ultra } /* 9 */
 };
+
+FL2LIB_API int FL2LIB_CALL FL2_maxCLevel(void)
+{
+    return FL2_MAX_CLEVEL;
+}
+
+FL2LIB_API int FL2LIB_CALL FL2_maxHighCLevel(void)
+{
+    return FL2_MAX_HIGH_CLEVEL;
+}
 
 static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParameters* const params)
 {
@@ -113,17 +138,7 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
 {
     FL2_CCtx* cctx;
 
-#ifndef FL2_SINGLETHREAD
-    if (!nbThreads) {
-        nbThreads = UTIL_countPhysicalCores();
-        nbThreads += !nbThreads;
-    }
-    if (nbThreads > FL2_MAXTHREADS) {
-        nbThreads = FL2_MAXTHREADS;
-    }
-#else
-    nbThreads = 1;
-#endif
+    nbThreads = FL2_checkNbThreads(nbThreads);
 
     DEBUGLOG(3, "FL2_createCCtxMt : %u threads", nbThreads);
 
@@ -232,7 +247,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     int err = 0;
 #ifndef FL2_SINGLETHREAD
     size_t mfThreads = cctx->curBlock.end / RMF_MIN_BYTES_PER_THREAD;
-    size_t nbThreads = MIN(cctx->jobCount, encodeSize / MIN_BYTES_PER_THREAD);
+    size_t nbThreads = MIN(cctx->jobCount, encodeSize / ENC_MIN_BYTES_PER_THREAD);
     nbThreads += !nbThreads;
 #else
     size_t mfThreads = 1;
@@ -605,14 +620,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
             FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, cctx->params.compressionLevel);
         }
         return cctx->params.highCompression;
-
-    case FL2_p_7zLevel:
-        if (value > 0) { /* 0 : does not change current level */
-            if ((int)value > FL2_MAX_7Z_CLEVEL) value = FL2_MAX_7Z_CLEVEL;
-            FL2_fillParameters(cctx, &FL2_7zCParameters[value]);
-            cctx->params.compressionLevel = value;
-        }
-        return cctx->params.compressionLevel;
 
     case FL2_p_dictionaryLog:
         if (value) {  /* 0 : does not change current dictionaryLog */

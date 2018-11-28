@@ -113,9 +113,6 @@
     <ClInclude Include="..\range_enc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\threading.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -123,6 +120,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\fl2pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fl2_threading.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

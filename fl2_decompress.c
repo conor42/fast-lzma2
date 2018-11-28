@@ -91,9 +91,9 @@ FL2LIB_API FL2_DCtx *FL2LIB_CALL FL2_createDCtxMt(unsigned nbThreads)
 
         nbThreads = FL2_checkNbThreads(nbThreads);
 
+#ifndef FL2_SINGLETHREAD
         dctx->nbThreads = 1;
 
-#ifndef FL2_SINGLETHREAD
         if (nbThreads > 1) {
             dctx->blocks = malloc(nbThreads * sizeof(BlockDecMt));
             dctx->factory = FL2POOL_create(nbThreads - 1);
@@ -626,13 +626,8 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
     }
     if (fds->stage == FL2DEC_STAGE_HASH) {
 #ifndef NO_XXHASH
-        if (decmt->hashPos == 0) {
-            size_t pos = decmt->threads[0].inBlock.endPos;
-            decmt->hashPos = MIN(XXHASH_SIZEOF, decmt->head->length - pos);
-            memcpy(&decmt->hash, decmt->head->inBuf + pos, decmt->hashPos);
-        }
         size_t to_read = MIN(XXHASH_SIZEOF - decmt->hashPos, input->size - input->pos);
-        memcpy(&decmt->hash + decmt->hashPos, (BYTE*)input->src + input->pos, to_read);
+        memcpy(decmt->hash.digest + decmt->hashPos, (BYTE*)input->src + input->pos, to_read);
         decmt->hashPos += to_read;
         if (decmt->hashPos == XXHASH_SIZEOF) {
             U32 hash;

@@ -14,6 +14,10 @@
 #include "atomic.h"
 #include "radix_mf.h"
 
+#if defined(FL2_XZ_BUILD) && defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+#  define MEM_read32(a) (*(const U32*)(a))
+#endif
+
 #if defined (__cplusplus)
 extern "C" {
 #endif

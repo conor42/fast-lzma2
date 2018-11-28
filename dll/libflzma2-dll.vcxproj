@@ -140,7 +140,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WholeProgramOptimization>true</WholeProgramOptimization>
-      <PreprocessorDefinitions>LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FL2_DEBUG=1;FL2_SINGLETHREAD;LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -152,7 +152,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FL2_DEBUG=1;LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -182,6 +182,7 @@
     <ClInclude Include="..\fl2_compress_internal.h" />
     <ClInclude Include="..\fl2_errors.h" />
     <ClInclude Include="..\fl2_internal.h" />
+    <ClInclude Include="..\fl2_threading.h" />
     <ClInclude Include="..\lzma2_dec.h" />
     <ClInclude Include="..\lzma2_enc.h" />
     <ClInclude Include="..\mem.h" />
@@ -191,7 +192,6 @@
     <ClInclude Include="..\radix_internal.h" />
     <ClInclude Include="..\radix_mf.h" />
     <ClInclude Include="..\range_enc.h" />
-    <ClInclude Include="..\threading.h" />
     <ClInclude Include="..\util.h" />
     <ClInclude Include="..\xxhash.h" />
   </ItemGroup>

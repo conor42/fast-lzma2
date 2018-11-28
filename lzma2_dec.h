@@ -259,7 +259,11 @@ typedef struct
     size_t unpackSize;
 } ChunkParseInfo;
 
-#define LZMA2_MT_INPUT_SIZE 0x40000
+#if defined(FL2_DEBUG) && (FL2_DEBUG>=1)
+#  define LZMA2_MT_INPUT_SIZE 0x400
+#else
+#  define LZMA2_MT_INPUT_SIZE 0x40000
+#endif
 
 InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
 void FLzma2Dec_FreeInbufNodeChain(InBufNode *node, InBufNode *keep);

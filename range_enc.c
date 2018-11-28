@@ -49,7 +49,7 @@ void ShiftLow(RangeEncoder* const rc)
 	{
 		BYTE temp = rc->cache;
 		do {
-			assert (rc->out_index < rc->chunk_size - 4096);
+			assert (rc->out_index < 0x10000);
             rc->out_buffer[rc->out_index++] = temp + (BYTE)(rc->low >> 32);
             temp = 0xFF;
 		} while (--rc->cache_size != 0);

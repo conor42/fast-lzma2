@@ -176,7 +176,7 @@ FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
  *  srcStart + srcSize should equal the dictionary size except on the last call.
  *  Can be called multiple times. FL2_endFrame() must be called when finished.
  *  For compatibility with this library the caller must write a property byte at
- *  the beginning of the output. Obtain it by calling FL2_dictSizeProp() before
+ *  the beginning of the output. Obtain it by calling FL2_getCCtxDictProp() before
  *  compressing the first block or after the last. No hash will be written, but
  *  the caller can calculate it using the interface in xxhash.h, write it at the end,
  *  and set bit 7 in the property byte. */
@@ -476,12 +476,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int h
 *  used for string matching are allocated only when compression begins. */
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads); /*!< memory usage determined by params */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads); /*!< obtain dictSize from FL2_getCCtxDictProp() */
 
 #endif  /* FAST_LZMA2_H */
 

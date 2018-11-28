@@ -1033,11 +1033,19 @@ size_t FL2_memoryUsage_internal(unsigned const dictionaryLog, unsigned const buf
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads)
 {
-    return FL2_memoryUsage_internal(FL2_defaultCParameters[compressionLevel].dictionaryLog,
-        FL2_defaultCParameters[compressionLevel].bufferLog,
-        FL2_defaultCParameters[compressionLevel].searchDepth,
-        FL2_defaultCParameters[compressionLevel].chainLog,
-        FL2_defaultCParameters[compressionLevel].strategy,
+    if (compressionLevel == 0)
+        compressionLevel = FL2_CLEVEL_DEFAULT;
+    CLAMPCHECK(compressionLevel, 1, FL2_MAX_CLEVEL);
+    return FL2_estimateCCtxSize_byParams(FL2_defaultCParameters + compressionLevel, nbThreads);
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters * params, unsigned nbThreads)
+{
+    return FL2_memoryUsage_internal(params->dictionaryLog,
+        params->bufferLog,
+        params->searchDepth,
+        params->chainLog,
+        params->strategy,
         nbThreads);
 }
 
@@ -1055,6 +1063,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsi
 {
     return FL2_estimateCCtxSize(compressionLevel, nbThreads)
         + ((size_t)1 << FL2_defaultCParameters[compressionLevel].dictionaryLog);
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compressionParameters * params, unsigned nbThreads)
+{
+    return FL2_estimateCCtxSize_byParams(params, nbThreads)
+        + ((size_t)1 << params->dictionaryLog);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs)

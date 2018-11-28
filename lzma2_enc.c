@@ -8,12 +8,21 @@ Public domain
 #include <math.h>
 
 #include "fl2_internal.h"
-#include "mem.h"
 #include "lzma2_enc.h"
 #include "fl2_compress_internal.h"
 #include "radix_mf.h"
 #include "range_enc.h"
+#include "mem.h"
 #include "count.h"
+
+#ifdef FL2_XZ_BUILD
+#  define MEM_readLE32(a) unaligned_read32le(a)
+
+#ifdef TUKLIB_FAST_UNALIGNED_ACCESS
+#  define MEM_read16(a) (*(const U16*)(a))
+#endif
+
+#endif
 
 #define kNumReps 4U
 #define kNumStates 12U

@@ -278,7 +278,7 @@ static int callback(const void *src, size_t size, void *opaque)
 #define CHECK(fn)  { CHECK_V(err, fn); }
 #define CHECKPLUS(var, fn, more)  { CHECK_V(var, fn); more; }
 
-static int basicUnitTests(U32 seed, double compressibility)
+static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
 {
     size_t const CNBuffSize = 20 MB;
     void* const CNBuffer = malloc(CNBuffSize);
@@ -310,6 +310,23 @@ static int basicUnitTests(U32 seed, double compressibility)
         DISPLAYLEVEL(4, "OK : %s \n", errorString);
     }
 
+    DISPLAYLEVEL(4, "test%3i : Compression memory usage for %u thread(s)\n", testNb++, nbThreads);
+    {   DISPLAYLEVEL(4, "Level  Dict size  CCtx size  CStream size");
+        for (int level = 1; level <= FL2_maxCLevel(); ++level) {
+            FL2_compressionParameters params;
+            FL2_getLevelParameters(level, 0, &params);
+            DISPLAYLEVEL(4, "\n %2d    %9u  %10u  %10u",
+                level,
+                1U << params.dictionaryLog,
+                (unsigned)FL2_estimateCCtxSize(level, nbThreads),
+                (unsigned)FL2_estimateCStreamSize(level, nbThreads));
+        }
+        DISPLAYLEVEL(4, " : OK\n");
+    }
+
+    DISPLAYLEVEL(4, "test%3i : Single thread decompression memory usage excluding dict: ", testNb++);
+    {   DISPLAYLEVEL(4, "%u\n", (unsigned)FL2_estimateDCtxSize(1));
+    }
 
     DISPLAYLEVEL(4, "test%3i : compress %u bytes : ", testNb++, (U32)CNBuffSize);
     {   FL2_CCtx* cctx = FL2_createCCtxMt(0);
@@ -745,8 +762,10 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
     BYTE* const dstBuffer = (BYTE*) malloc (dstBufferSize);
     BYTE* const mirrorBuffer = (BYTE*) malloc (dstBufferSize);
     FL2_CCtx* const cctx = FL2_createCCtxMt(nbThreads);
-    FL2_DCtx* const dctx = FL2_createDCtxMt(nbThreads);
-    FL2_DStream *const dstream = FL2_createDStream();
+    FL2_DCtx* const dctxMt = FL2_createDCtxMt(nbThreads);
+    FL2_DCtx* const dctxSt = FL2_createDCtx();
+    FL2_DStream* const dstreamMt = FL2_createDStreamMt(nbThreads);
+    FL2_DStream* const dstreamSt = FL2_createDStream();
     U32 result = 0;
     U32 testNb = 0;
     U32 coreSeed = seed, lseed = 0;
@@ -761,7 +780,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
     cNoiseBuffer[3] = (BYTE*)malloc (srcBufferSize);
     cNoiseBuffer[4] = (BYTE*)malloc (srcBufferSize);
     CHECK (!cNoiseBuffer[0] || !cNoiseBuffer[1] || !cNoiseBuffer[2] || !cNoiseBuffer[3] || !cNoiseBuffer[4]
-           || !dstBuffer || !mirrorBuffer || !cBuffer || !cctx || !dctx || !dstream,
+           || !dstBuffer || !mirrorBuffer || !cBuffer || !cctx || !dctxMt || !dctxSt || !dstreamMt || !dstreamSt,
            "Not enough memory, fuzzer tests cancelled");
 
     /* Create initial samples */
@@ -780,6 +799,8 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
         size_t sampleSize;
         size_t cSize;
         BYTE* sampleBuffer;
+        FL2_DCtx* dctx;
+        FL2_DStream* dstream;
 
         /* notification */
         if (nbTests >= testNb) { DISPLAYUPDATE(2, "\r%6u/%6u    ", testNb, nbTests); }
@@ -787,6 +808,16 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
 
         FUZ_rand(&coreSeed);
         { U32 const prime1 = 2654435761U; lseed = coreSeed ^ prime1; }
+
+        /* select mt or st */
+        if (FUZ_rand(&lseed) & 3) {
+            dctx = dctxMt;
+            dstream = dstreamMt;
+        }
+        else {
+            dctx = dctxSt;
+            dstream = dstreamSt;
+        }
 
         /* srcBuffer selection [0-4] */
         {   U32 buffNb = FUZ_rand(&lseed) & 0x7F;
@@ -952,8 +983,10 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
 
 _cleanup:
     FL2_freeCCtx(cctx);
-    FL2_freeDCtx(dctx);
-    FL2_freeDStream(dstream);
+    FL2_freeDCtx(dctxSt);
+    FL2_freeDCtx(dctxMt);
+    FL2_freeDStream(dstreamSt);
+    FL2_freeDStream(dstreamMt);
     free(cNoiseBuffer[0]);
     free(cNoiseBuffer[1]);
     free(cNoiseBuffer[2]);
@@ -1140,7 +1173,7 @@ int main(int argc, const char** argv)
     if (nbTests < testNb) nbTests = testNb;
 
     if (testNb==0)
-        result = basicUnitTests(0, ((double)proba) / 100);  /* constant seed for predictability */
+        result = basicUnitTests(nbThreads, 0, ((double)proba) / 100);  /* constant seed for predictability */
     if (!result && decompTests)
         result = decompressionTests(seed, nbTests, testNb, maxDuration, ((double)proba) / 100);
     if (!result)

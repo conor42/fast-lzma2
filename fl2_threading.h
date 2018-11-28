@@ -13,11 +13,19 @@
 #ifndef THREADING_H_938743
 #define THREADING_H_938743
 
+#ifndef FL2_XZ_BUILD
+#  ifdef _WIN32
+#    define MYTHREAD_VISTA
+#  else
+#    define MYTHREAD_POSIX  /* posix assumed ; need a better detection method */
+#  endif
+#endif
+
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-#if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
+#if !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_VISTA)
 
 /**
  * Windows minimalist Pthread Wrapper, based on :
@@ -72,7 +80,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
  */
 
 
-#elif !defined(FL2_SINGLETHREAD)   /* posix assumed ; need a better detection method */
+#elif !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_POSIX)
 /* ===   POSIX Systems   === */
 #  include <pthread.h>
 
@@ -93,7 +101,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 #define ZSTD_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
 #define ZSTD_pthread_join(a, b)         pthread_join((a),(b))
 
-#else  /* FL2_SINGLETHREAD defined */
+#elif defined(FL2_SINGLETHREAD)
 /* No multithreading support */
 
 typedef int ZSTD_pthread_mutex_t;
@@ -111,6 +119,8 @@ typedef int ZSTD_pthread_cond_t;
 
 /* do not use ZSTD_pthread_t */
 
+#else
+#  error FL2_SINGLETHREAD not defined but no threading support found
 #endif /* FL2_SINGLETHREAD */
 
 #if defined (__cplusplus)

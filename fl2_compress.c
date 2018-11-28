@@ -181,7 +181,10 @@ FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads)
         cctx->jobs[u].cctx = cctx;
     }
     cctx->dictMax = 0;
-    cctx->block_total = 0;
+    cctx->blockTotal = 0;
+    cctx->srcSize = 0;
+    cctx->outThread = 0;
+    cctx->threadCount = 0;
 
     return cctx;
 }
@@ -355,7 +358,11 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 
 #endif
 
-    cctx->block_total += encodeSize;
+    for (size_t u = 0; u < nbThreads; ++u)
+        if (FL2_isError(cctx->jobs[u].cSize))
+            return cctx->jobs[u].cSize;
+
+    cctx->blockTotal += encodeSize;
 
     return nbThreads;
 }
@@ -363,77 +370,73 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx)
 {
     cctx->dictMax = 0;
-    cctx->block_total = 0;
+    cctx->blockTotal = 0;
+    cctx->srcSize = 0;
+    cctx->outThread = 0;
+    cctx->threadCount = 0;
 }
 
 static size_t FL2_compressBlock(FL2_CCtx* const cctx,
-    const void* const src, size_t srcStart, size_t const srcEnd,
+    const void* const src, size_t const srcStart, size_t const srcEnd,
     void* const dst, size_t dstCapacity,
-    FL2_writerFn const writeFn, void* const opaque,
-    FL2_progressFn progress)
+    FL2_progressFn progress, void* const opaque)
 {
     BYTE* dstBuf = dst;
     size_t outSize = 0;
-    size_t const dictionary_size = (size_t)1 << cctx->params.rParams.dictionary_log;
-    size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    size_t const dictionarySize = (size_t)1 << cctx->params.rParams.dictionary_log;
+    size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
     if (srcStart >= srcEnd)
         return 0;
-    cctx->curBlock.data = src;
-    cctx->curBlock.start = srcStart;
 
-    while (srcStart < srcEnd) {
-        size_t nbThreads;
+    if (src != NULL) {
+        cctx->curBlock.data = src;
+        cctx->curBlock.start = srcStart;
 
-        cctx->curBlock.end = cctx->curBlock.start + MIN(srcEnd - srcStart, dictionary_size - cctx->curBlock.start);
+        cctx->srcSize = srcEnd - srcStart;
+    }
 
-        nbThreads = FL2_compressCurBlock(cctx, progress, opaque);
-        if (FL2_isError(nbThreads))
-            return nbThreads;
+    do {
+        cctx->curBlock.end = cctx->curBlock.start + MIN(cctx->srcSize, dictionarySize - cctx->curBlock.start);
 
-        for (size_t u = 0; u < nbThreads; ++u) {
+        cctx->outThread = 0;
+        cctx->threadCount = FL2_compressCurBlock(cctx, progress, opaque);
+        if (FL2_isError(cctx->threadCount))
+            return cctx->threadCount;
+
+        if(dst != NULL) for (size_t u = 0; u < cctx->threadCount; ++u) {
             const BYTE* const outBuf = RMF_getTableAsOutputBuffer(cctx->matchTable, cctx->jobs[u].block.start);
-
-            if (FL2_isError(cctx->jobs[u].cSize))
-                return cctx->jobs[u].cSize;
 
             DEBUGLOG(5, "Write thread %u : %u bytes", (U32)u, (U32)cctx->jobs[u].cSize);
 
-            if (writeFn == NULL && dstCapacity < cctx->jobs[u].cSize) {
+            if (dstCapacity < cctx->jobs[u].cSize) {
                 return FL2_ERROR(dstSize_tooSmall);
             }
-            if (writeFn != NULL) {
-                if(writeFn(outBuf, cctx->jobs[u].cSize, opaque))
-                    return FL2_ERROR(write_failed);
-                outSize += cctx->jobs[u].cSize;
-            }
-            else {
-                memcpy(dstBuf, outBuf, cctx->jobs[u].cSize);
-                dstBuf += cctx->jobs[u].cSize;
-                dstCapacity -= cctx->jobs[u].cSize;
-            }
+            memcpy(dstBuf, outBuf, cctx->jobs[u].cSize);
+            dstBuf += cctx->jobs[u].cSize;
+            dstCapacity -= cctx->jobs[u].cSize;
         }
-        srcStart += cctx->curBlock.end - cctx->curBlock.start;
-        if (cctx->params.rParams.block_size_log && cctx->block_total + MIN(cctx->curBlock.end - block_overlap, srcEnd - srcStart) > ((U64)1 << cctx->params.rParams.block_size_log)) {
+        cctx->srcSize -= cctx->curBlock.end - cctx->curBlock.start;
+        if (cctx->params.rParams.block_size_log && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, cctx->srcSize) > ((U64)1 << cctx->params.rParams.block_size_log)) {
             /* periodically reset the dictionary for mt decompression */
             cctx->curBlock.start = 0;
-            cctx->block_total = 0;
+            cctx->blockTotal = 0;
         }
         else {
-            cctx->curBlock.start = block_overlap;
+            cctx->curBlock.start = blockOverlap;
         }
         cctx->curBlock.data += cctx->curBlock.end - cctx->curBlock.start;
-    }
-    return (writeFn != NULL) ? outSize : dstBuf - (const BYTE*)dst;
+    } while (dst != NULL && cctx->srcSize != 0);
+    return (dst == NULL) ? 0 : dstBuf - (const BYTE*)dst;
 }
 
-static BYTE FL2_getProp(FL2_CCtx* cctx, size_t dictionary_size)
+static BYTE FL2_getProp(FL2_CCtx* cctx, size_t dictionarySize)
 {
 #ifndef NO_XXHASH
-    return FL2_getDictSizeProp(dictionary_size) | (BYTE)((cctx->params.doXXH != 0) << FL2_PROP_HASH_BIT);
+    return FL2_getDictSizeProp(dictionarySize) | (BYTE)((cctx->params.doXXH != 0) << FL2_PROP_HASH_BIT);
 #else
     (void)cctx;
-    return FL2_getDictSizeProp(dictionary_size);
+    return FL2_getDictSizeProp(dictionarySize);
 #endif
 }
 
@@ -457,7 +460,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     FL2_beginFrame(cctx);
 
     dstBuf += !cctx->params.omitProp;
-    cSize = FL2_compressBlock(cctx, src, 0, srcSize, dstBuf, end - dstBuf, NULL, NULL, NULL);
+    cSize = FL2_compressBlock(cctx, src, 0, srcSize, dstBuf, end - dstBuf, NULL, NULL);
     if(!cctx->params.omitProp)
         dstBuf[-1] = FL2_getProp(cctx, cctx->dictMax);
 
@@ -483,6 +486,24 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     return dstBuf - (BYTE*)dst;
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf, FL2_progressFn progress, void* const opaque)
+{
+    size_t cSize = 0;
+
+    if (FL2_isError(cctx->threadCount))
+        return cctx->threadCount;
+
+    if (cctx->outThread == cctx->threadCount && cctx->srcSize != 0)
+        CHECK_F(FL2_compressBlock(cctx, NULL, 0, 1, NULL, 0, progress, opaque));
+
+    if (cctx->outThread < cctx->threadCount) {
+        *buf = RMF_getTableAsOutputBuffer(cctx->matchTable, cctx->jobs[cctx->outThread].block.start);
+        cSize = cctx->jobs[cctx->outThread].cSize;
+        ++cctx->outThread;
+    }
+    return cSize;
+}
+
 FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* cctx)
 {
 	return OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
@@ -495,20 +516,20 @@ FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(FL2_CCtx* cctx, FL2_blockBuffer *bloc
 
 FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(FL2_CCtx* cctx, FL2_blockBuffer *block, unsigned char *dst)
 {
-    size_t const block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
-	if (block_overlap == 0) {
+	if (blockOverlap == 0) {
 		block->start = 0;
 		block->end = 0;
 	}
-	else if (block->end > block_overlap) {
-        size_t const from = (block->end - block_overlap) & ALIGNMENT_MASK;
+	else if (block->end > blockOverlap) {
+        size_t const from = (block->end - blockOverlap) & ALIGNMENT_MASK;
         size_t overlap = block->end - from;
 
-        if (cctx->params.rParams.block_size_log && cctx->block_total + from > ((U64)1 << cctx->params.rParams.block_size_log)) {
+        if (cctx->params.rParams.block_size_log && cctx->blockTotal + from > ((U64)1 << cctx->params.rParams.block_size_log)) {
             /* periodically reset the dictionary for mt decompression */
             overlap = 0;
-            cctx->block_total = 0;
+            cctx->blockTotal = 0;
         }
         else if (overlap <= from || dst != NULL) {
             DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
@@ -531,7 +552,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* cctx,
     const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque)
 {
-    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, NULL, opaque, progress);
+    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, opaque, progress);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity)
@@ -539,22 +560,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity)
     if (!dstCapacity)
         return FL2_ERROR(dstSize_tooSmall);
     *(BYTE*)dst = LZMA2_END_MARKER;
-    return 1;
-}
-
-FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* cctx,
-    FL2_writerFn writeFn, void* opaque,
-    const FL2_blockBuffer *block,
-    FL2_progressFn progress)
-{
-    return FL2_compressBlock(cctx, block->data, block->start, block->end, NULL, 0, writeFn, opaque, progress);
-}
-
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_writerFn writeFn, void* opaque)
-{
-    BYTE c = LZMA2_END_MARKER;
-    if(writeFn(&c, 1, opaque))
-        return FL2_ERROR(write_failed);
     return 1;
 }
 
@@ -847,8 +852,8 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs,
             fcs->inBuff.start = fcs->inBuff.end;
         }
         if (!fcs->wrote_prop && !cctx->params.omitProp) {
-            size_t dictionary_size = ending ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log;
-            ((BYTE*)output->dst)[output->pos] = FL2_getProp(cctx, dictionary_size);
+            size_t dictionarySize = ending ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log;
+            ((BYTE*)output->dst)[output->pos] = FL2_getProp(cctx, dictionarySize);
             DEBUGLOG(4, "Writing property byte : 0x%X", ((BYTE*)output->dst)[output->pos]);
             ++output->pos;
             fcs->wrote_prop = 1;
@@ -859,9 +864,6 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs,
         BYTE* const dstBuf = (BYTE*)output->dst + output->pos;
         size_t const dstCapacity = output->size - output->pos;
         size_t to_write = cctx->jobs[fcs->out_thread].cSize;
-
-        if (FL2_isError(to_write))
-            return to_write;
 
         to_write = MIN(to_write - fcs->out_pos, dstCapacity);
 
@@ -891,8 +893,6 @@ static size_t FL2_remainingOutputSize(FL2_CStream* const fcs)
     for (size_t u = fcs->out_thread; u < fcs->thread_count; ++u) {
         size_t to_write = cctx->jobs[u].cSize;
 
-        if (FL2_isError(to_write))
-            return to_write;
         total += to_write - pos;
         pos = 0;
     }
@@ -903,7 +903,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
 {
     FL2_blockBuffer* const inBuff = &fcs->inBuff;
     FL2_CCtx* const cctx = fcs->cctx;
-    size_t block_overlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    size_t blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
     if (FL2_isError(fcs->thread_count))
         return fcs->thread_count;
@@ -923,7 +923,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
             inBuff->start = 0;
             inBuff->end = 0;
         }
-        if (inBuff->start > block_overlap && input->pos < input->size) {
+        if (inBuff->start > blockOverlap && input->pos < input->size) {
             FL2_shiftBlock(fcs->cctx, inBuff);
         }
         if (fcs->out_thread == fcs->thread_count) {

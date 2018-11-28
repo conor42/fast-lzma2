@@ -185,27 +185,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
     const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque);
 
+FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf, FL2_progressFn progress, void* const opaque);
+
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.
  *  Must be called after compressing with FL2_compressCCtxBlock() */
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity);
-
-typedef int (FL2LIB_CALL *FL2_writerFn)(const void* src, size_t srcSize, void* opaque);
-
-/*! FL2_compressCCtxBlock_toFn() :
- *  Same as FL2_compressCCtx except the caller is responsible for supplying an
- *  overlap section, and compressed data is written to a callback function.
- *  The FL2_p_overlapFraction parameter will not be used.
- *  Can be called multiple times. FL2_endFrame_toFn() must be called when finished. */
-FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock_toFn(FL2_CCtx* ctx,
-    FL2_writerFn writeFn, void* opaque,
-    const FL2_blockBuffer *block,
-    FL2_progressFn progress);
-
-/*! FL2_endFrame() :
- *  Write the end marker to a callback function to terminate the LZMA2 stream.
- *  Must be called after compressing with FL2_compressCCtxBlock_toFn() */
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame_toFn(FL2_writerFn writeFn, void* opaque);
 
 /*! FL2_getCCtxDictProp() :
  *  Get the dictionary size property.

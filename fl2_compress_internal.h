@@ -58,8 +58,11 @@ struct FL2_CCtx_s {
     FL2POOL_ctx* factory;
 #endif
     FL2_dataBlock curBlock;
+    size_t srcSize;
+    size_t threadCount;
+    size_t outThread;
     size_t dictMax;
-    U64 block_total;
+    U64 blockTotal;
     FL2_matchTable* matchTable;
     unsigned jobCount;
     FL2_job jobs[1];

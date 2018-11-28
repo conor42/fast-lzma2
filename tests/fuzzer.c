@@ -385,7 +385,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }
     DISPLAYLEVEL(4, "OK \n");
 
-    DISPLAYLEVEL(4, "test%3i : compress to callback fn : ", testNb++);
+    DISPLAYLEVEL(4, "test%3i : compress with dst == NULL and read : ", testNb++);
     {   FL2_blockBuffer in = { CNBuffer, 0, CNBuffSize, CNBuffSize };
         FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_CCtx* cctx = FL2_createCCtxMt(0);
@@ -393,8 +393,15 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, 1);
         BYTE prop = FL2_getCCtxDictProp(cctx);
         callback(&prop, 1, &out);
-        CHECK(FL2_compressCCtxBlock_toFn(cctx, callback, &out, &in, NULL));
-        CHECK(FL2_endFrame_toFn(callback, &out));
+        CHECK(FL2_compressCCtxBlock(cctx, NULL, 0, &in, NULL, NULL));
+        do {
+            void *buf;
+            cSize = FL2_readCCtx(cctx, &buf, NULL, NULL);
+            if (FL2_isError(cSize)) goto _output_error;
+            callback(buf, cSize, &out);
+        } while (cSize != 0);
+        prop = 0;
+        callback(&prop, 1, &out);
         FL2_freeCCtx(cctx);
         CHECK(FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, compressedBufferSize));
     }

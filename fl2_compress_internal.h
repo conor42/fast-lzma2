@@ -61,6 +61,7 @@ struct FL2_CCtx_s {
     size_t srcSize;
     size_t threadCount;
     size_t outThread;
+    size_t outPos;
     size_t dictMax;
     U64 blockTotal;
     FL2_matchTable* matchTable;
@@ -74,12 +75,10 @@ struct FL2_CStream_s {
 #ifndef NO_XXHASH
     XXH32_state_t *xxh;
 #endif
-    size_t thread_count;
-    size_t out_thread;
-    size_t out_pos;
     size_t hash_pos;
     BYTE end_marked;
     BYTE wrote_prop;
+    BYTE loopCount;
 };
 
 #if defined (__cplusplus)

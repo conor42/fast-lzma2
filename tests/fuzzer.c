@@ -311,7 +311,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }
 
     DISPLAYLEVEL(4, "test%3i : Compression memory usage for %u thread(s)\n", testNb++, nbThreads);
-    {   DISPLAYLEVEL(4, "Level  Dict size  CCtx size  CStream size");
+    {   DISPLAYLEVEL(4, "Level  Dict size   CCtx size  CStream size");
         for (int level = 1; level <= FL2_maxCLevel(); ++level) {
             FL2_compressionParameters params;
             FL2_getLevelParameters(level, 0, &params);
@@ -491,6 +491,17 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }
     DISPLAYLEVEL(4, "OK \n");
 
+    DISPLAYLEVEL(4, "test%3i : decompress stream infinite loop : ", testNb++);
+    {   FL2_inBuffer in = { compressedBuffer, cSize - 1, 0 };
+        FL2_outBuffer out = { decodedBuffer, CNBuffSize, 0 };
+        size_t r;
+        CHECK(FL2_initDStream(dstream));
+        do {
+            r = FL2_decompressStream(dstream, &out, &in);
+        } while (!FL2_isError(r));
+    }
+    DISPLAYLEVEL(4, "OK \n");
+
     DISPLAYLEVEL(4, "test%3i : compress stream split hash write : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, cSize - 1, 0 };
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
@@ -547,11 +558,6 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }
     DISPLAYLEVEL(4, "OK \n");
 
-    DISPLAYLEVEL(4, "test%3i : decompress stream < dictionary_size with flush : ", testNb++);
-    {   size_t const r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, cSize);
-        if (r != 128 KB + 1 MB - 1) goto _output_error; }
-    DISPLAYLEVEL(4, "OK \n");
-
     DISPLAYLEVEL(4, "test%3i : compress empty stream : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_inBuffer in = { CNBuffer, 0, 0 };
@@ -567,6 +573,17 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     DISPLAYLEVEL(4, "test%3i : decompress empty stream : ", testNb++);
     {   size_t const r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, cSize);
         if (r != 0) goto _output_error; }
+    DISPLAYLEVEL(4, "OK \n");
+
+    DISPLAYLEVEL(4, "test%3i : compress stream infinite loop : ", testNb++);
+    {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
+        FL2_inBuffer in = { CNBuffer, 1, 0 };
+        size_t r;
+        CHECK(FL2_initCStream(cstream, 4));
+        do {
+            r = FL2_compressStream(cstream, &out, &in);
+        } while (!FL2_isError(r));
+    }
     DISPLAYLEVEL(4, "OK \n");
 
     /* long rle test */

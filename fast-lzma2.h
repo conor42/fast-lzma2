@@ -185,7 +185,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
     const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque);
 
-FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf, FL2_progressFn progress, void* const opaque);
+FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf,
+    FL2_progressFn progress, void* const opaque);
 
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.

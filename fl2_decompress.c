@@ -280,11 +280,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     }
 
 #ifndef NO_XXHASH
-    BYTE const do_hash = prop >> FL2_PROP_HASH_BIT;
+    BYTE const doHash = prop >> FL2_PROP_HASH_BIT;
 #endif
     prop &= FL2_LZMA_PROP_MASK;
 
-    DEBUGLOG(4, "FL2_decompressDCtx : dict prop 0x%X, do hash %u", prop, do_hash);
+    DEBUGLOG(4, "FL2_decompressDCtx : dict prop 0x%X, do hash %u", prop, doHash);
 
     srcPos = srcSize;
 
@@ -313,7 +313,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     dicPos = dctx->dec.dicPos - dicPos;
 
 #ifndef NO_XXHASH
-    if (do_hash) {
+    if (doHash) {
         XXH32_canonical_t canonical;
         U32 hash;
 
@@ -376,7 +376,8 @@ struct FL2_DStream_s
     XXH32_state_t *xxh;
 #endif
     DecoderStage stage;
-    BYTE do_hash;
+    BYTE doHash;
+    BYTE loopCount;
 };
 
 #ifndef FL2_SINGLETHREAD
@@ -498,7 +499,7 @@ static size_t FL2_writeStreamBlocks(FL2_DStream* fds, FL2_outBuffer* output)
         size_t to_write = MIN(thread->bufSize - decmt->srcPos, output->size - output->pos);
         memcpy((BYTE*)output->dst + output->pos, thread->outBuf + decmt->srcPos, to_write);
 #ifndef NO_XXHASH
-        if (fds->do_hash)
+        if (fds->doHash)
             XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, to_write);
 #endif
         decmt->srcPos += to_write;
@@ -621,10 +622,10 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
     }
     if (fds->stage == FL2DEC_STAGE_MT_WRITE) {
         if (FL2_writeStreamBlocks(fds, output))
-            fds->stage = decmt->isFinal ? (fds->do_hash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED)
+            fds->stage = decmt->isFinal ? (fds->doHash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED)
                 : FL2DEC_STAGE_DECOMP;
     }
-    if (fds->stage == FL2DEC_STAGE_HASH) {
+/*    if (fds->stage == FL2DEC_STAGE_HASH) {
 #ifndef NO_XXHASH
         size_t to_read = MIN(XXHASH_SIZEOF - decmt->hashPos, input->size - input->pos);
         memcpy(decmt->hash.digest + decmt->hashPos, (BYTE*)input->src + input->pos, to_read);
@@ -642,7 +643,7 @@ static size_t FL2_decompressStreamMt(FL2_DStream* fds, FL2_outBuffer* output, FL
 #else
         fds->stage = FL2DEC_STAGE_FINISHED;
 #endif
-    }
+    }*/
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
 #endif
@@ -670,7 +671,8 @@ FL2LIB_API FL2_DStream *FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads)
 #ifndef NO_XXHASH
         fds->xxh = NULL;
 #endif
-        fds->do_hash = 0;
+        fds->doHash = 0;
+        fds->loopCount = 0;
     }
 
     return fds;
@@ -694,6 +696,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
     fds->stage = FL2DEC_STAGE_INIT;
+    fds->loopCount = 0;
 #ifndef FL2_SINGLETHREAD
     FL2_Lzma2DecMt_Init(fds->decmt);
 #endif
@@ -702,7 +705,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 
 static size_t FL2_initDStream_prop(FL2_DStream* fds, BYTE prop)
 {
-    fds->do_hash = prop >> FL2_PROP_HASH_BIT;
+    fds->doHash = prop >> FL2_PROP_HASH_BIT;
     prop &= FL2_LZMA_PROP_MASK;
 
 #ifndef FL2_SINGLETHREAD
@@ -713,7 +716,7 @@ static size_t FL2_initDStream_prop(FL2_DStream* fds, BYTE prop)
         CHECK_F(FLzma2Dec_Init(&fds->dec, prop, NULL, 0));
 
 #ifndef NO_XXHASH
-    if (fds->do_hash) {
+    if (fds->doHash) {
         if (fds->xxh == NULL) {
             DEBUGLOG(3, "Creating hash state");
             fds->xxh = XXH32_createState();
@@ -736,6 +739,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigne
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
+    size_t prevOut = output->pos;
+    size_t prevIn = input->pos;
+
     if (input->pos < input->size
 #ifndef FL2_SINGLETHREAD
         || fds->decmt
@@ -749,7 +755,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
         }
 #ifndef FL2_SINGLETHREAD
         if (fds->decmt)
-            return FL2_decompressStreamMt(fds, output, input);
+            FL2_decompressStreamMt(fds, output, input);
+        else
 #endif
         if (fds->stage == FL2DEC_STAGE_DECOMP) {
             size_t destSize = output->size - output->pos;
@@ -759,7 +766,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
             DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
 
 #ifndef NO_XXHASH
-            if(fds->do_hash)
+            if(fds->doHash)
                 XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, destSize);
 #endif
 
@@ -770,7 +777,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
                 return res;
             if (res == LZMA_STATUS_FINISHED_WITH_MARK) {
                 DEBUGLOG(4, "Found end mark");
-                fds->stage = fds->do_hash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED;
+                fds->stage = fds->doHash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED;
             }
         }
         if (fds->stage == FL2DEC_STAGE_HASH) {
@@ -780,15 +787,26 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 
             DEBUGLOG(4, "Checking hash");
 
-            if (input->size - input->pos < XXHASH_SIZEOF)
-                return 1;
-            memcpy(&canonical, (BYTE*)input->src + input->pos, XXHASH_SIZEOF);
-            hash = XXH32_hashFromCanonical(&canonical);
-            if (hash != XXH32_digest(fds->xxh))
-                return FL2_ERROR(checksum_wrong);
-#endif
+            if (input->size - input->pos >= XXHASH_SIZEOF) {
+                memcpy(&canonical, (BYTE*)input->src + input->pos, XXHASH_SIZEOF);
+                input->pos += XXHASH_SIZEOF;
+                hash = XXH32_hashFromCanonical(&canonical);
+                if (hash != XXH32_digest(fds->xxh))
+                    return FL2_ERROR(checksum_wrong);
+                fds->stage = FL2DEC_STAGE_FINISHED;
+            }
+#else
             fds->stage = FL2DEC_STAGE_FINISHED;
+#endif
         }
+    }
+    if (fds->stage != FL2DEC_STAGE_FINISHED && prevOut == output->pos && prevIn == input->pos) {
+        ++fds->loopCount;
+        if (fds->loopCount > 1)
+            return FL2_ERROR(infinite_loop);
+    }
+    else {
+        fds->loopCount = 0;
     }
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }

@@ -75,7 +75,8 @@ struct FL2_CCtx_s {
 
 struct FL2_CStream_s {
     FL2_CCtx* cctx;
-    FL2_blockBuffer inBuffs[2];
+    FL2_blockBuffer inBuf;
+    BYTE *dictBufs[2];
     size_t bufIndex;
 #ifndef NO_XXHASH
     XXH32_state_t *xxh;

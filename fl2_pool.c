@@ -35,7 +35,6 @@ typedef struct FL2POOL_job_s {
 
 struct FL2POOL_ctx_s {
     /* Keep track of the threads */
-    ZSTD_pthread_t *threads;
     size_t numThreads;
 
     /* The queue is a single job */
@@ -54,6 +53,7 @@ struct FL2POOL_ctx_s {
     ZSTD_pthread_cond_t queuePopCond;
     /* Indicates if the queue is shutting down */
     int shutdown;
+    ZSTD_pthread_t threads[1];
 };
 
 /* FL2POOL_thread() :
@@ -99,7 +99,7 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads) {
     /* Check the parameters */
     if (!numThreads) { return NULL; }
     /* Allocate the context and zero initialize */
-    ctx = (FL2POOL_ctx*)calloc(1, sizeof(FL2POOL_ctx));
+    ctx = (FL2POOL_ctx*)calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(ZSTD_pthread_t));
     if (!ctx) { return NULL; }
     /* Initialize the job queue.
      * It needs one extra space since one space is wasted to differentiate empty
@@ -111,11 +111,7 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads) {
     (void)ZSTD_pthread_cond_init(&ctx->queuePushCond, NULL);
     (void)ZSTD_pthread_cond_init(&ctx->queuePopCond, NULL);
     ctx->shutdown = 0;
-    /* Allocate space for the thread handles */
-    ctx->threads = (ZSTD_pthread_t*)malloc(numThreads * sizeof(ZSTD_pthread_t));
     ctx->numThreads = 0;
-    /* Check for errors */
-    if (!ctx->threads) { FL2POOL_free(ctx); return NULL; }
     /* Initialize the threads */
     {   size_t i;
         for (i = 0; i < numThreads; ++i) {
@@ -153,7 +149,6 @@ void FL2POOL_free(FL2POOL_ctx *ctx) {
     ZSTD_pthread_mutex_destroy(&ctx->queueMutex);
     ZSTD_pthread_cond_destroy(&ctx->queuePushCond);
     ZSTD_pthread_cond_destroy(&ctx->queuePopCond);
-    free(ctx->threads);
     free(ctx);
 }
 

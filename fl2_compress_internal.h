@@ -56,6 +56,7 @@ struct FL2_CCtx_s {
     FL2_CCtx_params params;
 #ifndef FL2_SINGLETHREAD
     FL2POOL_ctx* factory;
+    FL2POOL_ctx* asyncThread;
 #endif
     FL2_dataBlock curBlock;
     FL2_progressFn asyncProgress;

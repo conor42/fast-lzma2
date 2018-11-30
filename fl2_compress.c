@@ -430,7 +430,6 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
     FL2_progressFn progress, void* const opaque)
 {
     BYTE* dstBuf = dst;
-    size_t outSize = 0;
     size_t const dictionarySize = (size_t)1 << cctx->params.rParams.dictionary_log;
     size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
 
@@ -642,7 +641,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* cctx,
     const FL2_blockBuffer *block,
     FL2_progressFn progress, void* opaque)
 {
-    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, opaque, progress);
+    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, progress, opaque);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity)
@@ -1000,6 +999,13 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs,
     return 0;
 }
 
+static void FL2_shiftBlock_switchBuffer(FL2_CStream* fcs)
+{
+    FL2_shiftBlock_switch(fcs->cctx, &fcs->inBuf, fcs->cctx->async ? fcs->dictBufs[fcs->bufIndex ^ 1] : NULL);
+    fcs->bufIndex ^= fcs->cctx->async;
+    fcs->inBuf.data = fcs->dictBufs[fcs->bufIndex];
+}
+
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input)
 {
     FL2_blockBuffer * const inBuf = &fcs->inBuf;
@@ -1014,9 +1020,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
     if (output->pos < output->size) while (input->pos < input->size) {
         /* read input and/or write output until a buffer is full */
         if (inBuf->start > blockOverlap && input->pos < input->size) {
-            FL2_shiftBlock_switch(fcs->cctx, inBuf, cctx->async ? fcs->dictBufs[fcs->bufIndex ^ 1] : NULL);
-            fcs->bufIndex ^= fcs->cctx->async;
-            inBuf->data = fcs->dictBufs[fcs->bufIndex];
+            FL2_shiftBlock_switchBuffer(fcs);
         }
         if (cctx->outThread == cctx->threadCount) {
             /* no compressed output to write, so read */
@@ -1109,6 +1113,26 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* out
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs, unsigned timeout)
 {
     return FL2_waitCCtx(fcs->cctx, timeout);
+}
+
+FL2LIB_API void FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_outBuffer * dict)
+{
+    FL2_CCtx* const cctx = fcs->cctx;
+    size_t blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    if (fcs->inBuf.start > blockOverlap) {
+        FL2_shiftBlock_switchBuffer(fcs);
+    }
+    dict->dst = fcs->inBuf.data;
+    dict->pos = fcs->inBuf.end;
+    dict->size = fcs->inBuf.bufSize;
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream * fcs, size_t addedSize, FL2_outBuffer* output)
+{
+    fcs->inBuf.end += addedSize;
+    if (fcs->inBuf.end == fcs->inBuf.bufSize || fcs->cctx->outThread < fcs->cctx->threadCount)
+        CHECK_F(FL2_compressStream_internal(fcs, output, 0));
+    return FL2_error_no_error;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value)

@@ -589,7 +589,6 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *decmt, FL2_inBuffer* input)
             }
         }
         if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE && inBlock->endPos + LZMA_REQUIRED_INPUT_MAX >= inBlock->last->length) {
-            InBufNode* prev = inBlock->last;
             inBlock->last = FLzma2Dec_CreateInbufNode(inBlock->last);
             if (!inBlock->last)
                 return FL2_ERROR(memory_allocation);

@@ -464,6 +464,29 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }   }
     DISPLAYLEVEL(4, "OK \n");
 
+    DISPLAYLEVEL(4, "test%3i : compress stream using buffer access : ", testNb++);
+    {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
+        FL2_outBuffer dict;
+        size_t r;
+        CHECK(FL2_initCStream(cstream, 4));
+        FL2_getDictionaryBuffer(cstream, &dict);
+        memcpy(dict.dst, CNBuffer, dict.size);
+        CHECK(FL2_updateDictionary(cstream, dict.size, &out));
+        FL2_getDictionaryBuffer(cstream, &dict);
+        memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer + dict.size, dict.size / 2);
+        CHECK(FL2_updateDictionary(cstream, dict.size / 2, &out));
+        CHECK(FL2_flushStream(cstream, &out));
+        r = FL2_endStream(cstream, &out);
+        if (r != 0) goto _output_error;
+        r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, out.pos);
+        if (FL2_isError(r)) goto _output_error;
+        {   size_t diff = findDiff(CNBuffer, decodedBuffer, r);
+            if (diff < r) goto _output_error;
+        }
+        cSize = out.pos;
+    }
+    DISPLAYLEVEL(4, "OK \n");
+
     DISPLAYLEVEL(4, "test%3i : compress stream in one chunk : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };

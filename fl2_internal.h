@@ -19,7 +19,7 @@
 #include "mem.h"
 #include "compiler.h"
 #include "error_private.h"
-
+#include "util.h"
 
 #if defined (__cplusplus)
 extern "C" {

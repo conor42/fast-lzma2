@@ -296,7 +296,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output);
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream* fcs, unsigned timeout);
-
+FL2LIB_API void FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
+FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize, FL2_outBuffer* output);
 
 /*-***************************************************************************
  *  Streaming decompression - HowTo

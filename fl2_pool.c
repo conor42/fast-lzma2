@@ -16,11 +16,6 @@
 #include "fl2_pool.h"
 #include "fl2_internal.h"
 
-/* ======   Compiler specifics   ====== */
-#if defined(_MSC_VER)
-#  pragma warning(disable : 4204)        /* disable: C4204: non-constant aggregate initializer */
-#endif
-
 
 #ifndef FL2_SINGLETHREAD
 

@@ -186,16 +186,27 @@ void FL2POOL_add(void* ctxVoid, FL2POOL_function function, void *opaque, size_t 
     ZSTD_pthread_cond_signal(&ctx->queuePopCond);
 }
 
-void FL2POOL_waitAll(void *ctxVoid)
+int FL2POOL_waitAll(void *ctxVoid, unsigned timeout)
 {
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)ctxVoid;
-    if (!ctx) { return; }
+    if (!ctx) { return 0; }
 
     ZSTD_pthread_mutex_lock(&ctx->queueMutex);
-    while (ctx->numThreadsBusy && !ctx->shutdown) {
-        ZSTD_pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
+    if (timeout != 0) {
+        if (ctx->numThreadsBusy && !ctx->shutdown)
+            ZSTD_pthread_cond_timedwait(&ctx->queuePushCond, &ctx->queueMutex, timeout);
+    }
+    else {
+        while (ctx->numThreadsBusy && !ctx->shutdown)
+            ZSTD_pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
     }
     ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
+    return ctx->numThreadsBusy && !ctx->shutdown;
+}
+
+size_t FL2POOL_threadsBusy(void * ctx)
+{
+    return ((FL2POOL_ctx*)ctx)->numThreadsBusy;
 }
 
 #endif  /* FL2_SINGLETHREAD */

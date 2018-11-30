@@ -58,6 +58,9 @@ struct FL2_CCtx_s {
     FL2POOL_ctx* factory;
 #endif
     FL2_dataBlock curBlock;
+    FL2_progressFn asyncProgress;
+    void* asyncOpaque;
+    size_t asyncRes;
     size_t srcSize;
     size_t threadCount;
     size_t outThread;
@@ -65,13 +68,15 @@ struct FL2_CCtx_s {
     size_t dictMax;
     U64 blockTotal;
     FL2_matchTable* matchTable;
+    int async;
     unsigned jobCount;
     FL2_job jobs[1];
 };
 
 struct FL2_CStream_s {
     FL2_CCtx* cctx;
-    FL2_blockBuffer inBuff;
+    FL2_blockBuffer inBuffs[2];
+    size_t bufIndex;
 #ifndef NO_XXHASH
     XXH32_state_t *xxh;
 #endif

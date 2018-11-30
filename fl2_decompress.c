@@ -182,7 +182,7 @@ static size_t FL2_decompressCtxBlocksMt(FL2_DCtx* dctx, const BYTE *src, BYTE *d
     }
     CHECK_F(FLzma2Dec_Init(blocks[0].dec, prop, dst + blocks[0].unpackPos, blocks[0].unpackSize));
     FL2_decompressCtxBlock(blocks, 0);
-    FL2POOL_waitAll(dctx->factory);
+    FL2POOL_waitAll(dctx->factory, 0);
     size_t dSize = 0;
     for (size_t thread = 0; thread < nbThreads; ++thread) {
         if (FL2_isError(blocks[thread].res))
@@ -529,7 +529,7 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
         FL2POOL_add(fds->decmt->factory, FL2_decompressBlock, fds, thread);
     }
     fds->decmt->threads[0].res = FL2_decompressBlockMt(fds, 0);
-    FL2POOL_waitAll(fds->decmt->factory);
+    FL2POOL_waitAll(fds->decmt->factory, 0);
 
     if (decmt->numThreads > 0) {
         InBufNode *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;

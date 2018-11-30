@@ -135,6 +135,7 @@ FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maxim
 typedef struct FL2_CCtx_s FL2_CCtx;
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads);
+FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxAsync(unsigned nbThreads);
 FL2LIB_API void      FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx);
 
 FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* ctx);
@@ -145,6 +146,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     void* dst, size_t dstCapacity,
     const void* src, size_t srcSize,
     int compressionLevel);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx, unsigned timeout);
 
 /************************************************
 *  Caller-managed data buffer and overlap section
@@ -284,6 +287,7 @@ typedef struct FL2_CStream_s FL2_CStream;
 /*===== FL2_CStream management functions =====*/
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads);
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamAsync(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
 
 /*===== Streaming compression functions =====*/

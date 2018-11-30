@@ -119,10 +119,10 @@
     <ClInclude Include="..\xxhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\fl2pool.h">
+    <ClInclude Include="..\fl2_threading.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\fl2_threading.h">
+    <ClInclude Include="..\fl2_pool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

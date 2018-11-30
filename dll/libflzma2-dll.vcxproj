@@ -182,12 +182,12 @@
     <ClInclude Include="..\fl2_compress_internal.h" />
     <ClInclude Include="..\fl2_errors.h" />
     <ClInclude Include="..\fl2_internal.h" />
+    <ClInclude Include="..\fl2_pool.h" />
     <ClInclude Include="..\fl2_threading.h" />
     <ClInclude Include="..\lzma2_dec.h" />
     <ClInclude Include="..\lzma2_enc.h" />
     <ClInclude Include="..\mem.h" />
     <ClInclude Include="..\platform.h" />
-    <ClInclude Include="..\fl2pool.h" />
     <ClInclude Include="..\radix_engine.h" />
     <ClInclude Include="..\radix_internal.h" />
     <ClInclude Include="..\radix_mf.h" />

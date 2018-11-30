@@ -60,6 +60,7 @@ extern "C" {
 #define ZSTD_pthread_cond_init(a, b)    (InitializeConditionVariable((a)), 0)
 #define ZSTD_pthread_cond_destroy(a)    /* No delete */
 #define ZSTD_pthread_cond_wait(a, b)    SleepConditionVariableCS((a), (b), INFINITE)
+#define ZSTD_pthread_cond_timedwait(a, b, c)    SleepConditionVariableCS((a), (b), (c))
 #define ZSTD_pthread_cond_signal(a)     WakeConditionVariable((a))
 #define ZSTD_pthread_cond_broadcast(a)  WakeAllConditionVariable((a))
 

@@ -51,7 +51,9 @@ Note : The function may be executed asynchronously, so `opaque` must live until 
 */
 void FL2POOL_add(void *ctx, FL2POOL_function function, void *opaque, size_t n);
 
-void FL2POOL_waitAll(void *ctx);
+int FL2POOL_waitAll(void *ctx, unsigned timeout);
+
+size_t FL2POOL_threadsBusy(void *ctx);
 
 #if defined (__cplusplus)
 }

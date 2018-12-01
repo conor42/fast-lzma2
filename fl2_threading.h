@@ -56,13 +56,13 @@ extern "C" {
 #define ZSTD_pthread_mutex_unlock(a)   LeaveCriticalSection((a))
 
 /* condition variable */
-#define ZSTD_pthread_cond_t             CONDITION_VARIABLE
-#define ZSTD_pthread_cond_init(a, b)    (InitializeConditionVariable((a)), 0)
-#define ZSTD_pthread_cond_destroy(a)    /* No delete */
-#define ZSTD_pthread_cond_wait(a, b)    SleepConditionVariableCS((a), (b), INFINITE)
+#define ZSTD_pthread_cond_t                     CONDITION_VARIABLE
+#define ZSTD_pthread_cond_init(a, b)            (InitializeConditionVariable((a)), 0)
+#define ZSTD_pthread_cond_destroy(a)            /* No delete */
+#define ZSTD_pthread_cond_wait(a, b)            SleepConditionVariableCS((a), (b), INFINITE)
 #define ZSTD_pthread_cond_timedwait(a, b, c)    SleepConditionVariableCS((a), (b), (c))
-#define ZSTD_pthread_cond_signal(a)     WakeConditionVariable((a))
-#define ZSTD_pthread_cond_broadcast(a)  WakeAllConditionVariable((a))
+#define ZSTD_pthread_cond_signal(a)             WakeConditionVariable((a))
+#define ZSTD_pthread_cond_broadcast(a)          WakeAllConditionVariable((a))
 
 /* ZSTD_pthread_create() and ZSTD_pthread_join() */
 typedef struct {
@@ -101,6 +101,46 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 #define ZSTD_pthread_t                  pthread_t
 #define ZSTD_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
 #define ZSTD_pthread_join(a, b)         pthread_join((a),(b))
+
+/* Timed wait functions from XZ by Lasse Collin
+*/
+
+/* Sets condtime to the absolute time that is timeout_ms milliseconds
+ * in the future.
+ */
+static inline void
+mythread_condtime_set(struct timespec *condtime, uint32_t timeout_ms)
+{
+	condtime->tv_sec = timeout_ms / 1000;
+	condtime->tv_nsec = (timeout_ms % 1000) * 1000000;
+
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	condtime->tv_sec += now.tv_sec;
+	condtime->tv_nsec += now.tv_usec * 1000L;
+
+	// tv_nsec must stay in the range [0, 999_999_999].
+	if (condtime->tv_nsec >= 1000000000L) {
+		condtime->tv_nsec -= 1000000000L;
+		++condtime->tv_sec;
+	}
+}
+
+/* Waits on a condition or until a timeout expires. If the timeout expires,
+ * non-zero is returned, otherwise zero is returned.
+ */
+static inline int
+ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mutex,
+    uint32_t timeout_ms)
+{
+    struct timespec condtime;
+    mythread_condtime_set(&condtime, timeout_ms);
+	int ret = pthread_cond_timedwait(cond, mutex, &condtime);
+	assert(ret == 0 || ret == ETIMEDOUT);
+	return ret;
+}
+
 
 #elif defined(FL2_SINGLETHREAD)
 /* No multithreading support */

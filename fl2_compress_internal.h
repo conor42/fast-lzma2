@@ -22,6 +22,7 @@
 #include "fast-lzma2.h"
 #include "fl2_threading.h"
 #include "fl2_pool.h"
+#include "dict_buffer.h"
 #ifndef NO_XXHASH
 #  include "xxhash.h"
 #endif
@@ -56,8 +57,8 @@ struct FL2_CCtx_s {
     FL2_CCtx_params params;
 #ifndef FL2_SINGLETHREAD
     FL2POOL_ctx* factory;
-    FL2POOL_ctx* asyncThread;
 #endif
+    FL2POOL_ctx* compressThread;
     FL2_dataBlock curBlock;
     FL2_progressFn asyncProgress;
     void* asyncOpaque;
@@ -76,12 +77,7 @@ struct FL2_CCtx_s {
 
 struct FL2_CStream_s {
     FL2_CCtx* cctx;
-    FL2_blockBuffer inBuf;
-    BYTE *dictBufs[2];
-    size_t bufIndex;
-#ifndef NO_XXHASH
-    XXH32_state_t *xxh;
-#endif
+    DICT_buffer buf;
     size_t hash_pos;
     BYTE end_marked;
     BYTE wrote_prop;

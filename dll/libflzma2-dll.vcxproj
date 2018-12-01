@@ -157,6 +157,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\dict_buffer.c" />
     <ClCompile Include="..\error_private.c" />
     <ClCompile Include="..\fl2_common.c" />
     <ClCompile Include="..\fl2_compress.c" />
@@ -177,6 +178,7 @@
     <ClInclude Include="..\compiler.h" />
     <ClInclude Include="..\count.h" />
     <ClInclude Include="..\data_block.h" />
+    <ClInclude Include="..\dict_buffer.h" />
     <ClInclude Include="..\error_private.h" />
     <ClInclude Include="..\fast-lzma2.h" />
     <ClInclude Include="..\fastpos_table.h" />

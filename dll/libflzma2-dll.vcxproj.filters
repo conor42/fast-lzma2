@@ -57,6 +57,9 @@
     <ClCompile Include="..\fl2_threading.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\dict_buffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\atomic.h">
@@ -123,6 +126,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\fl2_pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dict_buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

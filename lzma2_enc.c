@@ -73,7 +73,7 @@ Public domain
 #define kNullDist (U32)-1
 
 #define kChunkSize ((1UL << 16U) - 8192U)
-#define kChunkBufferSize (1UL << 16U)
+#define kChunkBufferSize ((1UL << 16U) + 1)
 #define kMaxChunkUncompressedSize ((1UL << 21U) - kMatchLenMax)
 #define kChunkHeaderSize 5U
 #define kChunkResetShift 5U
@@ -201,9 +201,6 @@ struct FL2_lzmaEncoderCtx_s
     ptrdiff_t hash_dict_3;
     ptrdiff_t hash_prev_index;
     ptrdiff_t hash_alloc_3;
-
-    size_t progress;
-    int canceled;
 };
 
 FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
@@ -244,17 +241,6 @@ void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc)
     free(enc->hash_buf);
     free(enc->out_buf);
     free(enc);
-}
-
-void FL2_lzma2InitProgress(FL2_lzmaEncoderCtx * enc)
-{
-    enc->progress = 0;
-    enc->canceled = 0;
-}
-
-size_t FL2_lzma2GetProgress(FL2_lzmaEncoderCtx * enc)
-{
-    return enc->progress;
 }
 
 #define GetLiteralProbs(enc, pos, prev_symbol) (enc->states.literal_probs + ((((pos) & enc->lit_pos_mask) << enc->lc) + ((prev_symbol) >> (8 - enc->lc))) * kNumLiterals * kNumLitTables)
@@ -1932,10 +1918,15 @@ __pragma(warning(disable:4701))
 size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
-    const FL2_lzma2Parameters* options)
+    const FL2_lzma2Parameters* options,
+    int stream_prop,
+    FL2_atomic *progress,
+    int *canceled)
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
+    if (stream_prop >= 0)
+        *out_dest++ = (BYTE)stream_prop;
 	/* Each encoder writes a properties byte because the upstream encoder(s) could */
 	/* write only uncompressed chunks with no properties. */
 	BYTE encode_properties = 1;
@@ -2061,9 +2052,9 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
             memcpy(out_dest, enc->out_buf, compressed_size + header_size);
         }
         out_dest += compressed_size + header_size;
+        FL2_atomic_add(*progress, (long)next_index - index);
         index = next_index;
-        enc->progress = index - start;
-        if (enc->canceled)
+        if (*canceled)
             return FL2_ERROR(canceled);
     }
     return out_dest - RMF_getTableAsOutputBuffer(tbl, start);

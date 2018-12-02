@@ -44,6 +44,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressBound(size_t srcSize)
  *  tells if a return value is an error code */
 FL2LIB_API unsigned FL2LIB_CALL FL2_isError(size_t code) { return ERR_isError(code); }
 
+FL2LIB_API unsigned FL2LIB_CALL FL2_isTimedOut(size_t code) { return ERR_isTimedOut(code); }
+
 /*! FL2_getErrorName() :
  *  provides error code string from function result (useful for debugging) */
 FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code) { return ERR_getErrorName(code); }

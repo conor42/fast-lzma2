@@ -61,10 +61,8 @@ struct FL2_CCtx_s {
     FL2POOL_ctx* compressThread;
     FL2_dataBlock curBlock;
     size_t asyncRes;
-    size_t srcSize;
     size_t threadCount;
     size_t outThread;
-    size_t outPos;
     size_t dictMax;
     U64 blockTotal;
     U64 streamTotal;
@@ -72,6 +70,8 @@ struct FL2_CCtx_s {
     U32 timeout;
     U32 rmfWeight;
     U32 encWeight;
+    FL2_atomic encProgress;
+    int canceled;
     unsigned jobCount;
     FL2_job jobs[1];
 };

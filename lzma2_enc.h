@@ -10,6 +10,7 @@ Public domain
 #include "mem.h"
 #include "data_block.h"
 #include "radix_mf.h"
+#include "atomic.h"
 
 #if defined (__cplusplus)
 extern "C" {
@@ -41,16 +42,15 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create(void);
 
 void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc);
 
-void FL2_lzma2InitProgress(FL2_lzmaEncoderCtx* enc);
-
-size_t FL2_lzma2GetProgress(FL2_lzmaEncoderCtx* enc);
-
 int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options);
 
 size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
-    const FL2_lzma2Parameters* options);
+    const FL2_lzma2Parameters* options,
+    int stream_prop,
+    FL2_atomic *progress,
+    int *canceled);
 
 BYTE FL2_getDictSizeProp(size_t dictionary_size);
 

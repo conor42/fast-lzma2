@@ -43,7 +43,8 @@ typedef enum {
   FL2_error_write_failed            = 12,
   FL2_error_canceled                = 13,
   FL2_error_infinite_loop           = 14,
-  FL2_error_maxCode = 20  /* never EVER use this value directly, it can change in future versions! Use FL2_isError() instead */
+  FL2_error_timedOut                = 15,
+  FL2_error_maxCode                 = 20  /* never EVER use this value directly, it can change in future versions! Use FL2_isError() instead */
 } FL2_ErrorCode;
 
 /*! FL2_getErrorCode() :

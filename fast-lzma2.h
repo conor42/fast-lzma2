@@ -119,6 +119,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t s
 #define FL2_COMPRESSBOUND(srcSize)   ((srcSize) + (((srcSize) + 0xFFF) / 0x1000) * 3 + 6)  /* this formula calculates the maximum size of data stored in uncompressed chunks */
 FL2LIB_API size_t      FL2LIB_CALL FL2_compressBound(size_t srcSize); /*!< maximum compressed size in worst case scenario */
 FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells if a `size_t` function result is an error code */
+FL2LIB_API unsigned    FL2LIB_CALL FL2_isTimedOut(size_t code);       /*!< tells if a `size_t` function result is the timeout code */
 FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code);     /*!< provides readable string from an error code */
 FL2LIB_API int         FL2LIB_CALL FL2_maxCLevel(void);               /*!< maximum compression level available */
 FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maximum compression level available in high mode */
@@ -170,10 +171,6 @@ typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
 FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* ctx);
 
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
-
-FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx);
-
-FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf);
 
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.
@@ -274,12 +271,15 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
 
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
-FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer* output, FL2_inBuffer* input);
-FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer* output);
-FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* output);
-FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream* fcs, unsigned timeout);
+FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
+FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, const void **src);
+FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity);
+FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream* fcs);
 FL2LIB_API void FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
-FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize, FL2_outBuffer* output);
+FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
 /*-***************************************************************************
  *  Streaming decompression - HowTo

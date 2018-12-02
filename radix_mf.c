@@ -183,6 +183,8 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
         tbl->list_heads[i + 1].head = RADIX_NULL_LINK;
         tbl->list_heads[i + 1].count = 0;
     }
+    RMF_initProgress(tbl);
+    
     return tbl;
 }
 
@@ -217,8 +219,10 @@ size_t RMF_threadCount(const FL2_matchTable* const tbl)
 
 void RMF_initProgress(FL2_matchTable * const tbl)
 {
-    tbl->progress = 0;
-    tbl->canceled;
+    if (tbl != NULL) {
+        tbl->progress = 0;
+        tbl->canceled = 0;
+    }
 }
 
 size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)

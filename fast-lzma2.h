@@ -147,7 +147,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx, unsigned timeout);
+FL2LIB_API void FL2LIB_CALL FL2_setTimeout(FL2_CCtx* ctx, unsigned timeout);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx);
+
+unsigned long long FL2_getProgress(const FL2_CCtx * ctx);
 
 /************************************************
 *  Caller-managed data buffer and overlap section
@@ -165,33 +169,11 @@ typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
 /* Get the size of the overlap section. */
 FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* ctx);
 
-/* Copy the overlap section to the start to prepare for more data */
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock(FL2_CCtx* ctx, FL2_blockBuffer *block);
-/* Copy the overlap to a different buffer. This allows a dual-buffer configuration where
- * data is read into one block while the other is compressed. */
-FL2LIB_API void FL2LIB_CALL FL2_shiftBlock_switch(FL2_CCtx* ctx, FL2_blockBuffer *block, unsigned char *dst);
-
 FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
-
-/*! FL2_compressCCtxBlock() :
- *  Same as FL2_compressCCtx except the caller is responsible for supplying an overlap section.
- *  The FL2_p_overlapFraction parameter will not be used.
- *  srcStart + srcSize should equal the dictionary size except on the last call.
- *  Can be called multiple times. FL2_endFrame() must be called when finished.
- *  For compatibility with this library the caller must write a property byte at
- *  the beginning of the output. Obtain it by calling FL2_getCCtxDictProp() before
- *  compressing the first block or after the last. No hash will be written, but
- *  the caller can calculate it using the interface in xxhash.h, write it at the end,
- *  and set bit 7 in the property byte. */
-FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* ctx,
-    void* dst, size_t dstCapacity,
-    const FL2_blockBuffer *block,
-    FL2_progressFn progress, void* opaque);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx);
 
-FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf,
-    FL2_progressFn progress, void* const opaque);
+FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf);
 
 /*! FL2_endFrame() :
  *  Write the end marker to terminate the LZMA2 stream.

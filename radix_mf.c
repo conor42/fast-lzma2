@@ -215,6 +215,12 @@ size_t RMF_threadCount(const FL2_matchTable* const tbl)
     return tbl->thread_count;
 }
 
+void RMF_initProgress(FL2_matchTable * const tbl)
+{
+    tbl->progress = 0;
+    tbl->canceled;
+}
+
 size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
 {
     DEBUGLOG(5, "RMF_initTable : start %u, size %u", (U32)start, (U32)end);
@@ -606,15 +612,14 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
 int RMF_buildTable(FL2_matchTable* const tbl,
 	size_t const job,
     unsigned const multi_thread,
-    FL2_dataBlock const block,
-    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)
+    FL2_dataBlock const block)
 {
     DEBUGLOG(5, "RMF_buildTable : thread %u", (U32)job);
     if (tbl->isStruct) {
-        return RMF_structuredBuildTable(tbl, job, multi_thread, block, progress, opaque, weight, init_done);
+        return RMF_structuredBuildTable(tbl, job, multi_thread, block);
     }
     else {
-        return RMF_bitpackBuildTable(tbl, job, multi_thread, block, progress, opaque, weight, init_done);
+        return RMF_bitpackBuildTable(tbl, job, multi_thread, block);
     }
 }
 

@@ -182,10 +182,13 @@ FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads)
     }
     cctx->dictMax = 0;
     cctx->blockTotal = 0;
+    cctx->streamTotal = 0;
     cctx->srcSize = 0;
     cctx->outThread = 0;
     cctx->outPos = 0;
+    cctx->asyncRes = 0;
     cctx->threadCount = 0;
+    cctx->timeout = 0;
 
     return cctx;
 }
@@ -257,13 +260,18 @@ static int FL2_initEncoders(FL2_CCtx* const cctx)
     return 0;
 }
 
-static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn progress, void* opaque)
+static void FL2_initProgress(FL2_CCtx* const cctx)
+{
+    RMF_initProgress(cctx->matchTable);
+
+    for (size_t i = 0; i < cctx->jobCount; ++i)
+        FL2_lzma2InitProgress(cctx->jobs[i].enc);
+}
+
+static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx)
 {
     size_t const encodeSize = (cctx->curBlock.end - cctx->curBlock.start);
     size_t init_done;
-    U32 rmf_weight = ZSTD_highbit32((U32)cctx->curBlock.end);
-    U32 depth_weight = 2 + (cctx->params.rParams.depth >= 12) + (cctx->params.rParams.depth >= 28);
-    U32 enc_weight;
     int err = 0;
 #ifndef FL2_SINGLETHREAD
     size_t mfThreads = cctx->curBlock.end / RMF_MIN_BYTES_PER_THREAD;
@@ -273,22 +281,6 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn
     size_t mfThreads = 1;
     size_t nbThreads = 1;
 #endif
-
-    if (rmf_weight >= 20) {
-        rmf_weight = depth_weight * (rmf_weight - 10) + (rmf_weight - 19) * 12;
-        if (cctx->params.cParams.strategy == 0)
-            enc_weight = 20;
-        else if (cctx->params.cParams.strategy == 1)
-            enc_weight = 50;
-        else
-            enc_weight = 60 + cctx->params.cParams.second_dict_bits + ZSTD_highbit32(cctx->params.cParams.fast_length) * 3U;
-        rmf_weight = (rmf_weight << 4) / (rmf_weight + enc_weight);
-        enc_weight = 16 - rmf_weight;
-    }
-    else {
-        rmf_weight = 8;
-        enc_weight = 8;
-    }
 
     DEBUGLOG(5, "FL2_compressCurBlock : %u threads, %u start, %u bytes", (U32)nbThreads, (U32)cctx->curBlock.start, (U32)encodeSize);
 
@@ -327,7 +319,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn
     }
 
     /* initialize to length 2 */
-    init_done = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
+    cctx->matchTable->progress = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
 
 #ifndef FL2_SINGLETHREAD
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
@@ -336,7 +328,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn
     }
 #endif
 
-    err = RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock, progress, opaque, rmf_weight, init_done);
+    err = RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock);
 
 #ifndef FL2_SINGLETHREAD
 
@@ -355,7 +347,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn
 		FL2POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
     }
 
-    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight * (U32)nbThreads);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams);
     FL2POOL_waitAll(cctx->factory, 0);
 
 #else /* FL2_SINGLETHREAD */
@@ -368,7 +360,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, FL2_progressFn
     if (err)
         return FL2_ERROR(internal);
 #endif
-    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, progress, opaque, (rmf_weight * encodeSize) >> 4, enc_weight);
+    cctx->jobs[0].cSize = FL2_lzma2Encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams);
 
 #endif
 
@@ -388,13 +380,15 @@ static void FL2_compressCurBlock_async(void* const jobDescription, size_t n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, cctx->asyncProgress, cctx->asyncOpaque);
+    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx);
 }
 
-static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress, void* opaque)
+static size_t FL2_compressCurBlock(FL2_CCtx* const cctx)
 {
+    FL2_initProgress(cctx);
+
     if (cctx->curBlock.start == cctx->curBlock.end)
-        return;
+        return FL2_error_no_error;
 
     /* update largest dict size used */
     cctx->dictMax = MAX(cctx->dictMax, cctx->curBlock.end);
@@ -402,8 +396,29 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, FL2_progressFn progress
     cctx->outThread = 0;
     cctx->threadCount = 0;
 
-    cctx->asyncProgress = progress;
-    cctx->asyncOpaque = opaque;
+    U32 rmfWeight = ZSTD_highbit32((U32)cctx->curBlock.end);
+    U32 depthWeight = 2 + (cctx->params.rParams.depth >= 12) + (cctx->params.rParams.depth >= 28);
+    U32 encWeight;
+
+    if (rmfWeight >= 20) {
+        rmfWeight = depthWeight * (rmfWeight - 10) + (rmfWeight - 19) * 12;
+        if (cctx->params.cParams.strategy == 0)
+            encWeight = 20;
+        else if (cctx->params.cParams.strategy == 1)
+            encWeight = 50;
+        else
+            encWeight = 60 + cctx->params.cParams.second_dict_bits + ZSTD_highbit32(cctx->params.cParams.fast_length) * 3U;
+        rmfWeight = (rmfWeight << 4) / (rmfWeight + encWeight);
+        encWeight = 16 - rmfWeight;
+    }
+    else {
+        rmfWeight = 8;
+        encWeight = 8;
+    }
+
+    cctx->rmfWeight = rmfWeight;
+    cctx->encWeight = encWeight;
+
     FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, 0);
     return FL2_error_no_error;
 }
@@ -412,6 +427,7 @@ FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx)
 {
     cctx->dictMax = 0;
     cctx->blockTotal = 0;
+    cctx->streamTotal = 0;
     cctx->srcSize = 0;
     cctx->outThread = 0;
     cctx->outPos = 0;
@@ -420,8 +436,7 @@ FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx)
 
 static size_t FL2_compressBlock(FL2_CCtx* const cctx,
     const void* const src, size_t const srcStart, size_t const srcEnd,
-    void* const dst, size_t dstCapacity,
-    FL2_progressFn progress, void* const opaque)
+    void* const dst, size_t dstCapacity)
 {
     BYTE* dstBuf = dst;
     size_t const dictionarySize = (size_t)1 << cctx->params.rParams.dictionary_log;
@@ -440,7 +455,7 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
     do {
         cctx->curBlock.end = cctx->curBlock.start + MIN(cctx->srcSize, dictionarySize - cctx->curBlock.start);
 
-        CHECK_F(FL2_compressCurBlock(cctx, progress, opaque));
+        CHECK_F(FL2_compressCurBlock(cctx));
         FL2POOL_waitAll(cctx->compressThread, 0);
 
         if(dst != NULL) for (size_t u = 0; u < cctx->threadCount; ++u) {
@@ -525,9 +540,28 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     return dstBuf - (BYTE*)dst;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx * cctx, unsigned timeout)
+FL2LIB_API void FL2LIB_CALL FL2_setTimeout(FL2_CCtx * cctx, unsigned timeout)
 {
-    return FL2POOL_waitAll(cctx->compressThread, timeout);
+    cctx->timeout = timeout;
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx * cctx)
+{
+    return FL2POOL_waitAll(cctx->compressThread, cctx->timeout);
+}
+
+unsigned long long FL2_getProgress(const FL2_CCtx * cctx)
+{
+    size_t enc_progress = 0;
+    for (size_t i = 0; i < cctx->jobCount; ++i)
+        enc_progress += FL2_lzma2GetProgress(cctx->jobs[i].enc);
+
+    U64 const encodeSize = cctx->curBlock.end - cctx->curBlock.start;
+
+    if (enc_progress == 0)
+        return cctx->streamTotal + (cctx->matchTable->progress * encodeSize / cctx->curBlock.end * cctx->rmfWeight) >> 4;
+
+    return cctx->streamTotal + ((cctx->rmfWeight * encodeSize) >> 4) + ((enc_progress * cctx->encWeight) >> 4);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx)
@@ -535,7 +569,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx)
     size_t pos = cctx->outPos;
     size_t total = 0;
 
-    if (FL2_isError(cctx->threadCount))
+    if (FL2_isError(cctx->asyncRes))
         return cctx->threadCount;
 
     for (size_t u = cctx->outThread; u < cctx->threadCount; ++u) {
@@ -547,15 +581,15 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(FL2_CCtx* const cctx)
     return total;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf, FL2_progressFn progress, void* const opaque)
+FL2LIB_API size_t FL2LIB_CALL FL2_readCCtx(FL2_CCtx* cctx, void **buf)
 {
     size_t cSize = 0;
 
-    if (FL2_isError(cctx->threadCount))
+    if (FL2_isError(cctx->asyncRes))
         return cctx->threadCount;
 
     if (cctx->outThread == cctx->threadCount && cctx->srcSize != 0)
-        CHECK_F(FL2_compressBlock(cctx, NULL, 0, 1, NULL, 0, progress, opaque));
+        CHECK_F(FL2_compressBlock(cctx, NULL, 0, 1, NULL, 0));
 
     if (cctx->outThread < cctx->threadCount) {
         *buf = RMF_getTableAsOutputBuffer(cctx->matchTable, cctx->jobs[cctx->outThread].block.start);
@@ -591,14 +625,6 @@ static void FL2_copyCCtxOutput(FL2_CCtx *cctx, FL2_outBuffer *output)
 FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* cctx)
 {
 	return OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
-}
-
-FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtxBlock(FL2_CCtx* cctx,
-    void* dst, size_t dstCapacity,
-    const FL2_blockBuffer *block,
-    FL2_progressFn progress, void* opaque)
-{
-    return FL2_compressBlock(cctx, block->data, block->start, block->end, dst, dstCapacity, progress, opaque);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity)
@@ -805,9 +831,9 @@ static FL2_CStream* FL2_createCStream_internal(unsigned nbThreads, int async)
     }
     fcs->cctx = cctx;
     DICT_construct(&fcs->buf, async);
-    fcs->hash_pos = 0;
-    fcs->end_marked = 0;
-    fcs->wrote_prop = 0;
+    fcs->hashPos = 0;
+    fcs->endMarked = 0;
+    fcs->wroteProp = 0;
     return fcs;
 }
 
@@ -843,9 +869,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 {
     DEBUGLOG(4, "FL2_initCStream level %d", compressionLevel);
 
-    fcs->hash_pos = 0;
-    fcs->end_marked = 0;
-    fcs->wrote_prop = 0;
+    fcs->hashPos = 0;
+    fcs->endMarked = 0;
+    fcs->wroteProp = 0;
     fcs->loopCount = 0;
 
     FL2_CCtx_setParameter(fcs->cctx, FL2_p_compressionLevel, compressionLevel);
@@ -868,20 +894,22 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs,
     if (output->pos >= output->size)
         return 0;
 
-    FL2POOL_waitAll(fcs->cctx->compressThread, 0);
+    FL2POOL_waitAll(fcs->cctx->compressThread, fcs->cctx->timeout);
 
     if (cctx->outThread == cctx->threadCount && DICT_hasUnprocessed(buf)) {
+
+        cctx->streamTotal += cctx->curBlock.end - cctx->curBlock.start;
 
         DICT_getBlock(buf, &cctx->curBlock);
 
         CHECK_F(FL2_compressCurBlock(cctx, NULL, NULL));
 
-        if (!fcs->wrote_prop && !cctx->params.omitProp) {
+        if (!fcs->wroteProp && !cctx->params.omitProp) {
             size_t dictionarySize = ending ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log;
             ((BYTE*)output->dst)[output->pos] = FL2_getProp(cctx, dictionarySize);
             DEBUGLOG(4, "Writing property byte : 0x%X", ((BYTE*)output->dst)[output->pos]);
             ++output->pos;
-            fcs->wrote_prop = 1;
+            fcs->wroteProp = 1;
         }
     }
     return 0;
@@ -901,14 +929,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
     size_t prevOut = output->pos;
     size_t prevIn = input->pos;
 
-    if (FL2_isError(cctx->threadCount))
+    if (FL2_isError(cctx->asyncRes))
         return cctx->threadCount;
 
     if (output->pos < output->size) while (input->pos < input->size) {
         /* read input and/or write output until a buffer is full */
         if (input->pos < input->size && DICT_needShift(buf, blockOverlap)) {
             if(!DICT_async(buf))
-                FL2POOL_waitAll(cctx->compressThread, 0);
+                FL2POOL_waitAll(cctx->compressThread, cctx->timeout);
             DICT_shift(buf, blockOverlap);
         }
         if (cctx->outThread == cctx->threadCount) {
@@ -950,7 +978,7 @@ static size_t FL2_flushStream_internal(FL2_CStream* fcs, FL2_outBuffer* output, 
     size_t cSize = FL2_remainingOutputSize(fcs->cctx);
     if (cSize == 0) {
         CHECK_F(FL2_compressStream_internal(fcs, output, ending));
-        FL2POOL_waitAll(fcs->cctx->compressThread, 0);
+        FL2POOL_waitAll(fcs->cctx->compressThread, fcs->cctx->timeout);
         FL2_copyCStreamOutput(fcs, output);
         cSize = FL2_remainingOutputSize(fcs->cctx);
     }
@@ -969,18 +997,18 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* out
             return cSize;
     }
 
-    if(!fcs->end_marked) {
+    if(!fcs->endMarked) {
         if (output->pos >= output->size)
             return 1;
         DEBUGLOG(4, "Writing end marker");
         ((BYTE*)output->dst)[output->pos] = LZMA2_END_MARKER;
         ++output->pos;
-        fcs->end_marked = 1;
+        fcs->endMarked = 1;
     }
 
 #ifndef NO_XXHASH
-    if (fcs->cctx->params.doXXH && !fcs->cctx->params.omitProp && fcs->hash_pos < XXHASH_SIZEOF) {
-        size_t const to_write = MIN(output->size - output->pos, XXHASH_SIZEOF - fcs->hash_pos);
+    if (fcs->cctx->params.doXXH && !fcs->cctx->params.omitProp && fcs->hashPos < XXHASH_SIZEOF) {
+        size_t const to_write = MIN(output->size - output->pos, XXHASH_SIZEOF - fcs->hashPos);
         XXH32_canonical_t canonical;
 
         if (output->pos >= output->size)
@@ -988,10 +1016,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer* out
 
         XXH32_canonicalFromHash(&canonical, DICT_getDigest(&fcs->buf));
         DEBUGLOG(4, "Writing XXH32 : %u bytes", (U32)to_write);
-        memcpy((BYTE*)output->dst + output->pos, canonical.digest + fcs->hash_pos, to_write);
+        memcpy((BYTE*)output->dst + output->pos, canonical.digest + fcs->hashPos, to_write);
         output->pos += to_write;
-        fcs->hash_pos += to_write;
-        return fcs->hash_pos < XXHASH_SIZEOF;
+        fcs->hashPos += to_write;
+        return fcs->hashPos < XXHASH_SIZEOF;
     }
 #endif
     return 0;

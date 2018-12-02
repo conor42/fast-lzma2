@@ -913,20 +913,17 @@ RMF_structuredBuildTable
 (FL2_matchTable* const tbl,
 	size_t const job,
     unsigned const multi_thread,
-    FL2_dataBlock const block,
-    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done)
+    FL2_dataBlock const block)
 {
     if (!block.end)
         return 0;
-    U64 const enc_size = block.end - block.start;
     unsigned const best = !tbl->params.divide_and_conquer;
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
     size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
-    ptrdiff_t next_progress = 0;
+    ptrdiff_t next_progress = (job == 0) ? 0 : RADIX16_TABLE_SIZE;
     size_t update = UPDATE_INTERVAL;
-    size_t total = init_done;
 
-    for (;;)
+    while (!tbl->canceled)
     {
         /* Get the next to process */
         ptrdiff_t index = RMF_getNextList(tbl, multi_thread);
@@ -935,18 +932,10 @@ RMF_structuredBuildTable
         if (index < 0) {
             break;
         }
-        if (progress) {
-            while (next_progress < index) {
-                total += tbl->list_heads[tbl->stack[next_progress]].count;
-                ++next_progress;
-            }
-            if (total >= update) {
-                if (progress((size_t)((total * enc_size / block.end * weight) >> 4), opaque)) {
-					FL2_atomic_add(tbl->st_index, RADIX16_TABLE_SIZE);
-                    return 1;
-                }
-                update = total + UPDATE_INTERVAL;
-            }
+        while (next_progress < index) {
+            /* initial value of next_progress ensures only thread 0 executes this */
+            tbl->progress += tbl->list_heads[tbl->stack[next_progress]].count;
+            ++next_progress;
         }
         index = tbl->stack[index];
         list_head = tbl->list_heads[index];
@@ -975,7 +964,7 @@ RMF_structuredBuildTable
             RecurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
         }
     }
-    return 0;
+    return tbl->canceled;
 }
 
 int

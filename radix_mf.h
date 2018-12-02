@@ -42,12 +42,12 @@ void RMF_freeMatchTable(FL2_matchTable* const tbl);
 BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_parameters* const params, size_t const dict_reduce);
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const params, size_t const dict_reduce);
 size_t RMF_threadCount(const FL2_matchTable * const tbl);
+void RMF_initProgress(FL2_matchTable * const tbl);
 size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end);
 int RMF_buildTable(FL2_matchTable* const tbl,
 	size_t const job,
     unsigned const multi_thread,
-    FL2_dataBlock const block,
-    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
+    FL2_dataBlock const block);
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);

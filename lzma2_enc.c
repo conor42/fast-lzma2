@@ -201,6 +201,9 @@ struct FL2_lzmaEncoderCtx_s
     ptrdiff_t hash_dict_3;
     ptrdiff_t hash_prev_index;
     ptrdiff_t hash_alloc_3;
+
+    size_t progress;
+    int canceled;
 };
 
 FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
@@ -241,6 +244,17 @@ void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc)
     free(enc->hash_buf);
     free(enc->out_buf);
     free(enc);
+}
+
+void FL2_lzma2InitProgress(FL2_lzmaEncoderCtx * enc)
+{
+    enc->progress = 0;
+    enc->canceled = 0;
+}
+
+size_t FL2_lzma2GetProgress(FL2_lzmaEncoderCtx * enc)
+{
+    return enc->progress;
 }
 
 #define GetLiteralProbs(enc, pos, prev_symbol) (enc->states.literal_probs + ((((pos) & enc->lit_pos_mask) << enc->lc) + ((prev_symbol) >> (8 - enc->lc))) * kNumLiterals * kNumLitTables)
@@ -1918,8 +1932,7 @@ __pragma(warning(disable:4701))
 size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
-    const FL2_lzma2Parameters* options,
-    FL2_progressFn progress, void* opaque, size_t base, U32 weight)
+    const FL2_lzma2Parameters* options)
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
@@ -2049,7 +2062,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         }
         out_dest += compressed_size + header_size;
         index = next_index;
-        if (progress && progress(base + (((index - start) * weight) >> 4), opaque) != 0)
+        enc->progress = index - start;
+        if (enc->canceled)
             return FL2_ERROR(canceled);
     }
     return out_dest - RMF_getTableAsOutputBuffer(tbl, start);

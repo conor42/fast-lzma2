@@ -95,6 +95,8 @@ struct FL2_matchTable_s
     int isStruct;
     int allocStruct;
     unsigned thread_count;
+    int canceled;
+    size_t progress;
     RMF_parameters params;
     RMF_builder** builders;
     U32 stack[RADIX16_TABLE_SIZE];
@@ -107,13 +109,11 @@ size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, 
 int RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
 	size_t const job,
     unsigned const multi_thread,
-    FL2_dataBlock const block,
-    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
+    FL2_dataBlock const block);
 int RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
 	size_t const job,
     unsigned const multi_thread,
-    FL2_dataBlock const block,
-    FL2_progressFn progress, void* opaque, U32 weight, size_t init_done);
+    FL2_dataBlock const block);
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,

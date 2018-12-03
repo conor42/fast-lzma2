@@ -219,10 +219,8 @@ size_t RMF_threadCount(const FL2_matchTable* const tbl)
 
 void RMF_initProgress(FL2_matchTable * const tbl)
 {
-    if (tbl != NULL) {
+    if (tbl != NULL)
         tbl->progress = 0;
-        tbl->canceled = 0;
-    }
 }
 
 size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
@@ -625,6 +623,11 @@ int RMF_buildTable(FL2_matchTable* const tbl,
     else {
         return RMF_bitpackBuildTable(tbl, job, multi_thread, block);
     }
+}
+
+void RMF_cancelBuild(FL2_matchTable * const tbl)
+{
+    FL2_atomic_add(tbl->st_index, (long)RADIX_CANCEL_INDEX - ATOMIC_INITIAL_VALUE);
 }
 
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth)

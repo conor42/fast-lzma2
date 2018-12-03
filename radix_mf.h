@@ -48,6 +48,7 @@ int RMF_buildTable(FL2_matchTable* const tbl,
 	size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block);
+void RMF_cancelBuild(FL2_matchTable* const tbl);
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);

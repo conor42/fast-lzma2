@@ -890,10 +890,22 @@ static void RecurseListsReference(RMF_builder* const tbl,
 #endif /* RMF_REFERENCE */
 
 /* Atomically take a list from the head table */
-static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi_thread)
+static ptrdiff_t RMF_getNextList_mt(FL2_matchTable* const tbl)
 {
     if (tbl->st_index < tbl->end_index) {
-        long index = multi_thread ? FL2_atomic_increment(tbl->st_index) : FL2_nonAtomic_increment(tbl->st_index);
+        long index = FL2_atomic_increment(tbl->st_index);
+        if (index < tbl->end_index) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+/* Non-atomically take a list from the head table */
+static ptrdiff_t RMF_getNextList_st(FL2_matchTable* const tbl)
+{
+    if (tbl->st_index < tbl->end_index) {
+        long index = FL2_nonAtomic_increment(tbl->st_index);
         if (index < tbl->end_index) {
             return index;
         }
@@ -919,11 +931,13 @@ RMF_structuredBuildTable
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
     size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
     ptrdiff_t next_progress = (job == 0) ? 0 : RADIX16_TABLE_SIZE;
+    ptrdiff_t(*getNextList)(FL2_matchTable* const tbl)
+        = multi_thread ? RMF_getNextList_mt : RMF_getNextList_st;
 
-    while (!tbl->canceled)
+    for (;;)
     {
         /* Get the next to process */
-        ptrdiff_t index = RMF_getNextList(tbl, multi_thread);
+        ptrdiff_t index = getNextList(tbl);
         RMF_tableHead list_head;
 
         if (index < 0) {
@@ -961,7 +975,7 @@ RMF_structuredBuildTable
             RecurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
         }
     }
-    return tbl->canceled;
+    return tbl->st_index >= RADIX_CANCEL_INDEX;
 }
 
 int

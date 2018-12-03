@@ -46,6 +46,8 @@ extern "C" {
 #define UNIT_BITS 2
 #define UNIT_MASK ((1UL << UNIT_BITS) - 1)
 
+#define RADIX_CANCEL_INDEX (RADIX16_TABLE_SIZE + FL2_MAXTHREADS + 2)
+
 typedef struct
 {
     U32 head;
@@ -95,7 +97,6 @@ struct FL2_matchTable_s
     int isStruct;
     int allocStruct;
     unsigned thread_count;
-    int canceled;
     size_t progress;
     RMF_parameters params;
     RMF_builder** builders;

@@ -61,8 +61,11 @@ void DICT_free(DICT_buffer * buf)
 {
     free(buf->data[0]);
     free(buf->data[1]);
+    buf->data[0] = NULL;
+    buf->data[1] = NULL;
 #ifndef NO_XXHASH
     XXH32_freeState(buf->xxh);
+    buf->xxh = NULL;
 #endif
 }
 
@@ -126,7 +129,7 @@ int DICT_needShift(DICT_buffer * buf, size_t overlap)
 
 int DICT_async(const DICT_buffer * buf)
 {
-    return buf->async;
+    return (int)buf->async;
 }
 
 void DICT_shift(DICT_buffer * buf, size_t overlap)

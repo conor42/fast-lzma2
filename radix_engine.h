@@ -901,8 +901,6 @@ static ptrdiff_t RMF_getNextList(FL2_matchTable* const tbl, unsigned const multi
     return -1;
 }
 
-#define UPDATE_INTERVAL 0x40000U
-
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
 int
 #ifdef RMF_BITPACK
@@ -921,7 +919,6 @@ RMF_structuredBuildTable
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
     size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
     ptrdiff_t next_progress = (job == 0) ? 0 : RADIX16_TABLE_SIZE;
-    size_t update = UPDATE_INTERVAL;
 
     while (!tbl->canceled)
     {

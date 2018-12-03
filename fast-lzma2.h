@@ -148,11 +148,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-FL2LIB_API void FL2LIB_CALL FL2_setTimeout(FL2_CCtx* ctx, unsigned timeout);
+FL2LIB_API void FL2LIB_CALL FL2_setCCtxTimeout(FL2_CCtx* ctx, unsigned timeout);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx);
 
-unsigned long long FL2_getProgress(const FL2_CCtx * ctx);
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCCtxProgress(const FL2_CCtx * ctx);
 
 /************************************************
 *  Caller-managed data buffer and overlap section
@@ -271,14 +271,16 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
 
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
+FL2LIB_API void   FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream* fcs, unsigned timeout);
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
-FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, const void **src);
+FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
 FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity);
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream* fcs);
-FL2LIB_API void FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
+FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
 FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
 /*-***************************************************************************

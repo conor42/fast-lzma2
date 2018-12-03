@@ -79,9 +79,8 @@ struct FL2_CCtx_s {
 struct FL2_CStream_s {
     FL2_CCtx* cctx;
     DICT_buffer buf;
-    size_t hashPos;
-    BYTE endMarked;
     BYTE wroteProp;
+    BYTE endMarked;
     BYTE loopCount;
 };
 

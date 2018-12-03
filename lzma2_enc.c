@@ -1925,7 +1925,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
-    if (stream_prop >= 0)
+    size_t prop_size = (stream_prop >= 0);
+    if(prop_size)
         *out_dest++ = (BYTE)stream_prop;
 	/* Each encoder writes a properties byte because the upstream encoder(s) could */
 	/* write only uncompressed chunks with no properties. */
@@ -2049,10 +2050,11 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
             /* After the first chunk we can write data to the match table because the */
             /* compressed data will never catch up with the table position being read. */
             out_dest = RMF_getTableAsOutputBuffer(tbl, start);
-            memcpy(out_dest, enc->out_buf, compressed_size + header_size);
+            memcpy(out_dest, enc->out_buf, prop_size + compressed_size + header_size);
+            out_dest += prop_size;
         }
         out_dest += compressed_size + header_size;
-        FL2_atomic_add(*progress, (long)next_index - index);
+        FL2_atomic_add(*progress, (long)(next_index - index));
         index = next_index;
         if (*canceled)
             return FL2_ERROR(canceled);

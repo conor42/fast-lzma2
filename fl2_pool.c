@@ -179,7 +179,7 @@ void FL2POOL_add(void* ctxVoid, FL2POOL_function function, void *opaque, size_t 
 int FL2POOL_waitAll(void *ctxVoid, unsigned timeout)
 {
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)ctxVoid;
-    if (!ctx) { return 0; }
+    if (!ctx || !ctx->numThreadsBusy || ctx->shutdown) { return 0; }
 
     ZSTD_pthread_mutex_lock(&ctx->queueMutex);
     if (timeout != 0) {

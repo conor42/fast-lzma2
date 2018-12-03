@@ -54,7 +54,7 @@ typedef FL2_ErrorCode ERR_enum;
 
 ERR_STATIC unsigned ERR_isError(size_t code) { return (code > FL2_ERROR(maxCode)); }
 
-ERR_STATIC unsigned ERR_isTimedOut(size_t code) { return (code > FL2_ERROR(timedOut)); }
+ERR_STATIC unsigned ERR_isTimedOut(size_t code) { return (code == FL2_ERROR(timedOut)); }
 
 ERR_STATIC ERR_enum ERR_getErrorCode(size_t code) { if (!ERR_isError(code)) return (ERR_enum)0; return (ERR_enum) (0-code); }
 

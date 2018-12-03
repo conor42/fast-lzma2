@@ -440,15 +440,59 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     DISPLAYLEVEL(4, "test%3i : compress stream using buffer access : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_outBuffer dict;
+        FL2_inBuffer cbuf;
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
         FL2_getDictionaryBuffer(cstream, &dict);
         memcpy(dict.dst, CNBuffer, dict.size);
-        CHECK(FL2_updateDictionary(cstream, dict.size));
+        CHECK_V(res, FL2_updateDictionary(cstream, dict.size));
         FL2_getDictionaryBuffer(cstream, &dict);
         memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer + dict.size, dict.size / 2);
         CHECK(FL2_updateDictionary(cstream, dict.size / 2));
-        CHECK(FL2_flushStream(cstream));
+        r = FL2_endStream(cstream);
+        if (r == 0) goto _output_error;
+        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+            memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
+            out.pos += cbuf.size;
+        }
+        r = FL2_endStream(cstream);
+        if (r == 0) goto _output_error;
+        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+            memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
+            out.pos += cbuf.size;
+        }
+        r = FL2_endStream(cstream);
+        if (r != 0) goto _output_error;
+        r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, out.pos);
+        if (FL2_isError(r)) goto _output_error;
+        {   size_t diff = findDiff(CNBuffer, decodedBuffer, r);
+            if (diff < r) goto _output_error;
+        }
+        cSize = out.pos;
+    }
+    DISPLAYLEVEL(4, "OK \n");
+
+    DISPLAYLEVEL(4, "test%3i : compress stream using buffer access with flush: ", testNb++);
+    {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
+        FL2_outBuffer dict;
+        FL2_inBuffer cbuf;
+        size_t r;
+        CHECK(FL2_initCStream(cstream, 4));
+        FL2_getDictionaryBuffer(cstream, &dict);
+        memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer, dict.size / 2);
+        CHECK(FL2_updateDictionary(cstream, dict.size / 2));
+        r = FL2_flushStream(cstream);
+        if (r == 0) goto _output_error;
+        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+            memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
+            out.pos += cbuf.size;
+        }
+        r = FL2_endStream(cstream);
+        if (r == 0) goto _output_error;
+        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+            memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
+            out.pos += cbuf.size;
+        }
         r = FL2_endStream(cstream);
         if (r != 0) goto _output_error;
         r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, out.pos);
@@ -465,9 +509,14 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
-        CHECK(FL2_compressStream(cstream, &in));
-        r = FL2_endStream(cstream);
-        if (r != 0) goto _output_error;
+        do {
+            CHECK(FL2_compressStream(cstream, &in));
+            out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
+        } while (in.pos < in.size);
+        do {
+            CHECK(r = FL2_endStream(cstream));
+            out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
+        } while (r);
         cSize = out.pos;
     }
     DISPLAYLEVEL(4, "OK \n");
@@ -498,25 +547,29 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     }
     DISPLAYLEVEL(4, "OK \n");
 
-    DISPLAYLEVEL(4, "test%3i : compress stream split hash write : ", testNb++);
-    {   FL2_outBuffer out = { compressedBuffer, cSize - 1, 0 };
+    DISPLAYLEVEL(4, "test%3i : compress stream with progress : ", testNb++);
+    {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
         size_t r;
-        CHECK(FL2_initCStream(cstream, 4));
+        DISPLAYLEVEL(4, "  0%c", '%');
+        CHECK(FL2_initCStream(cstream, 9));
+        FL2_setCStreamTimeout(cstream, 300);
         CHECK(FL2_compressStream(cstream, &in));
-        r = FL2_endStream(cstream);
-        if(!r) goto _output_error;
-        out.size = cSize;
-        r = FL2_endStream(cstream);
-        if (r != 0) goto _output_error;
+        do {
+            r = FL2_endStream(cstream);
+            if (FL2_isTimedOut(r)) {
+                DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)(FL2_getCStreamProgress(cstream) * 100 / CNBuffSize), '%');
+            }
+            else {
+                CHECK(r);
+                out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
+            }
+        } while (r);
+        FL2_setCStreamTimeout(cstream, 0);
         cSize = out.pos;
+        CHECK(FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, cSize));
     }
-    DISPLAYLEVEL(4, "OK \n");
-
-    DISPLAYLEVEL(4, "test%3i : decompress stream from split hash write : ", testNb++);
-    {   size_t const r = FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, cSize);
-        if (r != CNBuffSize) goto _output_error; }
-    DISPLAYLEVEL(4, "OK \n");
+    DISPLAYLEVEL(4, " : OK \n");
 
     DISPLAYLEVEL(4, "test%3i : compress stream < dictionary_size : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
@@ -524,6 +577,8 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
         CHECK(FL2_compressStream(cstream, &in));
+        CHECK(FL2_endStream(cstream));
+        out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
         r = FL2_endStream(cstream);
         if (r != 0) goto _output_error;
         cSize = out.pos;
@@ -544,14 +599,16 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         CHECK(FL2_initCStream(cstream, 4));
         CHECK(FL2_compressStream(cstream, &in));
         CHECK(FL2_flushStream(cstream));
+        out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
         in.src = (BYTE*)CNBuffer + 128 KB - 1;
         in.pos = 0;
         in.size = 1 MB;
         CHECK(FL2_compressStream(cstream, &in));
-        r = FL2_endStream(cstream);
-        FL2_waitStream(cstream);
-        r = FL2_endStream(cstream);
-        if (r != 0) goto _output_error;
+        do {
+            r = FL2_endStream(cstream);
+            CHECK(r);
+            out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
+        } while (r);
         cSize = out.pos;
     }
     DISPLAYLEVEL(4, "OK \n");
@@ -562,6 +619,8 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
         CHECK(FL2_compressStream(cstream, &in));
+        CHECK(FL2_endStream(cstream));
+        out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
         r = FL2_endStream(cstream);
         if (r != 0) goto _output_error;
         cSize = out.pos;

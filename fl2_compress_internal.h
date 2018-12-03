@@ -54,6 +54,7 @@ typedef struct {
 } FL2_job;
 
 struct FL2_CCtx_s {
+    DICT_buffer buf;
     FL2_CCtx_params params;
 #ifndef FL2_SINGLETHREAD
     FL2POOL_ctx* factory;
@@ -72,16 +73,11 @@ struct FL2_CCtx_s {
     U32 encWeight;
     FL2_atomic encProgress;
     int canceled;
-    unsigned jobCount;
-    FL2_job jobs[1];
-};
-
-struct FL2_CStream_s {
-    FL2_CCtx* cctx;
-    DICT_buffer buf;
     BYTE wroteProp;
     BYTE endMarked;
     BYTE loopCount;
+    unsigned jobCount;
+    FL2_job jobs[1];
 };
 
 #if defined (__cplusplus)

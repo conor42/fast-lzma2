@@ -399,7 +399,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             in.size = MIN(0x8101, end - (BYTE*)in.src);
             in.pos = 0;
             CHECK_V(r, FL2_compressStream(cstream, &in));
-            if (r)
+            if (!r)
                 out.pos += FL2_getCStreamOutput(cstream, (BYTE*)out.dst + out.pos, out.size - out.pos);
         }
         do {

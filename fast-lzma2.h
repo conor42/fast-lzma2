@@ -136,7 +136,6 @@ FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maxim
 typedef struct FL2_CCtx_s FL2_CCtx;
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtx(void);
 FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxMt(unsigned nbThreads);
-FL2LIB_API FL2_CCtx* FL2LIB_CALL FL2_createCCtxAsync(unsigned nbThreads);
 FL2LIB_API void      FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx);
 
 FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* ctx);
@@ -148,7 +147,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-FL2LIB_API void FL2LIB_CALL FL2_setCCtxTimeout(FL2_CCtx* ctx, unsigned timeout);
+FL2LIB_API size_t FL2LIB_CALL FL2_setCCtxTimeout(FL2_CCtx* ctx, unsigned timeout);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx);
 
@@ -261,27 +260,42 @@ typedef struct FL2_outBuffer_s {
  *
  * *******************************************************************/
 
-typedef struct FL2_CStream_s FL2_CStream;
+typedef struct FL2_CCtx_s FL2_CStream;
 
 /*===== FL2_CStream management functions =====*/
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads);
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamAsync(unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_freeCStream(FL2_CStream* fcs);
+
+static void FL2_freeCStream(FL2_CStream * fcs) {
+    FL2_freeCCtx(fcs);
+}
+
 
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
-FL2LIB_API void   FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream* fcs, unsigned timeout);
-FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream* fcs);
+
+static size_t FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout) {
+    return FL2_setCCtxTimeout(fcs, timeout);
+}
+
+static unsigned long long FL2_getCStreamProgress(const FL2_CStream * fcs) {
+    return FL2_getCCtxProgress(fcs);
+}
+
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
+FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
+FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
+
+static size_t FL2_waitStream(FL2_CStream * fcs) {
+    return FL2_waitCCtx(fcs);
+}
+
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
 FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity);
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs);
-FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream* fcs);
-FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
-FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
 /*-***************************************************************************
  *  Streaming decompression - HowTo

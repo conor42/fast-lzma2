@@ -285,7 +285,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     size_t const compressedBufferSize = FL2_compressBound(CNBuffSize);
     void* const compressedBuffer = malloc(compressedBufferSize);
     void* const decodedBuffer = malloc(CNBuffSize);
-    FL2_CStream *const cstream = FL2_createCStreamAsync(nbThreads);
+    FL2_CStream *const cstream = FL2_createCStreamMt(nbThreads, 1);
     FL2_DStream *const dstream = FL2_createDStream();
     int testResult = 0;
     U32 testNb=0;
@@ -319,7 +319,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
                 level,
                 1U << params.dictionaryLog,
                 (unsigned)FL2_estimateCCtxSize(level, nbThreads),
-                (unsigned)FL2_estimateCStreamSize(level, nbThreads));
+                (unsigned)FL2_estimateCStreamSize(level, nbThreads, 1));
         }
         DISPLAYLEVEL(4, " : OK\n");
     }
@@ -430,7 +430,8 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             out.pos = 0;
             r = FL2_decompressStream(dstream, &out, &in);
             total += out.pos;
-            if (FL2_isError(r)) goto _output_error;
+            if (FL2_isError(r))
+                goto _output_error;
         } while (r);
         {   size_t diff = findDiff(CNBuffer, decodedBuffer, total);
             if(diff < CNBuffSize) goto _output_error;

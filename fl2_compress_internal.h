@@ -76,6 +76,7 @@ struct FL2_CCtx_s {
     BYTE wroteProp;
     BYTE endMarked;
     BYTE loopCount;
+    BYTE lockParams;
     unsigned jobCount;
     FL2_job jobs[1];
 };

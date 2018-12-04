@@ -44,6 +44,10 @@ int DICT_async(const DICT_buffer *buf);
 
 void DICT_shift(DICT_buffer *buf, size_t overlap);
 
+#ifndef NO_XXHASH
 XXH32_hash_t DICT_getDigest(const DICT_buffer *buf);
+#endif
+
+size_t DICT_memUsage(const DICT_buffer *buf);
 
 #endif /* FL2_DICT_BUFFER_H_ */

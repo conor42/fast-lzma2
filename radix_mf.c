@@ -627,7 +627,8 @@ int RMF_buildTable(FL2_matchTable* const tbl,
 
 void RMF_cancelBuild(FL2_matchTable * const tbl)
 {
-    FL2_atomic_add(tbl->st_index, (long)RADIX_CANCEL_INDEX - ATOMIC_INITIAL_VALUE);
+    if(tbl != NULL)
+        FL2_atomic_add(tbl->st_index, (long)RADIX_CANCEL_INDEX - ATOMIC_INITIAL_VALUE);
 }
 
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth)

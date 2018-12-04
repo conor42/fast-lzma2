@@ -53,9 +53,9 @@ Introduction
 *********************************************************************************************************/
 
 /*------   Version   ------*/
-#define FL2_VERSION_MAJOR    0
-#define FL2_VERSION_MINOR    9
-#define FL2_VERSION_RELEASE  2
+#define FL2_VERSION_MAJOR    1
+#define FL2_VERSION_MINOR    0
+#define FL2_VERSION_RELEASE  0
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -147,40 +147,16 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* ctx,
     const void* src, size_t srcSize,
     int compressionLevel);
 
-FL2LIB_API size_t FL2LIB_CALL FL2_setCCtxTimeout(FL2_CCtx* ctx, unsigned timeout);
-
-FL2LIB_API size_t FL2LIB_CALL FL2_waitCCtx(FL2_CCtx* ctx);
-
-FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCCtxProgress(const FL2_CCtx * ctx);
-
-/************************************************
-*  Caller-managed data buffer and overlap section
-************************************************/
-
-typedef struct {
-    unsigned char *data;
-    size_t start;   /* start = 0 (first block) or overlap */
-    size_t end;     /* never < overlap */
-    size_t bufSize; /* allocation size */
-} FL2_blockBuffer;
-
-typedef int (FL2LIB_CALL *FL2_progressFn)(size_t done, void* opaque);
-
-/* Get the size of the overlap section. */
-FL2LIB_API size_t FL2LIB_CALL FL2_blockOverlap(const FL2_CCtx* ctx);
-
-FL2LIB_API void FL2LIB_CALL FL2_beginFrame(FL2_CCtx* const cctx);
-
-/*! FL2_endFrame() :
- *  Write the end marker to terminate the LZMA2 stream.
- *  Must be called after compressing with FL2_compressCCtxBlock() */
-FL2LIB_API size_t FL2LIB_CALL FL2_endFrame(void* dst, size_t dstCapacity);
-
 /*! FL2_getCCtxDictProp() :
  *  Get the dictionary size property.
  *  Intended for use with the FL2_p_omitProperties parameter for creating a
  *  7-zip or XZ compatible LZMA2 stream. */
 FL2LIB_API unsigned char FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* ctx);
+
+/****************************
+*  Decompression
+****************************/
+
 
 /*= Decompression context
  *  When decompressing many times,
@@ -264,32 +240,26 @@ typedef struct FL2_CCtx_s FL2_CStream;
 
 /*===== FL2_CStream management functions =====*/
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
-FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads);
-FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamAsync(unsigned nbThreads);
+FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads, int dualBuffer);
 
 static void FL2_freeCStream(FL2_CStream * fcs) {
     FL2_freeCCtx(fcs);
 }
 
-
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
 
-static size_t FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout) {
-    return FL2_setCCtxTimeout(fcs, timeout);
-}
-
-static unsigned long long FL2_getCStreamProgress(const FL2_CStream * fcs) {
-    return FL2_getCCtxProgress(fcs);
-}
+FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
 FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
 FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
-static size_t FL2_waitStream(FL2_CStream * fcs) {
-    return FL2_waitCCtx(fcs);
-}
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs);
+
+FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs);
+
+FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
@@ -452,7 +422,10 @@ typedef enum {
  *  @result : informational value (typically, the one being set, possibly corrected),
  *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
-FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
+
+static size_t FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value) {
+    return FL2_CCtx_setParameter(fcs, param, value);
+}
 
 FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters *params);
 
@@ -470,9 +443,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int h
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads); /*!< memory usage determined by params */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads, int dualBuffer);
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads, int dualBuffer);
+
+static size_t FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs) {
+    return FL2_estimateCCtxSize_usingCCtx(fcs);
+}
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads); /*!< obtain dictSize from FL2_getCCtxDictProp() */

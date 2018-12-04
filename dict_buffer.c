@@ -8,7 +8,7 @@ int DICT_construct(DICT_buffer * buf, int async)
     buf->data[0] = NULL;
     buf->data[1] = NULL;
 
-    buf->async = async;
+    buf->async = (async != 0);
 
 #ifndef NO_XXHASH
     buf->xxh = NULL;
@@ -171,3 +171,8 @@ XXH32_hash_t DICT_getDigest(const DICT_buffer * buf)
     return XXH32_digest(buf->xxh);
 }
 #endif
+
+size_t DICT_memUsage(const DICT_buffer * buf)
+{
+    return (1 + buf->async) * buf->bufSize;
+}

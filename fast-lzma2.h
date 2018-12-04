@@ -211,25 +211,33 @@ typedef struct FL2_outBuffer_s {
  *  Use FL2_initCStream() to start a new compression operation.
  *
  *  Use FL2_compressStream() repetitively to consume input stream.
- *  The function will automatically update both `pos` fields.
- *  It will always consume the entire input unless an error occurs,
+ *  The function will automatically update the `pos` field.
+ *  It will always consume the entire input unless an error occurs or the dictionary buffer is filled,
  *  unlike the decompression function.
- *  @return : a size hint - remaining capacity to fill before compression occurs,
+ *  @return : Nonzero if the CStream can accept more input,
+ *            zero if compressed output must be read,
  *            or an error code, which can be tested using FL2_isError().
- *            Note : it's just a hint, any other value will work fine.
  *
- *  At any moment, it's possible, but not recommended, to flush whatever data remains
- *  within internal buffer using FL2_flushStream().
- *  `output->pos` will be updated.
+ *  The radix match finder allows compressed data to be stored in its match table during encoding.
+ *  When FL2_compressStream returns zero, the compressed data must be read from
+ *  these internal buffers. Call FL2_getNextCStreamBuffer() repeatedly until it returns zero.
+ *  Each call returns buffer information in the FL2_inBuffer parameter. Applications typically will 
+ *  passed this to an I/O write function or downstream filter.
+ *  Alternately, applications may call FL2_getCStreamOutput() to copy all of the compressed data to
+ *  a buffer supplied by the application.
+ *
+ *  At any moment, it's possible, but not recommended, to compress whatever data remains
+ *  within internal buffers using FL2_flushStream(). It may be necessary to call it twice if the
+ *  CStream was created with dual dictionary buffers.
  *  Note 1 : this will reduce compression ratio because the algorithm is block-based.
- *  Note 2 : some content might still be left within internal buffers if `output->size` is too small.
+ *  Note 2 : compressed content must be read from the CStream object after each call.
  *  @return : nb of bytes still present within internal buffers (0 if they're empty)
  *            or an error code, which can be tested using FL2_isError().
  *
  *  FL2_endStream() instructs to finish a frame.
  *  It will perform a flush and write the LZMA2 termination byte (required).
- *  FL2_endStream() may not be able to flush full data if `output->size` is too small.
- *  In which case, call again FL2_endStream() to complete the flush.
+ *  FL2_endStream() may not be able to flush full data if the CStream was created with dual dictionary
+ *  buffers. In which case, read all compressed data from the CStream and call again FL2_endStream().
  *  @return : 0 if stream fully completed and flushed,
  *  or >0 to indicate the nb of bytes still present within the internal buffers,
  *  or an error code, which can be tested using FL2_isError().
@@ -249,22 +257,72 @@ static void FL2_freeCStream(FL2_CStream * fcs) {
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
 
+/*! FL2_setCStreamTimeout() :
+ *  Sets a timeout in milliseconds. Zero disables the timeout. Functions FL2_compressStream(),
+ *  FL2_updateDictionary(), FL2_flushStream(), and FL2_endStream() may return a timeout code
+ *  before compression of the current dictionary of data completes. FL2_isError returns true
+ *  for the timeout code, so check for it using FL2_isTimedOut() before testing for errors.
+ *  Functions EXCEPT FL2_updateDictionary() may be called again after the timeout. A typical
+ *  application for timeouts is to update the user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
+/*! FL2_compressStream() :
+ *  Reads data from input into the dictionary buffer. Compression will begin if the buffer fills up.
+ *  Streams created for dual buffering will fill the second buffer from input and return if all
+ *  input is consumed. A call to FL2_compressStream() will block when all dictionary space is
+ *  filled. FL2_compressStream() must not be called again until all compressed data is read.*/
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
+
+/*! FL2_getDictionaryBuffer() :
+ *  Returns a buffer in the FL2_outBuffer object, which the caller can directly read data into.
+ *  Applications will normally pass this buffer to an I/O read function or upstream filter. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
+
+/*! FL2_updateDictionary() :
+ *  Informs the CStream how much data was added to the buffer.*/
 FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
+/*! FL2_getCStreamProgress() :
+ *  Returns the number of bytes processed since the stream was initialized. This is a synthetic
+ *  estimate because the match finder does not proceed sequentially through the data. */
 FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs);
 
+/*! FL2_waitStream() :
+ *  Waits for compression to end. This function returns after the timeout set using
+ *  FL2_setCStreamTimeout has elapsed. Unnecessary when no timeout is set. */
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs);
 
+/*! FL2_cancelOperation() :
+ *  Cancels any compression operation underway. Useful only when dual buffering and/or timeouts
+ *  are enabled. */
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs);
 
+/*! FL2_remainingOutputSize() :
+ *  The amount of compressed data remaining to be read from the CStream object. */
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
+
+/*! FL2_getNextCStreamBuffer() :
+ *  Returns a buffer containing a slice of the compressed data. Call this function and process the
+ *  data until the function returns zero. In most cases it will return a buffer for each compression
+ *  thread used. It is sometimes less but never more than that. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
+
+/*! FL2_getCStreamOutput() :
+ *  Copies the compressed data to a single buffer, which must have a capacity of at least
+ *  FL2_remainingOutputSize() bytes. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity);
+
+/*! FL2_flushStream() :
+ *  Compress all data remaining in the dictionary buffer(s). With dual buffers it may be necessary
+ *  to call FL2_flushStream() twice and read the compressed data in between. Flushing is not
+ *  normally useful and produces larger output. */
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
+
+/*! FL2_endStream() :
+ *  Compress all data remaining in the dictionary buffer(s) and write the stream end marker. With
+ *  dual buffers it may be necessary to call FL2_endStream() twice and read the compressed data
+ *  each time.
+ *  Returns zero when compression is complete and the final output can be read. */
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs);
 
 /*-***************************************************************************

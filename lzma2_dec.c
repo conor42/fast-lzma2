@@ -957,10 +957,10 @@ static void LzmaDec_FreeDict(CLzma2Dec *p)
 
 void FLzmaDec_Free(CLzma2Dec *p)
 {
-  LzmaDec_FreeDict(p);
+    LzmaDec_FreeDict(p);
 }
 
-static size_t FLzma2Dec_DictSizeFromProp(BYTE dictProp)
+size_t FLzma2Dec_DictSizeFromProp(BYTE dictProp)
 {
     if (dictProp > 40)
         return FL2_ERROR(corruption_detected);
@@ -1257,27 +1257,17 @@ size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen, const BY
 
 size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen)
 {
-    const BYTE *end = src + srcLen;
     size_t unpackTotal = 0;
-    ++src;
-    while (src < end) {
-        ptrdiff_t len = end - src;
-        U32 unpackSize;
-        U32 packSize;
-        BYTE control;
-        CLzmaProps prop;
-        unsigned state = Lzma2Dec_NextChunkInfo(&control, &unpackSize, &packSize, &prop, src, &len);
-        if (state == LZMA2_STATE_FINISHED)
+    size_t pos = 1;
+    while (pos < srcLen) {
+        ChunkParseInfo inf;
+        int type = FLzma2Dec_ParseInput(src, pos, srcLen - pos, &inf);
+        if (type == CHUNK_FINAL)
             return unpackTotal;
-        src += len;
-        if (state == LZMA2_STATE_ERROR || state == LZMA2_STATE_CONTROL)
+        pos += inf.packSize;
+        if (type == CHUNK_ERROR || type == CHUNK_MORE_DATA)
             break;
-        unpackTotal += unpackSize;
-
-        if (LZMA2_IS_UNCOMPRESSED_STATE(control))
-            src += unpackSize;
-        else
-            src += packSize;
+        unpackTotal += inf.unpackSize;
     }
     return LZMA2_CONTENTSIZE_ERROR;
 }

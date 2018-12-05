@@ -519,7 +519,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     if (dstCapacity < 2U - cctx->params.omitProp) /* empty LZMA2 stream is byte sequence {0, 0} */
         return FL2_ERROR(dstSize_tooSmall);
 
-    FL2_beginFrame(cctx, srcSize);
+    CHECK_F(FL2_beginFrame(cctx, srcSize));
 
     cSize = FL2_compressBlock(cctx, src, srcSize, dstBuf, dstCapacity);
 
@@ -754,6 +754,8 @@ FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads, int 
 
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel)
 {
+    DICT_buffer *const buf = &fcs->buf;
+
     DEBUGLOG(4, "FL2_initCStream level %d", compressionLevel);
 
     fcs->endMarked = 0;
@@ -762,12 +764,17 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 
     FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, compressionLevel);
 
-    if(DICT_init(&fcs->buf,
-        (size_t)1 << fcs->params.rParams.dictionary_log,
-        fcs->params.doXXH && !fcs->params.omitProp) != 0)
+    size_t dictSize = (size_t)1 << fcs->params.rParams.dictionary_log;
+
+    /* Free unsuitable objects before reallocating anything new */
+    if (DICT_size(buf) < dictSize)
+        DICT_free(buf);
+
+    CHECK_F(FL2_beginFrame(fcs, 0));
+
+    if(DICT_init(buf, dictSize, (fcs->params.doXXH && !fcs->params.omitProp)) != 0)
         return FL2_ERROR(memory_allocation);
 
-    FL2_beginFrame(fcs, 0);
     return 0;
 }
 

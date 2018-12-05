@@ -29,6 +29,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t s
     return FLzma2Dec_UnpackSize(src, srcSize);
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_getDictSizeFromProp(unsigned char prop)
+{
+    return FLzma2Dec_DictSizeFromProp(prop);
+}
+
 typedef struct
 {
     CLzma2Dec* dec;

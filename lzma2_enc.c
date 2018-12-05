@@ -73,8 +73,10 @@ Public domain
 #define kNullDist (U32)-1
 
 #define kChunkSize ((1UL << 16U) - 8192U)
-#define kChunkBufferSize ((1UL << 16U) + 1)
+#define kTempMinOutput (LZMA_REQUIRED_INPUT_MAX * 4U)
+#define kTempBufferSize (kTempMinOutput + kOptimizerBufferSize + kOptimizerBufferSize / 16U)
 #define kMaxChunkUncompressedSize ((1UL << 21U) - kMatchLenMax)
+#define kMaxChunkCompressedSize (1UL << 16U)
 #define kChunkHeaderSize 5U
 #define kChunkResetShift 5U
 #define kChunkUncompressedDictReset 1U
@@ -193,14 +195,14 @@ struct FL2_lzmaEncoderCtx_s
 
     OptimalNode opt_buf[kOptimizerBufferSize];
 
-    BYTE* out_buf;
-
     HashChains* hash_buf;
     ptrdiff_t chain_mask_2;
     ptrdiff_t chain_mask_3;
     ptrdiff_t hash_dict_3;
     ptrdiff_t hash_prev_index;
     ptrdiff_t hash_alloc_3;
+
+    BYTE out_buf[kTempBufferSize];
 };
 
 FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
@@ -210,11 +212,6 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
     if (enc == NULL)
         return NULL;
 
-    enc->out_buf = malloc(kChunkBufferSize);
-    if (enc->out_buf == NULL) {
-        free(enc);
-        return NULL;
-    }
     enc->lc = 3;
     enc->lp = 0;
     enc->pb = 2;
@@ -239,7 +236,6 @@ void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc)
     if (enc == NULL)
         return;
     free(enc->hash_buf);
-    free(enc->out_buf);
     free(enc);
 }
 
@@ -863,7 +859,6 @@ _encode:
         }
         ++prev;
     }
-    Flush(&enc->rc);
     return prev;
 }
 
@@ -1727,7 +1722,6 @@ size_t EncodeChunkBest(FL2_lzmaEncoderCtx* enc,
             ++index;
         }
     }
-    Flush(&enc->rc);
     return index;
 }
 
@@ -1801,7 +1795,7 @@ BYTE FL2_getDictSizeProp(size_t dictionary_size)
 
 size_t FL2_lzma2MemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count)
 {
-    size_t size = sizeof(FL2_lzmaEncoderCtx) + kChunkBufferSize;
+    size_t size = sizeof(FL2_lzmaEncoderCtx);
     if(strategy == FL2_ultra)
         size += sizeof(HashChains) + (sizeof(U32) << chain_log) - sizeof(U32);
     return size * thread_count;
@@ -1915,6 +1909,33 @@ static BYTE IsChunkRandom(const FL2_matchTable* const tbl,
 __pragma(warning(disable:4701))
 #endif
 
+static size_t EncodeChunk(FL2_lzmaEncoderCtx* enc,
+    FL2_matchTable* tbl,
+    const FL2_dataBlock block,
+    size_t index, size_t end)
+{
+    if (enc->strategy == FL2_fast) {
+        if (tbl->isStruct) {
+            return EncodeChunkFast(enc, block, tbl, 1,
+                index, end);
+        }
+        else {
+            return EncodeChunkFast(enc, block, tbl, 0,
+                index, end);
+        }
+    }
+    else {
+        if (tbl->isStruct) {
+            return EncodeChunkBest(enc, block, tbl, 1,
+                index, end);
+        }
+        else {
+            return EncodeChunkBest(enc, block, tbl, 0,
+                index, end);
+        }
+    }
+
+}
 size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
@@ -1925,9 +1946,6 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
 {
     size_t const start = block.start;
     BYTE* out_dest = enc->out_buf;
-    size_t prop_size = (stream_prop >= 0);
-    if(prop_size)
-        *out_dest++ = (BYTE)stream_prop;
 	/* Each encoder writes a properties byte because the upstream encoder(s) could */
 	/* write only uncompressed chunks with no properties. */
 	BYTE encode_properties = 1;
@@ -1962,7 +1980,7 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     RMF_limitLengths(tbl, block.end);
     for (size_t index = start; index < block.end;)
     {
-        unsigned header_size = encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize;
+        size_t header_size = (stream_prop >= 0) + (encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize);
         EncoderStates saved_states;
         size_t next_index;
         size_t compressed_size;
@@ -1970,54 +1988,55 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         RangeEncReset(&enc->rc);
         SetOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
         if (!next_is_random) {
+            size_t cur = index;
+            size_t end;
+            if (enc->strategy == FL2_fast)
+                end = MIN(block.end, index + kMaxChunkUncompressedSize);
+            else
+                end = MIN(block.end, index + kMaxChunkUncompressedSize - kOptimizerBufferSize);
             saved_states = enc->states;
             if (index == 0) {
                 EncodeLiteral(enc, 0, block.data[0], 0);
+                ++cur;
             }
-            if (enc->strategy == FL2_fast) {
-                if (tbl->isStruct) {
-                    next_index = EncodeChunkFast(enc, block, tbl, 1,
-                        index + (index == 0),
-                        MIN(block.end, index + kMaxChunkUncompressedSize));
-                }
-                else {
-                    next_index = EncodeChunkFast(enc, block, tbl, 0,
-                        index + (index == 0),
-                        MIN(block.end, index + kMaxChunkUncompressedSize));
-                }
+            if (index == start) {
+                /* After four bytes we can write data to the match table because the */
+                /* compressed data will never catch up with the table position being read. */
+                enc->rc.chunk_size = kTempMinOutput;
+                cur = EncodeChunk(enc, tbl, block, cur, end);
+                enc->rc.chunk_size = kChunkSize;
+                out_dest = RMF_getTableAsOutputBuffer(tbl, start);
+                memcpy(out_dest, enc->out_buf, header_size + enc->rc.out_index);
+                enc->rc.out_buffer = out_dest + header_size;
             }
-            else {
-                if (tbl->isStruct) {
-                    next_index = EncodeChunkBest(enc, block, tbl, 1,
-                        index + (index == 0),
-                        MIN(block.end, index + kMaxChunkUncompressedSize - kOptimizerBufferSize));
-                }
-                else {
-                    next_index = EncodeChunkBest(enc, block, tbl, 0,
-                        index + (index == 0),
-                        MIN(block.end, index + kMaxChunkUncompressedSize - kOptimizerBufferSize));
-                }
-            }
+            next_index = EncodeChunk(enc, tbl, block, cur, end);
+            Flush(&enc->rc);
         }
         else {
             next_index = MIN(index + kChunkSize, block.end);
         }
         compressed_size = enc->rc.out_index;
         uncompressed_size = next_index - index;
-        out_dest[1] = (BYTE)((uncompressed_size - 1) >> 8);
-        out_dest[2] = (BYTE)(uncompressed_size - 1);
+        if (compressed_size > kMaxChunkCompressedSize)
+            return FL2_ERROR(internal);
+        BYTE* header = out_dest;
+        if (stream_prop >= 0)
+            *header++ = (BYTE)stream_prop;
+        stream_prop = -1;
+        header[1] = (BYTE)((uncompressed_size - 1) >> 8);
+        header[2] = (BYTE)(uncompressed_size - 1);
         /* Output an uncompressed chunk if necessary */
         if (next_is_random || uncompressed_size + 3 <= compressed_size + header_size) {
             DEBUGLOG(5, "Storing chunk : was %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
             if (index == 0) {
-                out_dest[0] = kChunkUncompressedDictReset;
+                header[0] = kChunkUncompressedDictReset;
             }
             else {
-                out_dest[0] = kChunkUncompressed;
+                header[0] = kChunkUncompressed;
             }
-            memcpy(out_dest + 3, block.data + index, uncompressed_size);
+            memcpy(header + 3, block.data + index, uncompressed_size);
             compressed_size = uncompressed_size;
-            header_size = 3;
+            header_size = 3 + (header - out_dest);
             if (!next_is_random) {
                 enc->states = saved_states;
             }
@@ -2025,19 +2044,19 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         else {
             DEBUGLOG(5, "Compressed chunk : %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
             if (index == 0) {
-                out_dest[0] = kChunkCompressedFlag | kChunkAllReset;
+                header[0] = kChunkCompressedFlag | kChunkAllReset;
             }
             else if (encode_properties) {
-                out_dest[0] = kChunkCompressedFlag | kChunkStatePropertiesReset;
+                header[0] = kChunkCompressedFlag | kChunkStatePropertiesReset;
             }
             else {
-                out_dest[0] = kChunkCompressedFlag | kChunkNothingReset;
+                header[0] = kChunkCompressedFlag | kChunkNothingReset;
             }
-            out_dest[0] |= (BYTE)((uncompressed_size - 1) >> 16);
-            out_dest[3] = (BYTE)((compressed_size - 1) >> 8);
-            out_dest[4] = (BYTE)(compressed_size - 1);
+            header[0] |= (BYTE)((uncompressed_size - 1) >> 16);
+            header[3] = (BYTE)((compressed_size - 1) >> 8);
+            header[4] = (BYTE)(compressed_size - 1);
             if (encode_properties) {
-                out_dest[5] = GetLcLpPbCode(enc);
+                header[5] = GetLcLpPbCode(enc);
                 encode_properties = 0;
             }
         }
@@ -2045,13 +2064,6 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         {
             /* Test the next chunk for compressibility */
             next_is_random = IsChunkRandom(tbl, block, next_index, enc->strategy);
-        }
-        if (index == start) {
-            /* After the first chunk we can write data to the match table because the */
-            /* compressed data will never catch up with the table position being read. */
-            out_dest = RMF_getTableAsOutputBuffer(tbl, start);
-            memcpy(out_dest, enc->out_buf, prop_size + compressed_size + header_size);
-            out_dest += prop_size;
         }
         out_dest += compressed_size + header_size;
         FL2_atomic_add(*progress, (long)(next_index - index));

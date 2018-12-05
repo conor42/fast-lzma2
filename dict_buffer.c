@@ -19,7 +19,7 @@ int DICT_construct(DICT_buffer * buf, int async)
 
 int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
 {
-    if (buf->data[0] == NULL || dictSize != buf->bufSize) {
+    if (buf->data[0] == NULL || dictSize > buf->bufSize) {
         DICT_free(buf);
         buf->data[0] = malloc(dictSize);
 
@@ -67,6 +67,11 @@ void DICT_free(DICT_buffer * buf)
     XXH32_freeState(buf->xxh);
     buf->xxh = NULL;
 #endif
+}
+
+size_t DICT_size(const DICT_buffer * buf)
+{
+    return buf->bufSize;
 }
 
 size_t DICT_get(DICT_buffer * buf, size_t overlap, FL2_outBuffer * dict)

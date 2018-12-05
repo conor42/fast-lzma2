@@ -508,8 +508,20 @@ static size_t FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs) {
     return FL2_estimateCCtxSize_usingCCtx(fcs);
 }
 
+/*! FL2_getDictSizeFromProp() :
+ *  Get the dictionary size from the property byte for a stream. The property byte is the first byte
+*   in the stream, unless omitProperties was enabled, in which case the caller must store it. */
+FL2LIB_API size_t FL2LIB_CALL FL2_getDictSizeFromProp(unsigned char prop);
+
+/*! FL2_estimateDCtxSize() :
+ *  The size of a DCtx does not include a dictionary buffer because the caller must supply one. */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads);
-FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads); /*!< obtain dictSize from FL2_getCCtxDictProp() */
+
+/*! FL2_estimateDStreamSize() :
+ *  Estimate decompression memory use from the dictionary size and number of threads.
+ *  For nbThreads == 0 the number of available cores will be used.
+ *  Obtain dictSize by passing the property byte to FL2_getDictSizeFromProp. */
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads); /*!<  from FL2_getDictSizeFromProp() */
 
 #endif  /* FAST_LZMA2_H */
 

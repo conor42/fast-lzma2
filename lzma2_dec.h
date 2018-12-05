@@ -205,6 +205,8 @@ typedef enum
 
 void FLzmaDec_Free(CLzma2Dec *state);
 
+size_t FLzma2Dec_DictSizeFromProp(BYTE dictProp);
+
 size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 

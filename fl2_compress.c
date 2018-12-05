@@ -903,7 +903,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
     if (FL2POOL_waitAll(fcs->compressThread, fcs->timeout) != 0)
         return FL2_ERROR(timedOut);
     CHECK_F(fcs->asyncRes);
-    return FL2_error_no_error;
+    return fcs->outThread == fcs->threadCount;
 }
 
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)

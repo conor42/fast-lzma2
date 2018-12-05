@@ -7,6 +7,7 @@ int DICT_construct(DICT_buffer * buf, int async)
 {
     buf->data[0] = NULL;
     buf->data[1] = NULL;
+    buf->bufSize = 0;
 
     buf->async = (async != 0);
 
@@ -27,7 +28,7 @@ int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
         if (buf->async)
             buf->data[1] = malloc(dictSize);
 
-        if (buf->data[0] == NULL || buf->data[1] == NULL) {
+        if (buf->data[0] == NULL || (buf->async && buf->data[1] == NULL)) {
             DICT_free(buf);
             return 1;
         }
@@ -63,6 +64,7 @@ void DICT_free(DICT_buffer * buf)
     free(buf->data[1]);
     buf->data[0] = NULL;
     buf->data[1] = NULL;
+    buf->bufSize = 0;
 #ifndef NO_XXHASH
     XXH32_freeState(buf->xxh);
     buf->xxh = NULL;

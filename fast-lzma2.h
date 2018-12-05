@@ -270,7 +270,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
  *  Reads data from input into the dictionary buffer. Compression will begin if the buffer fills up.
  *  Streams created for dual buffering will fill the second buffer from input and return if all
  *  input is consumed. A call to FL2_compressStream() will block when all dictionary space is
- *  filled. FL2_compressStream() must not be called again until all compressed data is read.*/
+ *  filled. FL2_compressStream() must not be called again until all compressed data is read.
+ *  Returns zero to indicte compressed data must be read, or nonzero otherwise. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
 
 /*! FL2_getDictionaryBuffer() :
@@ -315,7 +316,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, 
 /*! FL2_flushStream() :
  *  Compress all data remaining in the dictionary buffer(s). With dual buffers it may be necessary
  *  to call FL2_flushStream() twice and read the compressed data in between. Flushing is not
- *  normally useful and produces larger output. */
+ *  normally useful and produces larger output.
+ *  Returns amount of compressed data to be read from the CStream object. */
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
 
 /*! FL2_endStream() :

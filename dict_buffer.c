@@ -80,9 +80,9 @@ size_t DICT_get(DICT_buffer * buf, size_t overlap, FL2_outBuffer * dict)
 {
     DICT_shift(buf, overlap);
 
-    dict->dst = buf->data[buf->index];
-    dict->pos = buf->start;
-    dict->size = buf->bufSize;
+    dict->dst = buf->data[buf->index] + buf->end;
+    dict->pos = 0;
+    dict->size = buf->bufSize - buf->end;
 
     return dict->size - dict->pos;
 }
@@ -90,6 +90,7 @@ size_t DICT_get(DICT_buffer * buf, size_t overlap, FL2_outBuffer * dict)
 int DICT_update(DICT_buffer * buf, size_t addedSize)
 {
     buf->end += addedSize;
+    assert(buf->end <= buf->bufSize);
     return !DICT_availSpace(buf);
 }
 
@@ -131,7 +132,7 @@ void DICT_getBlock(DICT_buffer * buf, FL2_dataBlock * block)
 
 int DICT_needShift(DICT_buffer * buf, size_t overlap)
 {
-    return buf->start > overlap;
+    return buf->start == buf->end && (overlap == 0 || buf->end > overlap + ALIGNMENT_MASK);
 }
 
 int DICT_async(const DICT_buffer * buf)
@@ -141,14 +142,15 @@ int DICT_async(const DICT_buffer * buf)
 
 void DICT_shift(DICT_buffer * buf, size_t overlap)
 {
-    if (buf->start <= overlap)
+    if (buf->start < buf->end)
         return;
 
     if (overlap == 0) {
         buf->start = 0;
         buf->end = 0;
+        buf->index ^= buf->async;
     }
-    else if (buf->end > overlap) {
+    else if (buf->end > overlap + ALIGNMENT_MASK) {
         size_t const from = (buf->end - overlap) & ALIGNMENT_MASK;
         BYTE *src = buf->data[buf->index];
         BYTE *dst = buf->data[buf->index ^ buf->async];
@@ -156,20 +158,20 @@ void DICT_shift(DICT_buffer * buf, size_t overlap)
         overlap = buf->end - from;
 
         if (overlap <= from || dst != src) {
-            DEBUGLOG(5, "Copy overlap data : %u bytes", (U32)overlap);
+            DEBUGLOG(5, "Copy overlap data : %u bytes from %u", (U32)overlap, (U32)from);
             memcpy(dst, src + from, overlap);
         }
         else if (from != 0) {
-            DEBUGLOG(5, "Move overlap data : %u bytes", (U32)overlap);
+            DEBUGLOG(5, "Move overlap data : %u bytes from %u", (U32)overlap, (U32)from);
             memmove(dst, src + from, overlap);
         }
         buf->start = overlap;
         buf->end = overlap;
+        buf->index ^= buf->async;
     }
     else {
         buf->start = buf->end;
     }
-    buf->index ^= buf->async;
 }
 
 #ifndef NO_XXHASH

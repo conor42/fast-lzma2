@@ -153,7 +153,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>FL2_DEBUG=1;LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FL2_DEBUG=1;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

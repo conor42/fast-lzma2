@@ -447,9 +447,10 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         FL2_getDictionaryBuffer(cstream, &dict);
         memcpy(dict.dst, CNBuffer, dict.size);
         CHECK_V(res, FL2_updateDictionary(cstream, dict.size));
+        r = dict.size;
         FL2_getDictionaryBuffer(cstream, &dict);
-        memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer + dict.size, dict.size / 2);
-        CHECK(FL2_updateDictionary(cstream, dict.size / 2));
+        memcpy((BYTE*)dict.dst, (BYTE*)CNBuffer + r, r / 2);
+        CHECK(FL2_updateDictionary(cstream, r / 2));
         r = FL2_endStream(cstream);
         if (r == 0) goto _output_error;
         while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
@@ -935,7 +936,8 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                      (FL2_maxCLevel() * 2U / cLevelLimiter) )
                      + 1;
             unsigned lc = FUZ_rand(&lseed) % 5;
-			FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
+            unsigned useStream = FUZ_rand(&lseed) & 3;
+            FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cstream, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
             if((FUZ_rand(&lseed) & 7) > 6)
                 FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, 64);
@@ -945,13 +947,12 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_literalPosBits, FUZ_rand(&lseed) % (5 - lc));
             FL2_CCtx_setParameter(cstream, FL2_p_posBits, FUZ_rand(&lseed) % 5);
             FL2_CCtx_setParameter(cstream, FL2_p_doXXHash, FUZ_rand(&lseed) & 1);
-            if (testNb == 4)
-                __debugbreak();
-
-            if (FUZ_rand(&lseed) & 3) {
+//            if (testNb == 14)
+//                __debugbreak();
+            if (useStream) {
                 unsigned flushes = 1 + FUZ_rand(&lseed) % 3;
                 size_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
-                unsigned flushFreq = (unsigned)(((size_t)1 << FL2_CCtx_setParameter(cstream, FL2_p_dictionaryLog, 0)) / (bufSize * 2U));
+                unsigned flushFreq = (unsigned)(((size_t)2 << FL2_CCtx_setParameter(cstream, FL2_p_dictionaryLog, 0)) / bufSize);
                 flushFreq |= 3;
                 cSize = FL2_initCStream(cstream, 0);
                 CHECK(FL2_isError(cSize), "FL2_initCStream failed : %s", FL2_getErrorName(cSize));
@@ -968,7 +969,10 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                     in.pos = 0;
                     if (FUZ_rand(&lseed) & 1) {
                         FL2_outBuffer dict;
-                        FL2_getDictionaryBuffer(cstream, &dict);
+                        do {
+                            r = FL2_getDictionaryBuffer(cstream, &dict);
+                        } while (FL2_isTimedOut(r));
+                        CHECK(FL2_isError(r), "FL2_getDictionaryBuffer failed : %s", FL2_getErrorName(r));
                         dict.size = MIN(dict.size, in.size);
                         memcpy(dict.dst, in.src, dict.size);
                         in.pos += dict.size;
@@ -1018,7 +1022,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             }
 
             /* compression failure test : too small dest buffer */
-            if (cSize >= 2) {
+            if (!useStream && cSize >= 2) {
                 const size_t missing = (FUZ_rand(&lseed) % (cSize-1)) + 1;
                 const size_t tooSmallSize = cSize - missing;
                 const U32 endMark = 0x4DC2B1A9;

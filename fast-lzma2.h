@@ -276,7 +276,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer*
 
 /*! FL2_getDictionaryBuffer() :
  *  Returns a buffer in the FL2_outBuffer object, which the caller can directly read data into.
- *  Applications will normally pass this buffer to an I/O read function or upstream filter. */
+ *  Applications will normally pass this buffer to an I/O read function or upstream filter.
+ *  Returns the available size (equal to dict.size), or an error or timeout code. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_outBuffer* dict);
 
 /*! FL2_updateDictionary() :

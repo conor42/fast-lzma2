@@ -996,7 +996,7 @@ static size_t FL2_writeEnd(FL2_CStream* fcs)
         XXH32_canonical_t canonical;
 
         XXH32_canonicalFromHash(&canonical, DICT_getDigest(&fcs->buf));
-        DEBUGLOG(4, "Writing XXH32", (U32)to_write);
+        DEBUGLOG(4, "Writing XXH32");
         memcpy(dst + pos, &canonical, XXHASH_SIZEOF);
 
         pos += XXHASH_SIZEOF;
@@ -1015,7 +1015,7 @@ static size_t FL2_flushStream_internal(FL2_CStream* fcs, int ending)
     CHECK_F(fcs->asyncRes);
 
     DEBUGLOG(4, "FL2_flushStream_internal : %u to compress, %u to write",
-        (U32)(fcs->inBuf.end - fcs->inBuf.start),
+        (U32)(fcs->buf.end - fcs->buf.start),
         (U32)FL2_remainingOutputSize(fcs));
 
     CHECK_F(FL2_compressStream_internal(fcs, ending));

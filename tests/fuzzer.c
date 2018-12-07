@@ -952,7 +952,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             if (useStream) {
                 unsigned flushes = 1 + FUZ_rand(&lseed) % 3;
                 size_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
-                unsigned flushFreq = (unsigned)(((size_t)2 << FL2_CCtx_setParameter(cstream, FL2_p_dictionaryLog, 0)) / bufSize);
+                unsigned flushFreq = (unsigned)(((size_t)2 << FL2_CCtx_getParameter(cstream, FL2_p_dictionaryLog)) / bufSize);
                 flushFreq |= 3;
                 cSize = FL2_initCStream(cstream, 0);
                 CHECK(FL2_isError(cSize), "FL2_initCStream failed : %s", FL2_getErrorName(cSize));

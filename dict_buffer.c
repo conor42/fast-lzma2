@@ -21,7 +21,7 @@ int DICT_construct(DICT_buffer * buf, int async)
 int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
 {
     if (buf->data[0] == NULL || dictSize > buf->bufSize) {
-        DICT_free(buf);
+        DICT_destruct(buf);
         buf->data[0] = malloc(dictSize);
 
         buf->data[1] = NULL;
@@ -29,7 +29,7 @@ int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
             buf->data[1] = malloc(dictSize);
 
         if (buf->data[0] == NULL || (buf->async && buf->data[1] == NULL)) {
-            DICT_free(buf);
+            DICT_destruct(buf);
             return 1;
         }
     }
@@ -43,7 +43,7 @@ int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
         if (buf->xxh == NULL) {
             buf->xxh = XXH32_createState();
             if (buf->xxh == NULL) {
-                DICT_free(buf);
+                DICT_destruct(buf);
                 return 1;
             }
         }
@@ -58,7 +58,7 @@ int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
     return 0;
 }
 
-void DICT_free(DICT_buffer * buf)
+void DICT_destruct(DICT_buffer * buf)
 {
     free(buf->data[0]);
     free(buf->data[1]);

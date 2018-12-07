@@ -24,7 +24,7 @@ int DICT_construct(DICT_buffer *buf, int async);
 
 int DICT_init(DICT_buffer *buf, size_t dictSize, int doHash);
 
-void DICT_free(DICT_buffer *buf);
+void DICT_destruct(DICT_buffer *buf);
 
 size_t DICT_size(const DICT_buffer *buf);
 

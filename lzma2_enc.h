@@ -23,7 +23,7 @@ extern "C" {
 #define ENC_MIN_BYTES_PER_THREAD 0x20000
 
 
-typedef struct FL2_lzmaEncoderCtx_s FL2_lzmaEncoderCtx;
+typedef struct LZMA2_ECtx_s LZMA2_ECtx;
 
 typedef struct
 {
@@ -38,13 +38,13 @@ typedef struct
 } FL2_lzma2Parameters;
 
 
-FL2_lzmaEncoderCtx* FL2_lzma2Create(void);
+LZMA2_ECtx* LZMA2_createECtx(void);
 
-void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc);
+void LZMA2_freeECtx(LZMA2_ECtx* enc);
 
-int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options);
+int LZMA2_hashAlloc(LZMA2_ECtx* enc, const FL2_lzma2Parameters* options);
 
-size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
+size_t LZMA2_encode(LZMA2_ECtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     const FL2_lzma2Parameters* options,
@@ -52,9 +52,9 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
     FL2_atomic *progress,
     int *canceled);
 
-BYTE FL2_getDictSizeProp(size_t dictionary_size);
+BYTE LZMA2_getDictSizeProp(size_t dictionary_size);
 
-size_t FL2_lzma2MemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count);
+size_t LZMA2_encMemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count);
 
 #if defined (__cplusplus)
 }

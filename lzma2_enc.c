@@ -10,17 +10,17 @@ Public domain
 #include "fl2_internal.h"
 #include "lzma2_enc.h"
 #include "fl2_compress_internal.h"
-#include "radix_mf.h"
-#include "range_enc.h"
 #include "mem.h"
 #include "count.h"
+#include "radix_mf.h"
+#include "range_enc.h"
 
 #ifdef FL2_XZ_BUILD
 #  define MEM_readLE32(a) unaligned_read32le(a)
 
-#ifdef TUKLIB_FAST_UNALIGNED_ACCESS
-#  define MEM_read16(a) (*(const U16*)(a))
-#endif
+#  ifdef TUKLIB_FAST_UNALIGNED_ACCESS
+#    define MEM_read16(a) (*(const U16*)(a))
+#  endif
 
 #endif
 
@@ -104,6 +104,7 @@ static const BYTE kShortRepNextStates[kNumStates] = { 9, 9, 9, 9, 9, 9, 9, 11, 1
 #define ShortRepNextState(s) kShortRepNextStates[s]
 
 #include "fastpos_table.h"
+#include "radix_get.h"
 
 typedef struct 
 {
@@ -161,13 +162,7 @@ typedef struct {
     S32 hash_chain_3[1];
 } HashChains;
 
-typedef struct
-{
-    U32 length;
-    U32 dist;
-} Match;
-
-struct FL2_lzmaEncoderCtx_s
+struct LZMA2_ECtx_s
 {
     unsigned lc;
     unsigned lp;
@@ -190,7 +185,7 @@ struct FL2_lzmaEncoderCtx_s
     unsigned dist_slot_prices[kNumLenToPosStates][kDistTableSizeMax];
     unsigned distance_prices[kNumLenToPosStates][kNumFullDistances];
 
-    Match matches[kMatchLenMax-kMatchLenMin];
+    RMF_match matches[kMatchLenMax-kMatchLenMin];
     size_t match_count;
 
     OptimalNode opt_buf[kOptimizerBufferSize];
@@ -205,10 +200,10 @@ struct FL2_lzmaEncoderCtx_s
     BYTE out_buf[kTempBufferSize];
 };
 
-FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
+LZMA2_ECtx* LZMA2_createECtx(void)
 {
-    FL2_lzmaEncoderCtx* enc = malloc(sizeof(FL2_lzmaEncoderCtx));
-    DEBUGLOG(3, "FL2_lzma2Create");
+    LZMA2_ECtx* enc = malloc(sizeof(LZMA2_ECtx));
+    DEBUGLOG(3, "LZMA2_createECtx");
     if (enc == NULL)
         return NULL;
 
@@ -231,7 +226,7 @@ FL2_lzmaEncoderCtx* FL2_lzma2Create(void)
     return enc;
 }
 
-void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc)
+void LZMA2_freeECtx(LZMA2_ECtx* enc)
 {
     if (enc == NULL)
         return;
@@ -246,14 +241,14 @@ void FL2_lzma2Free(FL2_lzmaEncoderCtx* enc)
 #define IsCharState(state) ((state) < 7)
 
 HINT_INLINE
-unsigned GetRepLen1Price(FL2_lzmaEncoderCtx* enc, size_t state, size_t pos_state)
+unsigned GetRepLen1Price(LZMA2_ECtx* enc, size_t state, size_t pos_state)
 {
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
     unsigned rep0_long_prob = enc->states.is_rep0_long[state][pos_state];
     return GET_PRICE_0(rep_G0_prob) + GET_PRICE_0(rep0_long_prob);
 }
 
-static unsigned GetRepPrice(FL2_lzmaEncoderCtx* enc, size_t rep_index, size_t state, size_t pos_state)
+static unsigned GetRepPrice(LZMA2_ECtx* enc, size_t rep_index, size_t state, size_t pos_state)
 {
     unsigned price;
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
@@ -277,7 +272,7 @@ static unsigned GetRepPrice(FL2_lzmaEncoderCtx* enc, size_t rep_index, size_t st
     return price;
 }
 
-static unsigned GetRepMatch0Price(FL2_lzmaEncoderCtx* enc, size_t len, size_t state, size_t pos_state)
+static unsigned GetRepMatch0Price(LZMA2_ECtx* enc, size_t len, size_t state, size_t pos_state)
 {
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
     unsigned rep0_long_prob = enc->states.is_rep0_long[state][pos_state];
@@ -300,41 +295,39 @@ static unsigned GetLiteralPriceMatched(const Probability *prob_table, U32 symbol
     return price;
 }
 
-static void EncodeLiteral(FL2_lzmaEncoderCtx* enc, size_t index, U32 symbol, unsigned prev_symbol)
+static void EncodeLiteral(LZMA2_ECtx* enc, size_t index, U32 symbol, unsigned prev_symbol)
 {
     EncodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
     enc->states.state = LiteralNextState(enc->states.state);
 
-    {   Probability* prob_table = GetLiteralProbs(enc, index, prev_symbol);
-        symbol |= 0x100;
-        do {
-            EncodeBit(&enc->rc, prob_table + (symbol >> 8), symbol & (1 << 7));
-            symbol <<= 1;
-        } while (symbol < 0x10000);
-    }
+    Probability* prob_table = GetLiteralProbs(enc, index, prev_symbol);
+    symbol |= 0x100;
+    do {
+        EncodeBit(&enc->rc, prob_table + (symbol >> 8), symbol & (1 << 7));
+        symbol <<= 1;
+    } while (symbol < 0x10000);
 }
 
-static void EncodeLiteralMatched(FL2_lzmaEncoderCtx* enc, const BYTE* data_block, size_t index, U32 symbol)
+static void EncodeLiteralMatched(LZMA2_ECtx* enc, const BYTE* data_block, size_t index, U32 symbol)
 {
     EncodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
     enc->states.state = LiteralNextState(enc->states.state);
 
-    {   unsigned match_symbol = data_block[index - enc->states.reps[0] - 1];
-        Probability* prob_table = GetLiteralProbs(enc, index, data_block[index - 1]);
-        unsigned offset = 0x100;
-        symbol |= 0x100;
-        do {
-            match_symbol <<= 1;
-            size_t prob_index = offset + (match_symbol & offset) + (symbol >> 8);
-            EncodeBit(&enc->rc, prob_table + prob_index, symbol & (1 << 7));
-            symbol <<= 1;
-            offset &= ~(match_symbol ^ symbol);
-        } while (symbol < 0x10000);
-    }
+    unsigned match_symbol = data_block[index - enc->states.reps[0] - 1];
+    Probability* prob_table = GetLiteralProbs(enc, index, data_block[index - 1]);
+    unsigned offset = 0x100;
+    symbol |= 0x100;
+    do {
+        match_symbol <<= 1;
+        size_t prob_index = offset + (match_symbol & offset) + (symbol >> 8);
+        EncodeBit(&enc->rc, prob_table + prob_index, symbol & (1 << 7));
+        symbol <<= 1;
+        offset &= ~(match_symbol ^ symbol);
+    } while (symbol < 0x10000);
 }
 
 HINT_INLINE
-void EncodeLiteralBuf(FL2_lzmaEncoderCtx* enc, const BYTE* data_block, size_t index)
+void EncodeLiteralBuf(LZMA2_ECtx* enc, const BYTE* data_block, size_t index)
 {
     U32 symbol = data_block[index];
     if (IsCharState(enc->states.state)) {
@@ -346,196 +339,15 @@ void EncodeLiteralBuf(FL2_lzmaEncoderCtx* enc, const BYTE* data_block, size_t in
     }
 }
 
-static size_t RMF_bitpackExtendMatch(const BYTE* const data,
-    const U32* const table,
-    ptrdiff_t const start_index,
-    ptrdiff_t limit,
-    U32 const link,
-    size_t const length)
-{
-    ptrdiff_t end_index = start_index + length;
-    ptrdiff_t dist = start_index - link;
-    if (limit > start_index + (ptrdiff_t)kMatchLenMax)
-        limit = start_index + kMatchLenMax;
-    while (end_index < limit && end_index - (ptrdiff_t)(table[end_index] & RADIX_LINK_MASK) == dist) {
-        end_index += table[end_index] >> RADIX_LINK_BITS;
-    }
-    if (end_index >= limit) {
-        DEBUGLOG(7, "RMF_bitpackExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(limit - start_index));
-        return limit - start_index;
-    }
-    while (end_index < limit && data[end_index - dist] == data[end_index]) {
-        ++end_index;
-    }
-    DEBUGLOG(7, "RMF_bitpackExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(end_index - start_index));
-    return end_index - start_index;
-}
-
-#define GetMatchLink(table, index) ((const RMF_unit*)(table))[(index) >> UNIT_BITS].links[(index) & UNIT_MASK]
-
-#define GetMatchLength(table, index) ((const RMF_unit*)(table))[(index) >> UNIT_BITS].lengths[(index) & UNIT_MASK]
-
-static size_t RMF_structuredExtendMatch(const BYTE* const data,
-    const U32* const table,
-    ptrdiff_t const start_index,
-    ptrdiff_t limit,
-    U32 const link,
-    size_t const length)
-{
-    ptrdiff_t end_index = start_index + length;
-    ptrdiff_t dist = start_index - link;
-    if (limit > start_index + (ptrdiff_t)kMatchLenMax)
-        limit = start_index + kMatchLenMax;
-    while (end_index < limit && end_index - (ptrdiff_t)GetMatchLink(table, end_index) == dist) {
-        end_index += GetMatchLength(table, end_index);
-    }
-    if (end_index >= limit) {
-        DEBUGLOG(7, "RMF_structuredExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(limit - start_index));
-        return limit - start_index;
-    }
-    while (end_index < limit && data[end_index - dist] == data[end_index]) {
-        ++end_index;
-    }
-    DEBUGLOG(7, "RMF_structuredExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(end_index - start_index));
-    return end_index - start_index;
-}
-
-FORCE_INLINE_TEMPLATE
-Match FL2_radixGetMatch(FL2_dataBlock block,
-    FL2_matchTable* tbl,
-    unsigned max_depth,
-    int structTbl,
-    size_t index)
-{
-    if (structTbl)
-    {
-        Match match;
-        U32 link = GetMatchLink(tbl->table, index);
-        size_t length;
-        size_t dist;
-        match.length = 0;
-        if (link == RADIX_NULL_LINK)
-            return match;
-        length = GetMatchLength(tbl->table, index);
-        dist = index - link - 1;
-        if (length > block.end - index) {
-            match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
-        {
-            match.length = (U32)RMF_structuredExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
-            match.length = (U32)length;
-        }
-        match.dist = (U32)dist;
-        return match;
-    }
-    else {
-        Match match;
-        U32 link = tbl->table[index];
-        size_t length;
-        size_t dist;
-        match.length = 0;
-        if (link == RADIX_NULL_LINK)
-            return match;
-        length = link >> RADIX_LINK_BITS;
-        link &= RADIX_LINK_MASK;
-        dist = index - link - 1;
-        if (length > block.end - index) {
-            match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
-        {
-            match.length = (U32)RMF_bitpackExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
-            match.length = (U32)length;
-        }
-        match.dist = (U32)dist;
-        return match;
-    }
-}
-
-FORCE_INLINE_TEMPLATE
-Match FL2_radixGetNextMatch(FL2_dataBlock block,
-    FL2_matchTable* tbl,
-    unsigned max_depth,
-    int structTbl,
-    size_t index)
-{
-    if (structTbl)
-    {
-        Match match;
-        U32 link = GetMatchLink(tbl->table, index);
-        size_t length;
-        size_t dist;
-        match.length = 0;
-        if (link == RADIX_NULL_LINK)
-            return match;
-        length = GetMatchLength(tbl->table, index);
-        dist = index - link - 1;
-        if (link - 1 == GetMatchLink(tbl->table, index - 1)) {
-            /* same as the previous match, one byte shorter */
-            return match;
-        }
-        if (length > block.end - index) {
-            match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
-        {
-            match.length = (U32)RMF_structuredExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
-            match.length = (U32)length;
-        }
-        match.dist = (U32)dist;
-        return match;
-    }
-    else {
-        Match match;
-        U32 link = tbl->table[index];
-        size_t length;
-        size_t dist;
-        match.length = 0;
-        if (link == RADIX_NULL_LINK)
-            return match;
-        length = link >> RADIX_LINK_BITS;
-        link &= RADIX_LINK_MASK;
-        dist = index - link - 1;
-        if (link - 1 == (tbl->table[index - 1] & RADIX_LINK_MASK)) {
-            /* same distance, one byte shorter */
-            return match;
-        }
-        if (length > block.end - index) {
-            match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
-        {
-            match.length = (U32)RMF_bitpackExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
-            match.length = (U32)length;
-        }
-        match.dist = (U32)dist;
-        return match;
-    }
-}
-
 static void LengthStates_SetPrices(RangeEncoder* rc, LengthStates* ls, size_t pos_state)
 {
     unsigned prob = ls->choice;
     unsigned a0 = GET_PRICE_0(prob);
     unsigned a1 = GET_PRICE_1(prob);
-    unsigned b0, b1;
-    size_t i = 0;
     prob = ls->choice_2;
-    b0 = a1 + GET_PRICE_0(prob);
-    b1 = a1 + GET_PRICE_1(prob);
+    unsigned b0 = a1 + GET_PRICE_0(prob);
+    unsigned b1 = a1 + GET_PRICE_1(prob);
+    size_t i = 0;
     for (; i < kLenNumLowSymbols && i < ls->table_size; ++i) {
         ls->prices[pos_state][i] = a0 + GetTreePrice(ls->low + (pos_state << kLenNumLowBits), kLenNumLowBits, i);
     }
@@ -548,7 +360,7 @@ static void LengthStates_SetPrices(RangeEncoder* rc, LengthStates* ls, size_t po
     ls->counters[pos_state] = (unsigned)(ls->table_size);
 }
 
-static void EncodeLength(FL2_lzmaEncoderCtx* enc, LengthStates* len_prob_table, unsigned len, size_t pos_state)
+static void EncodeLength(LZMA2_ECtx* enc, LengthStates* len_prob_table, unsigned len, size_t pos_state)
 {
     len -= kMatchLenMin;
     if (len < kLenNumLowSymbols) {
@@ -571,7 +383,7 @@ static void EncodeLength(FL2_lzmaEncoderCtx* enc, LengthStates* len_prob_table, 
     }
 }
 
-static void EncodeRepMatch(FL2_lzmaEncoderCtx* enc, unsigned len, unsigned rep, size_t pos_state)
+static void EncodeRepMatch(LZMA2_ECtx* enc, unsigned len, unsigned rep, size_t pos_state)
 {
     DEBUGLOG(7, "EncodeRepMatch : length %u, rep %u", len, rep);
     EncodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
@@ -639,7 +451,7 @@ static size_t GetDistSlot(U32 distance)
 
 /* **************************************** */
 
-static void EncodeNormalMatch(FL2_lzmaEncoderCtx* enc, unsigned len, U32 dist, size_t pos_state)
+static void EncodeNormalMatch(LZMA2_ECtx* enc, unsigned len, U32 dist, size_t pos_state)
 {
     DEBUGLOG(7, "EncodeNormalMatch : length %u, dist %u", len, dist);
     EncodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
@@ -647,20 +459,19 @@ static void EncodeNormalMatch(FL2_lzmaEncoderCtx* enc, unsigned len, U32 dist, s
     enc->states.state = MatchNextState(enc->states.state);
     EncodeLength(enc, &enc->states.len_states, len, pos_state);
 
-    {   size_t dist_slot = GetDistSlot(dist);
-        EncodeBitTree(&enc->rc, enc->states.dist_slot_encoders[GetLenToDistState(len)], kNumPosSlotBits, (unsigned)(dist_slot));
-        if (dist_slot >= kStartPosModelIndex) {
-            unsigned footerBits = ((unsigned)(dist_slot >> 1) - 1);
-            size_t base = ((2 | (dist_slot & 1)) << footerBits);
-            unsigned posReduced = (unsigned)(dist - base);
-            if (dist_slot < kEndPosModelIndex) {
-                EncodeBitTreeReverse(&enc->rc, enc->states.dist_encoders + base - dist_slot - 1, footerBits, posReduced);
-            }
-            else {
-                EncodeDirect(&enc->rc, posReduced >> kNumAlignBits, footerBits - kNumAlignBits);
-                EncodeBitTreeReverse(&enc->rc, enc->states.dist_align_encoders, kNumAlignBits, posReduced & kAlignMask);
-                ++enc->align_price_count;
-            }
+    size_t dist_slot = GetDistSlot(dist);
+    EncodeBitTree(&enc->rc, enc->states.dist_slot_encoders[GetLenToDistState(len)], kNumPosSlotBits, (unsigned)(dist_slot));
+    if (dist_slot >= kStartPosModelIndex) {
+        unsigned footerBits = ((unsigned)(dist_slot >> 1) - 1);
+        size_t base = ((2 | (dist_slot & 1)) << footerBits);
+        unsigned posReduced = (unsigned)(dist - base);
+        if (dist_slot < kEndPosModelIndex) {
+            EncodeBitTreeReverse(&enc->rc, enc->states.dist_encoders + base - dist_slot - 1, footerBits, posReduced);
+        }
+        else {
+            EncodeDirect(&enc->rc, posReduced >> kNumAlignBits, footerBits - kNumAlignBits);
+            EncodeBitTreeReverse(&enc->rc, enc->states.dist_align_encoders, kNumAlignBits, posReduced & kAlignMask);
+            ++enc->align_price_count;
         }
     }
     enc->states.reps[3] = enc->states.reps[2];
@@ -675,7 +486,7 @@ static void EncodeNormalMatch(FL2_lzmaEncoderCtx* enc, unsigned len, U32 dist, s
 #endif
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeChunkFast(FL2_lzmaEncoderCtx* enc,
+size_t EncodeChunkFast(LZMA2_ECtx* enc,
     FL2_dataBlock const block,
     FL2_matchTable* tbl,
     int structTbl,
@@ -692,7 +503,7 @@ size_t EncodeChunkFast(FL2_lzmaEncoderCtx* enc,
         /* Table of distance restrictions for short matches */
         static const U32 max_dist_table[] = { 0, 0, 0, 1 << 6, 1 << 14 };
         /* Get a match from the table, extended to its full length */
-        Match bestMatch = FL2_radixGetMatch(block, tbl, search_depth, structTbl, index);
+        RMF_match bestMatch = RMF_getMatch(block, tbl, search_depth, structTbl, index);
         if (bestMatch.length < kMatchLenMin) {
             ++index;
             continue;
@@ -707,32 +518,31 @@ size_t EncodeChunkFast(FL2_lzmaEncoderCtx* enc,
         max_len = MIN(kMatchLenMax, block.end - index);
         data = block.data + index;
 
-        {   Match bestRep;
-            Match repMatch;
-            bestRep.length = 0;
-            for (repMatch.dist = 0; repMatch.dist < kNumReps; ++repMatch.dist) {
-                const BYTE *data_2 = data - enc->states.reps[repMatch.dist] - 1;
-                if (MEM_read16(data) != MEM_read16(data_2)) {
-                    continue;
-                }
-                repMatch.length = (U32)(ZSTD_count(data + 2, data_2 + 2, data + max_len) + 2);
-                if (repMatch.length >= max_len) {
-                    bestMatch = repMatch;
-                    goto _encode;
-                }
-                if (repMatch.length > bestRep.length) {
-                    bestRep = repMatch;
-                }
+        RMF_match bestRep;
+        RMF_match repMatch;
+        bestRep.length = 0;
+        for (repMatch.dist = 0; repMatch.dist < kNumReps; ++repMatch.dist) {
+            const BYTE *data_2 = data - enc->states.reps[repMatch.dist] - 1;
+            if (MEM_read16(data) != MEM_read16(data_2)) {
+                continue;
             }
-            if (bestMatch.length >= max_len)
+            repMatch.length = (U32)(ZSTD_count(data + 2, data_2 + 2, data + max_len) + 2);
+            if (repMatch.length >= max_len) {
+                bestMatch = repMatch;
                 goto _encode;
-            if (bestRep.length >= 2) {
-                int const gain2 = (int)(bestRep.length * 3 - bestRep.dist);
-                int const gain1 = (int)(bestMatch.length * 3 - ZSTD_highbit32(bestMatch.dist + 1) + 1);
-                if (gain2 > gain1) {
-                    DEBUGLOG(7, "Replace match (%u, %u) with rep (%u, %u)", bestMatch.length, bestMatch.dist, bestRep.length, bestRep.dist);
-                    bestMatch = bestRep;
-                }
+            }
+            if (repMatch.length > bestRep.length) {
+                bestRep = repMatch;
+            }
+        }
+        if (bestMatch.length >= max_len)
+            goto _encode;
+        if (bestRep.length >= 2) {
+            int const gain2 = (int)(bestRep.length * 3 - bestRep.dist);
+            int const gain1 = (int)(bestMatch.length * 3 - ZSTD_highbit32(bestMatch.dist + 1) + 1);
+            if (gain2 > gain1) {
+                DEBUGLOG(7, "Replace match (%u, %u) with rep (%u, %u)", bestMatch.length, bestMatch.dist, bestRep.length, bestRep.dist);
+                bestMatch = bestRep;
             }
         }
 
@@ -743,10 +553,8 @@ size_t EncodeChunkFast(FL2_lzmaEncoderCtx* enc,
 
         for (size_t next = index + 1; bestMatch.length < kMatchLenMax && next < uncompressed_end; ++next) {
             /* lazy matching scheme from ZSTD */
-            Match next_match = FL2_radixGetNextMatch(block, tbl, search_depth, structTbl, next);
+            RMF_match next_match = RMF_getNextMatch(block, tbl, search_depth, structTbl, next);
             if (next_match.length >= kMatchLenMin) {
-                Match bestRep;
-                Match repMatch;
                 bestRep.length = 0;
                 data = block.data + next;
                 max_len = MIN(kMatchLenMax, block.end - next);
@@ -782,10 +590,8 @@ size_t EncodeChunkFast(FL2_lzmaEncoderCtx* enc,
                 }
             }
             if (next < uncompressed_end - 4) {
-                Match bestRep;
-                Match repMatch;
                 ++next;
-                next_match = FL2_radixGetNextMatch(block, tbl, search_depth, structTbl, next);
+                next_match = RMF_getNextMatch(block, tbl, search_depth, structTbl, next);
                 if (next_match.length < 4)
                     break;
                 data = block.data + next;
@@ -894,7 +700,7 @@ static void ReverseOptimalChain(OptimalNode* opt_buf, size_t cur)
     } while (cur != 0);
 }
 
-static unsigned GetLiteralPrice(FL2_lzmaEncoderCtx* enc, size_t index, size_t state, unsigned prev_symbol, U32 symbol, unsigned match_byte)
+static unsigned GetLiteralPrice(LZMA2_ECtx* enc, size_t index, size_t state, unsigned prev_symbol, U32 symbol, unsigned match_byte)
 {
     const Probability* prob_table = GetLiteralProbs(enc, index, prev_symbol);
     if (IsCharState(state)) {
@@ -909,14 +715,14 @@ static unsigned GetLiteralPrice(FL2_lzmaEncoderCtx* enc, size_t index, size_t st
     return GetLiteralPriceMatched(prob_table, symbol, match_byte);
 }
 
-static void HashReset(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
+static void HashReset(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
 {
     enc->hash_dict_3 = (ptrdiff_t)1 << dictionary_bits_3;
     enc->chain_mask_3 = enc->hash_dict_3 - 1;
     memset(enc->hash_buf->table_3, 0xFF, sizeof(enc->hash_buf->table_3));
 }
 
-static int HashCreate(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
+static int HashCreate(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
 {
     DEBUGLOG(3, "Create hash chain : dict bits %u", dictionary_bits_3);
     if (enc->hash_buf) {
@@ -931,7 +737,7 @@ static int HashCreate(FL2_lzmaEncoderCtx* enc, unsigned dictionary_bits_3)
 }
 
 /* Create a hash chain for hybrid mode */
-int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* options)
+int LZMA2_hashAlloc(LZMA2_ECtx* enc, const FL2_lzma2Parameters* options)
 {
     if (enc->strategy == FL2_ultra && enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {
         return HashCreate(enc, options->second_dict_bits);
@@ -942,17 +748,15 @@ int FL2_lzma2HashAlloc(FL2_lzmaEncoderCtx* enc, const FL2_lzma2Parameters* optio
 #define GET_HASH_3(data) ((((MEM_readLE32(data)) << 8) * 506832829U) >> (32 - kHash3Bits))
 
 HINT_INLINE
-size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
+size_t HashGetMatches(LZMA2_ECtx* enc, const FL2_dataBlock block,
     ptrdiff_t index,
     size_t length_limit,
-    Match match)
+    RMF_match match)
 {
     ptrdiff_t const hash_dict_3 = enc->hash_dict_3;
     const BYTE* data = block.data;
     HashChains* tbl = enc->hash_buf;
     ptrdiff_t const chain_mask_3 = enc->chain_mask_3;
-    size_t max_len;
-    ptrdiff_t first_3;
 
     enc->match_count = 0;
     enc->hash_prev_index = MAX(enc->hash_prev_index, index - hash_dict_3);
@@ -963,12 +767,13 @@ size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
         tbl->table_3[hash] = (S32)enc->hash_prev_index;
     }
     data += index;
-    max_len = 2;
 
-    {   size_t hash = GET_HASH_3(data);
-        first_3 = tbl->table_3[hash];
-        tbl->table_3[hash] = (S32)(index);
-    }
+    size_t hash = GET_HASH_3(data);
+    ptrdiff_t first_3 = tbl->table_3[hash];
+    tbl->table_3[hash] = (S32)(index);
+
+    size_t max_len = 2;
+
     if (first_3 >= 0) {
         int cycles = enc->match_cycles;
         ptrdiff_t end_index = index - (((ptrdiff_t)match.dist < hash_dict_3) ? match.dist : hash_dict_3);
@@ -1015,8 +820,8 @@ size_t HashGetMatches(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
 * If is_hybrid != 0, this method works in hybrid mode, using the
 * hash chain to find shorter matches at near distances. */
 FORCE_INLINE_TEMPLATE
-size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
-    Match match,
+size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
+    RMF_match match,
     size_t const index,
     size_t const cur,
     size_t len_end,
@@ -1031,11 +836,8 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
     const BYTE* data = block.data + index;
     size_t const fast_length = enc->fast_length;
     size_t bytes_avail;
-    size_t max_length;
-    size_t start_len;
     U32 match_price;
     U32 rep_match_price;
-    Probability is_rep_prob;
 
     if (cur_opt->is_combination) {
         --prev_index;
@@ -1097,7 +899,7 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
     }
     cur_opt->state = state;
     memcpy(cur_opt->reps, reps, sizeof(cur_opt->reps));
-    is_rep_prob = enc->states.is_rep[state];
+    Probability is_rep_prob = enc->states.is_rep[state];
 
     {   Probability is_match_prob = enc->states.is_match[state][pos_state];
         unsigned cur_byte = *data;
@@ -1154,8 +956,8 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
         }
     }
 
-    max_length = MIN(bytes_avail, fast_length);
-    start_len = 2;
+    size_t max_length = MIN(bytes_avail, fast_length);
+    size_t start_len = 2;
     if (match.length > 0) {
         size_t len_test;
         size_t len;
@@ -1348,8 +1150,8 @@ size_t OptimalParse(FL2_lzmaEncoderCtx* const enc, const FL2_dataBlock block,
 }
 
 HINT_INLINE
-void InitMatchesPos0(FL2_lzmaEncoderCtx* enc,
-    Match match,
+void InitMatchesPos0(LZMA2_ECtx* enc,
+    RMF_match match,
     size_t pos_state,
     size_t len,
     unsigned normal_match_price)
@@ -1379,8 +1181,8 @@ void InitMatchesPos0(FL2_lzmaEncoderCtx* enc,
     }
 }
 
-static size_t InitMatchesPos0Best(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
-    Match match,
+static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
+    RMF_match match,
     size_t index,
     size_t len,
     unsigned normal_match_price)
@@ -1445,8 +1247,8 @@ static size_t InitMatchesPos0Best(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock b
 * This function must not be called at a position where no match is
 * available. */
 FORCE_INLINE_TEMPLATE
-size_t InitOptimizerPos0(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
-    Match match,
+size_t InitOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
+    RMF_match match,
     size_t index,
     int const is_hybrid,
     U32* reps)
@@ -1546,13 +1348,13 @@ size_t InitOptimizerPos0(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
 }
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeOptimumSequence(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
+size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
     FL2_matchTable* tbl,
     int const structTbl,
     int const is_hybrid,
     size_t start_index,
     size_t uncompressed_end,
-    Match match)
+    RMF_match match)
 {
     size_t len_end = enc->len_end_max;
     unsigned search_depth = tbl->params.depth;
@@ -1585,7 +1387,7 @@ size_t EncodeOptimumSequence(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
             for (; cur < (len_end - cur / (kOptimizerBufferSize / 2U)); ++cur, ++index) {
                 if (enc->opt_buf[cur + 1].price < enc->opt_buf[cur].price)
                     continue;
-                match = FL2_radixGetMatch(block, tbl, search_depth, structTbl, index);
+                match = RMF_getMatch(block, tbl, search_depth, structTbl, index);
                 if (match.length >= enc->fast_length) {
                     break;
                 }
@@ -1613,7 +1415,7 @@ size_t EncodeOptimumSequence(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
                 U32 dist = enc->opt_buf[i].prev_dist;
                 /* The last match will be truncated to fit in the optimal buffer so get the full length */
                 if (i + len >= kOptimizerBufferSize - 1 && dist >= kNumReps) {
-                    Match lastmatch = FL2_radixGetMatch(block, tbl, search_depth, tbl->isStruct, match_index);
+                    RMF_match lastmatch = RMF_getMatch(block, tbl, search_depth, tbl->isStruct, match_index);
                     if (lastmatch.length > len) {
                         len = lastmatch.length;
                         dist = lastmatch.dist + kNumReps;
@@ -1636,14 +1438,14 @@ size_t EncodeOptimumSequence(FL2_lzmaEncoderCtx* enc, const FL2_dataBlock block,
     return start_index;
 }
 
-static void UpdateLengthPrices(FL2_lzmaEncoderCtx* enc, LengthStates* len_states)
+static void UpdateLengthPrices(LZMA2_ECtx* enc, LengthStates* len_states)
 {
     for (size_t pos_state = 0; pos_state <= enc->pos_mask; ++pos_state) {
         LengthStates_SetPrices(&enc->rc, len_states, pos_state);
     }
 }
 
-static void FillAlignPrices(FL2_lzmaEncoderCtx* enc)
+static void FillAlignPrices(LZMA2_ECtx* enc)
 {
     for (size_t i = 0; i < kAlignTableSize; ++i) {
         enc->align_prices[i] = GetReverseTreePrice(enc->states.dist_align_encoders, kNumAlignBits, i);
@@ -1651,7 +1453,7 @@ static void FillAlignPrices(FL2_lzmaEncoderCtx* enc)
     enc->align_price_count = 0;
 }
 
-static void FillDistancesPrices(FL2_lzmaEncoderCtx* enc)
+static void FillDistancesPrices(LZMA2_ECtx* enc)
 {
     static const size_t kLastLenToPosState = kNumLenToPosStates - 1;
     for (size_t i = kStartPosModelIndex; i < kNumFullDistances; ++i) {
@@ -1683,7 +1485,7 @@ static void FillDistancesPrices(FL2_lzmaEncoderCtx* enc)
 }
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeChunkBest(FL2_lzmaEncoderCtx* enc,
+size_t EncodeChunkBest(LZMA2_ECtx* enc,
     FL2_dataBlock const block,
     FL2_matchTable* tbl,
     int const structTbl,
@@ -1697,7 +1499,7 @@ size_t EncodeChunkBest(FL2_lzmaEncoderCtx* enc,
     UpdateLengthPrices(enc, &enc->states.rep_len_states);
     while (index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size)
     {
-        Match match = FL2_radixGetMatch(block, tbl, search_depth, structTbl, index);
+        RMF_match match = RMF_getMatch(block, tbl, search_depth, structTbl, index);
         if (match.length > 1) {
             if (enc->strategy != FL2_ultra) {
                 index = EncodeOptimumSequence(enc, block, tbl, structTbl, 0, index, uncompressed_end, match);
@@ -1777,7 +1579,7 @@ static void EncoderStates_Reset(EncoderStates* es, unsigned lc, unsigned lp, uns
     }
 }
 
-BYTE FL2_getDictSizeProp(size_t dictionary_size)
+BYTE LZMA2_getDictSizeProp(size_t dictionary_size)
 {
     BYTE dict_size_prop = 0;
     for (BYTE bit = 11; bit < 32; ++bit) {
@@ -1793,28 +1595,28 @@ BYTE FL2_getDictSizeProp(size_t dictionary_size)
     return dict_size_prop;
 }
 
-size_t FL2_lzma2MemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count)
+size_t LZMA2_encMemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count)
 {
-    size_t size = sizeof(FL2_lzmaEncoderCtx);
+    size_t size = sizeof(LZMA2_ECtx);
     if(strategy == FL2_ultra)
         size += sizeof(HashChains) + (sizeof(U32) << chain_log) - sizeof(U32);
     return size * thread_count;
 }
 
-static void Reset(FL2_lzmaEncoderCtx* enc, size_t max_distance)
+static void Reset(LZMA2_ECtx* enc, size_t max_distance)
 {
     DEBUGLOG(5, "LZMA encoder reset : max_distance %u", (unsigned)max_distance);
-    U32 i = 0;
     RangeEncReset(&enc->rc);
     EncoderStates_Reset(&enc->states, enc->lc, enc->lp, enc->fast_length);
     enc->pos_mask = (1 << enc->pb) - 1;
     enc->lit_pos_mask = (1 << enc->lp) - 1;
+    U32 i = 0;
     for (; max_distance > (size_t)1 << i; ++i) {
     }
     enc->dist_price_table_size = i * 2;
 }
 
-static BYTE GetLcLpPbCode(FL2_lzmaEncoderCtx* enc)
+static BYTE GetLcLpPbCode(LZMA2_ECtx* enc)
 {
     return (BYTE)((enc->pb * 5 + enc->lp) * 9 + enc->lc);
 }
@@ -1884,21 +1686,20 @@ static BYTE IsChunkRandom(const FL2_matchTable* const tbl,
 			}
 		}
 
-		{	U32 char_count[256];
-			double char_total = 0.0;
-			/* Expected normal character count */
-			double const avg = (double)chunk_size / 256.0;
+        U32 char_count[256];
+        double char_total = 0.0;
+        /* Expected normal character count */
+        double const avg = (double)chunk_size / 256.0;
 
-			memset(char_count, 0, sizeof(char_count));
-			for (size_t index = start; index < end; ++index)
-				++char_count[block.data[index]];
-			/* Sum the deviations */
-			for (size_t i = 0; i < 256; ++i) {
-				double delta = (double)char_count[i] - avg;
-				char_total += delta * delta;
-			}
-			return sqrt(char_total) / sqrt((double)chunk_size) <= dev_table[strategy];
-		}
+        memset(char_count, 0, sizeof(char_count));
+        for (size_t index = start; index < end; ++index)
+            ++char_count[block.data[index]];
+        /* Sum the deviations */
+        for (size_t i = 0; i < 256; ++i) {
+            double delta = (double)char_count[i] - avg;
+            char_total += delta * delta;
+        }
+        return sqrt(char_total) / sqrt((double)chunk_size) <= dev_table[strategy];
 	}
 	return 0;
 }
@@ -1909,7 +1710,7 @@ static BYTE IsChunkRandom(const FL2_matchTable* const tbl,
 __pragma(warning(disable:4701))
 #endif
 
-static size_t EncodeChunk(FL2_lzmaEncoderCtx* enc,
+static size_t EncodeChunk(LZMA2_ECtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     size_t index, size_t end)
@@ -1936,7 +1737,7 @@ static size_t EncodeChunk(FL2_lzmaEncoderCtx* enc,
     }
 
 }
-size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
+size_t LZMA2_encode(LZMA2_ECtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     const FL2_lzma2Parameters* options,
@@ -1983,8 +1784,6 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         size_t header_size = (stream_prop >= 0) + (encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize);
         EncoderStates saved_states;
         size_t next_index;
-        size_t compressed_size;
-        size_t uncompressed_size;
         RangeEncReset(&enc->rc);
         SetOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
         if (!next_is_random) {
@@ -2015,8 +1814,8 @@ size_t FL2_lzma2Encode(FL2_lzmaEncoderCtx* enc,
         else {
             next_index = MIN(index + kChunkSize, block.end);
         }
-        compressed_size = enc->rc.out_index;
-        uncompressed_size = next_index - index;
+        size_t compressed_size = enc->rc.out_index;
+        size_t uncompressed_size = next_index - index;
         if (compressed_size > kMaxChunkCompressedSize)
             return FL2_ERROR(internal);
         BYTE* header = out_dest;

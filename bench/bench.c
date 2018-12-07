@@ -242,7 +242,7 @@ int FL2LIB_CALL main(int argc, char** argv)
     if (fcs == NULL)
         return 1;
     int end_level = parse_params(fcs, argc, argv);
-    int level = (int)FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, 0);
+    int level = (int)FL2_CCtx_getParameter(fcs, FL2_p_compressionLevel);
     size_t maxCompressedSize = FL2_compressBound(size);
     char* compressedBuffer = malloc(maxCompressedSize);
     char* resultBuffer = malloc(size);

@@ -484,8 +484,14 @@ typedef enum {
  *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value);
 
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParameter param);
+
 static size_t FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value) {
     return FL2_CCtx_setParameter(fcs, param, value);
+}
+
+static size_t FL2_CStream_getParameter(FL2_CStream* fcs, FL2_cParameter param) {
+    return FL2_CCtx_getParameter(fcs, param);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters *params);

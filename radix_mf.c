@@ -43,13 +43,12 @@ static RMF_builder* RMF_createBuilder(size_t match_buffer_size)
     match_buffer_size = MIN(match_buffer_size, MAX_MATCH_BUFFER_SIZE);
     match_buffer_size = MAX(match_buffer_size, MIN_MATCH_BUFFER_SIZE);
 
-    {   RMF_builder* const builder = (RMF_builder*)malloc(
-            sizeof(RMF_builder) + (match_buffer_size - 1) * sizeof(RMF_buildMatch));
-        builder->match_buffer_size = match_buffer_size;
-        builder->match_buffer_limit = match_buffer_size;
-        RMF_initTailTable(builder);
-        return builder;
-    }
+    RMF_builder* const builder = (RMF_builder*)malloc(
+        sizeof(RMF_builder) + (match_buffer_size - 1) * sizeof(RMF_buildMatch));
+    builder->match_buffer_size = match_buffer_size;
+    builder->match_buffer_limit = match_buffer_size;
+    RMF_initTailTable(builder);
+    return builder;
 }
 
 static void RMF_freeBuilderTable(RMF_builder** const builders, unsigned const size)
@@ -92,9 +91,9 @@ static int RMF_isStructParam(const RMF_parameters* const params)
     return RMF_isStruct(params->dictionary_log, params->depth);
 }
 
-/** RMF_clampCParams() :
-*  make CParam values within valid range.
-*  @return : valid CParams */
+/** RMF_clampParams() :
+*  make param values within valid range.
+*  @return : valid RMF_parameters */
 static RMF_parameters RMF_clampParams(RMF_parameters params)
 {
 #   define CLAMP(val,min,max) {      \
@@ -106,6 +105,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
     CLAMP(params.overlap_fraction, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
     CLAMP(params.depth, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
     return params;
+#   undef CLAMP
 }
 
 static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_parameters* const params)
@@ -117,24 +117,23 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_
         || (params->dictionary_log == tbl->params.dictionary_log && isStruct > tbl->allocStruct))
         return FL2_ERROR(parameter_unsupported);
 
-    {   size_t const match_buffer_size = (size_t)1 << (params->dictionary_log - params->match_buffer_log);
-        tbl->params = *params;
-        tbl->params.dictionary_log = dictionary_log;
-        tbl->isStruct = isStruct;
-        if (tbl->builders == NULL
-            || match_buffer_size > tbl->builders[0]->match_buffer_size)
-        {
-            RMF_freeBuilderTable(tbl->builders, tbl->thread_count);
-            tbl->builders = RMF_createBuilderTable(tbl->table, match_buffer_size, tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH, tbl->thread_count);
-            if (tbl->builders == NULL) {
-                return FL2_ERROR(memory_allocation);
-            }
+    size_t const match_buffer_size = (size_t)1 << (params->dictionary_log - params->match_buffer_log);
+    tbl->params = *params;
+    tbl->params.dictionary_log = dictionary_log;
+    tbl->isStruct = isStruct;
+    if (tbl->builders == NULL
+        || match_buffer_size > tbl->builders[0]->match_buffer_size)
+    {
+        RMF_freeBuilderTable(tbl->builders, tbl->thread_count);
+        tbl->builders = RMF_createBuilderTable(tbl->table, match_buffer_size, tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH, tbl->thread_count);
+        if (tbl->builders == NULL) {
+            return FL2_ERROR(memory_allocation);
         }
-        else {
-            for (unsigned i = 0; i < tbl->thread_count; ++i) {
-                tbl->builders[i]->match_buffer_limit = match_buffer_size;
-                tbl->builders[i]->max_len = tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH;
-            }
+    }
+    else {
+        for (unsigned i = 0; i < tbl->thread_count; ++i) {
+            tbl->builders[i]->match_buffer_limit = match_buffer_size;
+            tbl->builders[i]->max_len = tbl->isStruct ? STRUCTURED_MAX_LENGTH : BITPACK_MAX_LENGTH;
         }
     }
     return 0;
@@ -151,21 +150,17 @@ static void RMF_reduceDict(RMF_parameters* const params, size_t const dict_reduc
 
 FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const dict_reduce, unsigned const thread_count)
 {
-    int isStruct;
-    size_t dictionary_size;
-	size_t table_bytes;
-    FL2_matchTable* tbl;
     RMF_parameters params = RMF_clampParams(*p);
-
     RMF_reduceDict(&params, dict_reduce);
-    isStruct = RMF_isStructParam(&params);
-    dictionary_size = (size_t)1 << params.dictionary_log;
+
+    int isStruct = RMF_isStructParam(&params);
+    size_t dictionary_size = (size_t)1 << params.dictionary_log;
 
     DEBUGLOG(3, "RMF_createMatchTable : isStruct %d, dict %u", isStruct, (U32)dictionary_size);
 
-	table_bytes = isStruct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
+    size_t table_bytes = isStruct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
 		: dictionary_size * sizeof(U32);
-    tbl = (FL2_matchTable*)malloc(
+    FL2_matchTable* tbl = (FL2_matchTable*)malloc(
         sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
     if (!tbl) return NULL;
 
@@ -378,11 +373,6 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
         tbl->stack[j].count = (U32)tbl->tails_8[tbl->stack[j].count].list_count;
     }
     while (st_index > stack_base) {
-        const BYTE* data_src;
-        size_t link;
-        size_t slot;
-        U32 test;
-
         /* Pop an item off the stack */
         --st_index;
         list_count = tbl->stack[st_index].count;
@@ -391,7 +381,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             continue;
         }
         index = tbl->stack[st_index].head;
-        link = tbl->match_buffer[index].from;
+        size_t link = tbl->match_buffer[index].from;
         if (link < block_start) {
             /* Chain starts in the overlap region which is already encoded */
             continue;
@@ -404,7 +394,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             continue;
         }
         depth = tbl->match_buffer[index].next >> 24;
-        slot = (depth - base_depth) & 3;
+        size_t slot = (depth - base_depth) & 3;
         if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE) {
             /* Quicker to use brute force, each string compared with all previous strings */
             BruteForceBuffered(tbl,
@@ -418,10 +408,10 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             continue;
         }
         /* check for repeats at depth 4,8,16,32 etc */
-        test = max_depth != 6 && ((depth & 3) == 0) && ((REPEAT_CHECK_TABLE >> ((depth >> 2) & 31)) & 1) && (max_depth >= depth + (depth >> 1));
+        U32 test = max_depth != 6 && ((depth & 3) == 0) && ((REPEAT_CHECK_TABLE >> ((depth >> 2) & 31)) & 1) && (max_depth >= depth + (depth >> 1));
         ++depth;
         /* Update the offset data buffer pointer */
-        data_src = data_block + depth;
+        const BYTE* data_src = data_block + depth;
         /* Last pass is done separately */
         if (!test && depth < max_depth) {
             size_t const prev_st_index = st_index;

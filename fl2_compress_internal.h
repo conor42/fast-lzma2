@@ -48,7 +48,7 @@ typedef struct {
 
 typedef struct {
     FL2_CCtx* cctx;
-    FL2_lzmaEncoderCtx* enc;
+    LZMA2_ECtx* enc;
     FL2_dataBlock block;
     size_t cSize;
 } FL2_job;

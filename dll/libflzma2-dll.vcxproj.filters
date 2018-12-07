@@ -131,6 +131,9 @@
     <ClInclude Include="..\dict_buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\radix_get.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="..\LzmaDecOpt.asm">

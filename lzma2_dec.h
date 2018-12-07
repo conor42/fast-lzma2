@@ -13,7 +13,7 @@ extern "C" {
 
 /* #define LZMA_DEC_PROB16 */
 /* 32-bit probs can increase the speed on some CPUs,
-   but memory usage for CLzma2Dec::probs will be doubled in that case */
+   but memory usage for LZMA2_DCtx::probs will be doubled in that case */
 
 #ifdef LZMA_DEC_PROB16
 #define Probability U16
@@ -24,14 +24,14 @@ extern "C" {
 
 /* ---------- LZMA Properties ---------- */
 
-typedef struct CLzmaProps_s
+typedef struct
 {
 	BYTE lc;
 	BYTE lp;
 	BYTE pb;
 	BYTE pad_;
 	U32 dicSize;
-} CLzmaProps;
+} LZMA2_props;
 
 /* LzmaProps_Decode - decodes properties
 Returns:
@@ -132,7 +132,7 @@ Returns:
 
 typedef struct
 {
-    CLzmaProps prop;
+    LZMA2_props prop;
     BYTE *dic;
 	size_t dicPos;
 	size_t dicBufSize;
@@ -157,18 +157,9 @@ typedef struct
 	BYTE extDic;
 	BYTE pad_;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
-} CLzma2Dec;
+} LZMA2_DCtx;
 
-typedef struct
-{
-    U32 packSize;
-    U32 unpackSize;
-    CLzmaProps prop;
-} ChunkInfo;
-
-void LzmaDec_Construct(CLzma2Dec *p);
-
-void FLzmaDec_Init(CLzma2Dec *p);
+void LZMA_constructDCtx(LZMA2_DCtx *p);
 
 typedef enum
 {
@@ -203,63 +194,47 @@ typedef enum
 /* ELzmaStatus is used only as output value for function call */
 
 
-void FLzmaDec_Free(CLzma2Dec *state);
+void LZMA_destructDCtx(LZMA2_DCtx *state);
 
-size_t FLzma2Dec_DictSizeFromProp(BYTE dictProp);
-
-size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
-
-
-size_t FLzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_getDictSizeFromProp(BYTE dictProp);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
+size_t LZMA2_getUnpackSize(const BYTE *src, size_t srcLen);
 
-size_t FLzma2Dec_MemUsage(size_t dictSize);
+size_t LZMA2_decMemoryUsage(size_t dictSize);
 
-size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
+size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
 
-size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
+size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen,
     const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
 
-typedef struct InBufNode_s InBufNode;
+typedef struct LZMA2_mtInbuf_s LZMA2_mtInbuf;
 
-struct InBufNode_s
+struct LZMA2_mtInbuf_s
 {
-    InBufNode *next;
+    LZMA2_mtInbuf *next;
     size_t length;
     BYTE inBuf[1];
 };
 
-typedef struct
-{
-    InBufNode *first;
-    InBufNode *last;
-    size_t startPos;
-    size_t endPos;
-    size_t unpackSize;
-} InputBlock;
-
-enum ParseResult
+typedef enum
 {
     CHUNK_MORE_DATA,
     CHUNK_CONTINUE,
     CHUNK_DICT_RESET,
     CHUNK_FINAL,
     CHUNK_ERROR
-};
+} LZMA2_parseRes;
 
 typedef struct
 {
     size_t packSize;
     size_t unpackSize;
-} ChunkParseInfo;
+} LZMA2_chunk;
 
 #if defined(FL2_DEBUG) && (FL2_DEBUG>=1)
 #  define LZMA2_MT_INPUT_SIZE 0x400
@@ -267,10 +242,10 @@ typedef struct
 #  define LZMA2_MT_INPUT_SIZE 0x40000
 #endif
 
-InBufNode *FLzma2Dec_CreateInbufNode(InBufNode *prev);
-void FLzma2Dec_FreeInbufNodeChain(InBufNode *node, InBufNode *keep);
+LZMA2_mtInbuf *LZMA2_createInbufNode(LZMA2_mtInbuf *prev);
+void LZMA2_FreeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep);
 
-int FLzma2Dec_ParseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, ChunkParseInfo *inf);
+LZMA2_parseRes LZMA2_parseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, LZMA2_chunk *inf);
 
 #if defined (__cplusplus)
 }

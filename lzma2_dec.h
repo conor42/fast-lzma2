@@ -243,7 +243,7 @@ typedef struct
 #endif
 
 LZMA2_mtInbuf *LZMA2_createInbufNode(LZMA2_mtInbuf *prev);
-void LZMA2_FreeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep);
+void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep);
 
 LZMA2_parseRes LZMA2_parseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, LZMA2_chunk *inf);
 

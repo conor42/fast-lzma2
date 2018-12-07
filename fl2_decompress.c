@@ -420,7 +420,7 @@ static void FL2_Lzma2DecMt_Free(Lzma2DecMt *decmt)
 {
     if (decmt) {
         FL2_FreeOutputBuffers(decmt);
-        LZMA2_FreeInbufNodeChain(decmt->head, NULL);
+        LZMA2_freeInbufNodeChain(decmt->head, NULL);
         FL2POOL_free(decmt->factory);
         free(decmt);
     }
@@ -432,7 +432,7 @@ static void FL2_Lzma2DecMt_Init(Lzma2DecMt *decmt)
         decmt->isFinal = 0;
         decmt->hashPos = 0;
         FL2_FreeOutputBuffers(decmt);
-        LZMA2_FreeInbufNodeChain(decmt->head->next, NULL);
+        LZMA2_freeInbufNodeChain(decmt->head->next, NULL);
         decmt->head->length = 0;
         decmt->threads[0].inBlock.first = decmt->head;
         decmt->threads[0].inBlock.last = decmt->head;
@@ -576,7 +576,7 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* fds)
 
     if (decmt->numThreads > 0) {
         LZMA2_mtInbuf *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
-        LZMA2_FreeInbufNodeChain(decmt->head, keep);
+        LZMA2_freeInbufNodeChain(decmt->head, keep);
         decmt->head = keep;
         decmt->threads[0].inBlock.first = keep;
         decmt->threads[0].inBlock.last = keep;

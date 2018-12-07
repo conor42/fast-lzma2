@@ -241,14 +241,14 @@ void LZMA2_freeECtx(LZMA2_ECtx* enc)
 #define IsCharState(state) ((state) < 7)
 
 HINT_INLINE
-unsigned GetRepLen1Price(LZMA2_ECtx* enc, size_t state, size_t pos_state)
+unsigned LZMA_getRepLen1Price(LZMA2_ECtx* enc, size_t state, size_t pos_state)
 {
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
     unsigned rep0_long_prob = enc->states.is_rep0_long[state][pos_state];
     return GET_PRICE_0(rep_G0_prob) + GET_PRICE_0(rep0_long_prob);
 }
 
-static unsigned GetRepPrice(LZMA2_ECtx* enc, size_t rep_index, size_t state, size_t pos_state)
+static unsigned LZMA_getRepPrice(LZMA2_ECtx* enc, size_t rep_index, size_t state, size_t pos_state)
 {
     unsigned price;
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
@@ -272,7 +272,7 @@ static unsigned GetRepPrice(LZMA2_ECtx* enc, size_t rep_index, size_t state, siz
     return price;
 }
 
-static unsigned GetRepMatch0Price(LZMA2_ECtx* enc, size_t len, size_t state, size_t pos_state)
+static unsigned LZMA_getRepMatch0Price(LZMA2_ECtx* enc, size_t len, size_t state, size_t pos_state)
 {
     unsigned rep_G0_prob = enc->states.is_rep_G0[state];
     unsigned rep0_long_prob = enc->states.is_rep0_long[state][pos_state];
@@ -281,7 +281,7 @@ static unsigned GetRepMatch0Price(LZMA2_ECtx* enc, size_t len, size_t state, siz
         + GET_PRICE_1(rep0_long_prob);
 }
 
-static unsigned GetLiteralPriceMatched(const Probability *prob_table, U32 symbol, unsigned match_byte)
+static unsigned LZMA_getLiteralPriceMatched(const Probability *prob_table, U32 symbol, unsigned match_byte)
 {
     unsigned price = 0;
     unsigned offs = 0x100;
@@ -295,22 +295,22 @@ static unsigned GetLiteralPriceMatched(const Probability *prob_table, U32 symbol
     return price;
 }
 
-static void EncodeLiteral(LZMA2_ECtx* enc, size_t index, U32 symbol, unsigned prev_symbol)
+static void LZMA_encodeLiteral(LZMA2_ECtx* enc, size_t index, U32 symbol, unsigned prev_symbol)
 {
-    EncodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
+    RC_encodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
     enc->states.state = LiteralNextState(enc->states.state);
 
     Probability* prob_table = GetLiteralProbs(enc, index, prev_symbol);
     symbol |= 0x100;
     do {
-        EncodeBit(&enc->rc, prob_table + (symbol >> 8), symbol & (1 << 7));
+        RC_encodeBit(&enc->rc, prob_table + (symbol >> 8), symbol & (1 << 7));
         symbol <<= 1;
     } while (symbol < 0x10000);
 }
 
-static void EncodeLiteralMatched(LZMA2_ECtx* enc, const BYTE* data_block, size_t index, U32 symbol)
+static void LZMA_encodeLiteralMatched(LZMA2_ECtx* enc, const BYTE* data_block, size_t index, U32 symbol)
 {
-    EncodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
+    RC_encodeBit0(&enc->rc, &enc->states.is_match[enc->states.state][index & enc->pos_mask]);
     enc->states.state = LiteralNextState(enc->states.state);
 
     unsigned match_symbol = data_block[index - enc->states.reps[0] - 1];
@@ -320,26 +320,26 @@ static void EncodeLiteralMatched(LZMA2_ECtx* enc, const BYTE* data_block, size_t
     do {
         match_symbol <<= 1;
         size_t prob_index = offset + (match_symbol & offset) + (symbol >> 8);
-        EncodeBit(&enc->rc, prob_table + prob_index, symbol & (1 << 7));
+        RC_encodeBit(&enc->rc, prob_table + prob_index, symbol & (1 << 7));
         symbol <<= 1;
         offset &= ~(match_symbol ^ symbol);
     } while (symbol < 0x10000);
 }
 
 HINT_INLINE
-void EncodeLiteralBuf(LZMA2_ECtx* enc, const BYTE* data_block, size_t index)
+void LZMA_encodeLiteralBuf(LZMA2_ECtx* enc, const BYTE* data_block, size_t index)
 {
     U32 symbol = data_block[index];
     if (IsCharState(enc->states.state)) {
         unsigned prev_symbol = data_block[index - 1];
-        EncodeLiteral(enc, index, symbol, prev_symbol);
+        LZMA_encodeLiteral(enc, index, symbol, prev_symbol);
     }
     else {
-        EncodeLiteralMatched(enc, data_block, index, symbol);
+        LZMA_encodeLiteralMatched(enc, data_block, index, symbol);
     }
 }
 
-static void LengthStates_SetPrices(RangeEncoder* rc, LengthStates* ls, size_t pos_state)
+static void LZMA_lengthStates_SetPrices(LengthStates* ls, size_t pos_state)
 {
     unsigned prob = ls->choice;
     unsigned a0 = GET_PRICE_0(prob);
@@ -349,58 +349,58 @@ static void LengthStates_SetPrices(RangeEncoder* rc, LengthStates* ls, size_t po
     unsigned b1 = a1 + GET_PRICE_1(prob);
     size_t i = 0;
     for (; i < kLenNumLowSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = a0 + GetTreePrice(ls->low + (pos_state << kLenNumLowBits), kLenNumLowBits, i);
+        ls->prices[pos_state][i] = a0 + RC_getTreePrice(ls->low + (pos_state << kLenNumLowBits), kLenNumLowBits, i);
     }
     for (; i < kLenNumLowSymbols + kLenNumMidSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = b0 + GetTreePrice(ls->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, i - kLenNumLowSymbols);
+        ls->prices[pos_state][i] = b0 + RC_getTreePrice(ls->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, i - kLenNumLowSymbols);
     }
     for (; i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = b1 + GetTreePrice(ls->high, kLenNumHighBits, i - kLenNumLowSymbols - kLenNumMidSymbols);
+        ls->prices[pos_state][i] = b1 + RC_getTreePrice(ls->high, kLenNumHighBits, i - kLenNumLowSymbols - kLenNumMidSymbols);
     }
     ls->counters[pos_state] = (unsigned)(ls->table_size);
 }
 
-static void EncodeLength(LZMA2_ECtx* enc, LengthStates* len_prob_table, unsigned len, size_t pos_state)
+static void LZMA_encodeLength(LZMA2_ECtx* enc, LengthStates* len_prob_table, unsigned len, size_t pos_state)
 {
     len -= kMatchLenMin;
     if (len < kLenNumLowSymbols) {
-        EncodeBit0(&enc->rc, &len_prob_table->choice);
-        EncodeBitTree(&enc->rc, len_prob_table->low + (pos_state << kLenNumLowBits), kLenNumLowBits, len);
+        RC_encodeBit0(&enc->rc, &len_prob_table->choice);
+        RC_encodeBitTree(&enc->rc, len_prob_table->low + (pos_state << kLenNumLowBits), kLenNumLowBits, len);
     }
     else {
-        EncodeBit1(&enc->rc, &len_prob_table->choice);
+        RC_encodeBit1(&enc->rc, &len_prob_table->choice);
         if (len < kLenNumLowSymbols + kLenNumMidSymbols) {
-            EncodeBit0(&enc->rc, &len_prob_table->choice_2);
-            EncodeBitTree(&enc->rc, len_prob_table->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, len - kLenNumLowSymbols);
+            RC_encodeBit0(&enc->rc, &len_prob_table->choice_2);
+            RC_encodeBitTree(&enc->rc, len_prob_table->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, len - kLenNumLowSymbols);
         }
         else {
-            EncodeBit1(&enc->rc, &len_prob_table->choice_2);
-            EncodeBitTree(&enc->rc, len_prob_table->high, kLenNumHighBits, len - kLenNumLowSymbols - kLenNumMidSymbols);
+            RC_encodeBit1(&enc->rc, &len_prob_table->choice_2);
+            RC_encodeBitTree(&enc->rc, len_prob_table->high, kLenNumHighBits, len - kLenNumLowSymbols - kLenNumMidSymbols);
         }
     }
     if (enc->strategy != FL2_fast && --len_prob_table->counters[pos_state] == 0) {
-        LengthStates_SetPrices(&enc->rc, len_prob_table, pos_state);
+        LZMA_lengthStates_SetPrices(len_prob_table, pos_state);
     }
 }
 
-static void EncodeRepMatch(LZMA2_ECtx* enc, unsigned len, unsigned rep, size_t pos_state)
+static void LZMA_encodeRepMatch(LZMA2_ECtx* enc, unsigned len, unsigned rep, size_t pos_state)
 {
-    DEBUGLOG(7, "EncodeRepMatch : length %u, rep %u", len, rep);
-    EncodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
-    EncodeBit1(&enc->rc, &enc->states.is_rep[enc->states.state]);
+    DEBUGLOG(7, "LZMA_encodeRepMatch : length %u, rep %u", len, rep);
+    RC_encodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
+    RC_encodeBit1(&enc->rc, &enc->states.is_rep[enc->states.state]);
     if (rep == 0) {
-        EncodeBit0(&enc->rc, &enc->states.is_rep_G0[enc->states.state]);
-        EncodeBit(&enc->rc, &enc->states.is_rep0_long[enc->states.state][pos_state], ((len == 1) ? 0 : 1));
+        RC_encodeBit0(&enc->rc, &enc->states.is_rep_G0[enc->states.state]);
+        RC_encodeBit(&enc->rc, &enc->states.is_rep0_long[enc->states.state][pos_state], ((len == 1) ? 0 : 1));
     }
     else {
         U32 distance = enc->states.reps[rep];
-        EncodeBit1(&enc->rc, &enc->states.is_rep_G0[enc->states.state]);
+        RC_encodeBit1(&enc->rc, &enc->states.is_rep_G0[enc->states.state]);
         if (rep == 1) {
-            EncodeBit0(&enc->rc, &enc->states.is_rep_G1[enc->states.state]);
+            RC_encodeBit0(&enc->rc, &enc->states.is_rep_G1[enc->states.state]);
         }
         else {
-            EncodeBit1(&enc->rc, &enc->states.is_rep_G1[enc->states.state]);
-            EncodeBit(&enc->rc, &enc->states.is_rep_G2[enc->states.state], rep - 2);
+            RC_encodeBit1(&enc->rc, &enc->states.is_rep_G1[enc->states.state]);
+            RC_encodeBit(&enc->rc, &enc->states.is_rep_G2[enc->states.state], rep - 2);
             if (rep == 3) {
                 enc->states.reps[3] = enc->states.reps[2];
             }
@@ -413,7 +413,7 @@ static void EncodeRepMatch(LZMA2_ECtx* enc, unsigned len, unsigned rep, size_t p
         enc->states.state = ShortRepNextState(enc->states.state);
     }
     else {
-        EncodeLength(enc, &enc->states.rep_len_states, len, pos_state);
+        LZMA_encodeLength(enc, &enc->states.rep_len_states, len, pos_state);
         enc->states.state = RepNextState(enc->states.state);
     }
 }
@@ -422,19 +422,19 @@ static void EncodeRepMatch(LZMA2_ECtx* enc, unsigned len, unsigned rep, size_t p
 /* Distance slot functions based on fastpos.h from XZ*/
 
 HINT_INLINE
-unsigned FastDistShift(unsigned n)
+unsigned LZMA_fastDistShift(unsigned n)
 {
     return n * (kFastDistBits - 1);
 }
 
 HINT_INLINE
-unsigned FastDistResult(U32 dist, unsigned n)
+unsigned LZMA_fastDistResult(U32 dist, unsigned n)
 {
-    return distance_table[dist >> FastDistShift(n)]
-        + 2 * FastDistShift(n);
+    return distance_table[dist >> LZMA_fastDistShift(n)]
+        + 2 * LZMA_fastDistShift(n);
 }
 
-static size_t GetDistSlot(U32 distance)
+static size_t LZMA_getDistSlot(U32 distance)
 {
     U32 limit = 1UL << kFastDistBits;
     /* If it is small enough, we can pick the result directly from */
@@ -442,35 +442,35 @@ static size_t GetDistSlot(U32 distance)
     if (distance < limit) {
         return distance_table[distance];
     }
-    limit <<= FastDistShift(1);
+    limit <<= LZMA_fastDistShift(1);
     if (distance < limit) {
-        return FastDistResult(distance, 1);
+        return LZMA_fastDistResult(distance, 1);
     }
-    return FastDistResult(distance, 2);
+    return LZMA_fastDistResult(distance, 2);
 }
 
 /* **************************************** */
 
-static void EncodeNormalMatch(LZMA2_ECtx* enc, unsigned len, U32 dist, size_t pos_state)
+static void LZMA_encodeNormalMatch(LZMA2_ECtx* enc, unsigned len, U32 dist, size_t pos_state)
 {
-    DEBUGLOG(7, "EncodeNormalMatch : length %u, dist %u", len, dist);
-    EncodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
-    EncodeBit0(&enc->rc, &enc->states.is_rep[enc->states.state]);
+    DEBUGLOG(7, "LZMA_encodeNormalMatch : length %u, dist %u", len, dist);
+    RC_encodeBit1(&enc->rc, &enc->states.is_match[enc->states.state][pos_state]);
+    RC_encodeBit0(&enc->rc, &enc->states.is_rep[enc->states.state]);
     enc->states.state = MatchNextState(enc->states.state);
-    EncodeLength(enc, &enc->states.len_states, len, pos_state);
+    LZMA_encodeLength(enc, &enc->states.len_states, len, pos_state);
 
-    size_t dist_slot = GetDistSlot(dist);
-    EncodeBitTree(&enc->rc, enc->states.dist_slot_encoders[GetLenToDistState(len)], kNumPosSlotBits, (unsigned)(dist_slot));
+    size_t dist_slot = LZMA_getDistSlot(dist);
+    RC_encodeBitTree(&enc->rc, enc->states.dist_slot_encoders[GetLenToDistState(len)], kNumPosSlotBits, (unsigned)(dist_slot));
     if (dist_slot >= kStartPosModelIndex) {
         unsigned footerBits = ((unsigned)(dist_slot >> 1) - 1);
         size_t base = ((2 | (dist_slot & 1)) << footerBits);
         unsigned posReduced = (unsigned)(dist - base);
         if (dist_slot < kEndPosModelIndex) {
-            EncodeBitTreeReverse(&enc->rc, enc->states.dist_encoders + base - dist_slot - 1, footerBits, posReduced);
+            RC_encodeBitTreeReverse(&enc->rc, enc->states.dist_encoders + base - dist_slot - 1, footerBits, posReduced);
         }
         else {
-            EncodeDirect(&enc->rc, posReduced >> kNumAlignBits, footerBits - kNumAlignBits);
-            EncodeBitTreeReverse(&enc->rc, enc->states.dist_align_encoders, kNumAlignBits, posReduced & kAlignMask);
+            RC_encodeDirect(&enc->rc, posReduced >> kNumAlignBits, footerBits - kNumAlignBits);
+            RC_encodeBitTreeReverse(&enc->rc, enc->states.dist_align_encoders, kNumAlignBits, posReduced & kAlignMask);
             ++enc->align_price_count;
         }
     }
@@ -486,7 +486,7 @@ static void EncodeNormalMatch(LZMA2_ECtx* enc, unsigned len, U32 dist, size_t po
 #endif
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeChunkFast(LZMA2_ECtx* enc,
+size_t LZMA_encodeChunkFast(LZMA2_ECtx* enc,
     FL2_dataBlock const block,
     FL2_matchTable* tbl,
     int structTbl,
@@ -635,10 +635,10 @@ _encode:
         assert(index + bestMatch.length <= block.end);
         while (prev < index && enc->rc.out_index < enc->rc.chunk_size) {
             if (block.data[prev] == block.data[prev - enc->states.reps[0] - 1]) {
-                EncodeRepMatch(enc, 1, 0, prev & pos_mask);
+                LZMA_encodeRepMatch(enc, 1, 0, prev & pos_mask);
             }
             else {
-                EncodeLiteralBuf(enc, block.data, prev);
+                LZMA_encodeLiteralBuf(enc, block.data, prev);
             }
             ++prev;
         }
@@ -647,10 +647,10 @@ _encode:
         }
         if(bestMatch.length >= kMatchLenMin) {
             if (bestMatch.dist < kNumReps) {
-                EncodeRepMatch(enc, bestMatch.length, bestMatch.dist, index & pos_mask);
+                LZMA_encodeRepMatch(enc, bestMatch.length, bestMatch.dist, index & pos_mask);
             }
             else {
-                EncodeNormalMatch(enc, bestMatch.length, bestMatch.dist - kNumReps, index & pos_mask);
+                LZMA_encodeNormalMatch(enc, bestMatch.length, bestMatch.dist - kNumReps, index & pos_mask);
             }
             index += bestMatch.length;
             prev = index;
@@ -658,10 +658,10 @@ _encode:
     }
     while (prev < index && enc->rc.out_index < enc->rc.chunk_size) {
         if (block.data[prev] == block.data[prev - enc->states.reps[0] - 1]) {
-            EncodeRepMatch(enc, 1, 0, prev & pos_mask);
+            LZMA_encodeRepMatch(enc, 1, 0, prev & pos_mask);
         }
         else {
-            EncodeLiteralBuf(enc, block.data, prev);
+            LZMA_encodeLiteralBuf(enc, block.data, prev);
         }
         ++prev;
     }
@@ -669,7 +669,7 @@ _encode:
 }
 
 /* Reverse the direction of the linked list generated by the optimal parser */
-static void ReverseOptimalChain(OptimalNode* opt_buf, size_t cur)
+static void LZMA_reverseOptimalChain(OptimalNode* opt_buf, size_t cur)
 {
     size_t next_index = opt_buf[cur].prev_index;
     U32 next_dist = opt_buf[cur].prev_dist;
@@ -700,7 +700,7 @@ static void ReverseOptimalChain(OptimalNode* opt_buf, size_t cur)
     } while (cur != 0);
 }
 
-static unsigned GetLiteralPrice(LZMA2_ECtx* enc, size_t index, size_t state, unsigned prev_symbol, U32 symbol, unsigned match_byte)
+static unsigned LZMA_getLiteralPrice(LZMA2_ECtx* enc, size_t index, size_t state, unsigned prev_symbol, U32 symbol, unsigned match_byte)
 {
     const Probability* prob_table = GetLiteralProbs(enc, index, prev_symbol);
     if (IsCharState(state)) {
@@ -712,17 +712,17 @@ static unsigned GetLiteralPrice(LZMA2_ECtx* enc, size_t index, size_t state, uns
         } while (symbol < 0x10000);
         return price;
     }
-    return GetLiteralPriceMatched(prob_table, symbol, match_byte);
+    return LZMA_getLiteralPriceMatched(prob_table, symbol, match_byte);
 }
 
-static void HashReset(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
+static void LZMA_hashReset(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
 {
     enc->hash_dict_3 = (ptrdiff_t)1 << dictionary_bits_3;
     enc->chain_mask_3 = enc->hash_dict_3 - 1;
     memset(enc->hash_buf->table_3, 0xFF, sizeof(enc->hash_buf->table_3));
 }
 
-static int HashCreate(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
+static int LZMA_hashCreate(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
 {
     DEBUGLOG(3, "Create hash chain : dict bits %u", dictionary_bits_3);
     if (enc->hash_buf) {
@@ -732,7 +732,7 @@ static int HashCreate(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
     enc->hash_buf = malloc(sizeof(HashChains) + (enc->hash_alloc_3 - 1) * sizeof(S32));
     if (enc->hash_buf == NULL)
         return 1;
-    HashReset(enc, dictionary_bits_3);
+    LZMA_hashReset(enc, dictionary_bits_3);
     return 0;
 }
 
@@ -740,7 +740,7 @@ static int HashCreate(LZMA2_ECtx* enc, unsigned dictionary_bits_3)
 int LZMA2_hashAlloc(LZMA2_ECtx* enc, const FL2_lzma2Parameters* options)
 {
     if (enc->strategy == FL2_ultra && enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {
-        return HashCreate(enc, options->second_dict_bits);
+        return LZMA_hashCreate(enc, options->second_dict_bits);
     }
     return 0;
 }
@@ -748,7 +748,7 @@ int LZMA2_hashAlloc(LZMA2_ECtx* enc, const FL2_lzma2Parameters* options)
 #define GET_HASH_3(data) ((((MEM_readLE32(data)) << 8) * 506832829U) >> (32 - kHash3Bits))
 
 HINT_INLINE
-size_t HashGetMatches(LZMA2_ECtx* enc, const FL2_dataBlock block,
+size_t LZMA_hashGetMatches(LZMA2_ECtx* enc, const FL2_dataBlock block,
     ptrdiff_t index,
     size_t length_limit,
     RMF_match match)
@@ -820,7 +820,7 @@ size_t HashGetMatches(LZMA2_ECtx* enc, const FL2_dataBlock block,
 * If is_hybrid != 0, this method works in hybrid mode, using the
 * hash chain to find shorter matches at near distances. */
 FORCE_INLINE_TEMPLATE
-size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
+size_t LZMA_optimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
     RMF_match match,
     size_t const index,
     size_t const cur,
@@ -906,7 +906,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
         unsigned match_byte = *(data - reps[0] - 1);
         U32 cur_price = cur_opt->price;
         U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob) +
-            GetLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
+            LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
         OptimalNode* next_opt = &enc->opt_buf[cur + 1];
         BYTE next_is_char = 0;
         /* Try literal */
@@ -920,7 +920,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
         rep_match_price = match_price + GET_PRICE_1(is_rep_prob);
         if (match_byte == cur_byte) {
             /* Try 1-byte rep0 */
-            U32 short_rep_price = rep_match_price + GetRepLen1Price(enc, state, pos_state);
+            U32 short_rep_price = rep_match_price + LZMA_getRepLen1Price(enc, state, pos_state);
             if (short_rep_price <= next_opt->price) {
                 next_opt->price = short_rep_price;
                 next_opt->prev_index = (unsigned)cur;
@@ -943,7 +943,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                     GET_PRICE_1(enc->states.is_match[state_2][pos_state_next]) +
                     GET_PRICE_1(enc->states.is_rep[state_2]);
                 size_t offset = cur + 1 + len_test_2;
-                U32 cur_and_len_price = next_rep_match_price + GetRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
+                U32 cur_and_len_price = next_rep_match_price + LZMA_getRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
                 if (cur_and_len_price < enc->opt_buf[offset].price) {
                     len_end = MAX(len_end, offset);
                     enc->opt_buf[offset].price = cur_and_len_price;
@@ -968,7 +968,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                 continue;
             len_test = ZSTD_count(data + 2, data_2 + 2, data + max_length) + 2;
             len_end = MAX(len_end, cur + len_test);
-            cur_rep_price = rep_match_price + GetRepPrice(enc, rep_index, state, pos_state);
+            cur_rep_price = rep_match_price + LZMA_getRepPrice(enc, rep_index, state, pos_state);
             len = 2;
             /* Try rep match */
             do {
@@ -996,7 +996,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                 U32 rep_lit_rep_total_price =
                     cur_rep_price + enc->states.rep_len_states.prices[pos_state][len_test - kMatchLenMin] +
                     GET_PRICE_0(enc->states.is_match[state_2][pos_state_next]) +
-                    GetLiteralPriceMatched(GetLiteralProbs(enc, index + len_test, data[len_test - 1]),
+                    LZMA_getLiteralPriceMatched(GetLiteralProbs(enc, index + len_test, data[len_test - 1]),
                         data[len_test], data_2[len_test]);
                 size_t offset;
 
@@ -1006,7 +1006,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                     GET_PRICE_1(enc->states.is_match[state_2][pos_state_next]) +
                     GET_PRICE_1(enc->states.is_rep[state_2]);
                 offset = cur + len_test + 1 + len_test_2;
-                rep_lit_rep_total_price += GetRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
+                rep_lit_rep_total_price += LZMA_getRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
                 if (rep_lit_rep_total_price < enc->opt_buf[offset].price) {
                     len_end = MAX(len_end, offset);
                     enc->opt_buf[offset].price = rep_lit_rep_total_price;
@@ -1027,7 +1027,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
             /* Normal mode - single match */
             size_t length = MIN(match.length, max_length);
             size_t cur_dist = match.dist;
-            size_t dist_slot = GetDistSlot(match.dist);
+            size_t dist_slot = LZMA_getDistSlot(match.dist);
             size_t len_test = length;
             len_end = MAX(len_end, cur + length);
             /* Pre-load rep0 data bytes */
@@ -1066,7 +1066,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                 main_len = match.length;
             }
             else {
-                main_len = HashGetMatches(enc, block, index, max_length, match);
+                main_len = LZMA_hashGetMatches(enc, block, index, max_length, match);
             }
             match_index = enc->match_count - 1;
             if (main_len == max_length
@@ -1083,7 +1083,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
             for (; match_index >= start_match; --match_index) {
                 size_t len_test = enc->matches[match_index].length;
                 size_t cur_dist = enc->matches[match_index].dist;
-                size_t dist_slot = GetDistSlot((U32)cur_dist);
+                size_t dist_slot = LZMA_getDistSlot((U32)cur_dist);
                 U32 cur_and_len_price;
                 size_t base_len = (match_index > start_match) ? enc->matches[match_index - 1].length + 1 : start_len;
                 unsigned rep_0_bytes = MEM_read16(data - cur_dist + len_test);
@@ -1119,7 +1119,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                             size_t pos_state_next = (index + len_test) & pos_mask;
                             U32 match_lit_rep_total_price = cur_and_len_price +
                                 GET_PRICE_0(enc->states.is_match[state_2][pos_state_next]) +
-                                GetLiteralPriceMatched(GetLiteralProbs(enc, index + len_test, data[len_test - 1]),
+                                LZMA_getLiteralPriceMatched(GetLiteralProbs(enc, index + len_test, data[len_test - 1]),
                                     data[len_test], data_2[len_test]);
                             size_t offset;
 
@@ -1129,7 +1129,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
                                 GET_PRICE_1(enc->states.is_match[state_2][pos_state_next]) +
                                 GET_PRICE_1(enc->states.is_rep[state_2]);
                             offset = cur + rep_0_pos + len_test_2;
-                            match_lit_rep_total_price += GetRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
+                            match_lit_rep_total_price += LZMA_getRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
                             if (match_lit_rep_total_price < enc->opt_buf[offset].price) {
                                 len_end = MAX(len_end, offset);
                                 enc->opt_buf[offset].price = match_lit_rep_total_price;
@@ -1150,7 +1150,7 @@ size_t OptimalParse(LZMA2_ECtx* const enc, const FL2_dataBlock block,
 }
 
 HINT_INLINE
-void InitMatchesPos0(LZMA2_ECtx* enc,
+void LZMA_initMatchesPos0(LZMA2_ECtx* enc,
     RMF_match match,
     size_t pos_state,
     size_t len,
@@ -1158,7 +1158,7 @@ void InitMatchesPos0(LZMA2_ECtx* enc,
 {
     if ((unsigned)len <= match.length) {
         size_t distance = match.dist;
-        size_t slot = GetDistSlot(match.dist);
+        size_t slot = LZMA_getDistSlot(match.dist);
         /* Test every available length of the match */
         do
         {
@@ -1181,7 +1181,7 @@ void InitMatchesPos0(LZMA2_ECtx* enc,
     }
 }
 
-static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
+static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
     RMF_match match,
     size_t index,
     size_t len,
@@ -1200,7 +1200,7 @@ static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
             main_len = match.length;
         }
         else {
-            main_len = HashGetMatches(enc, block, index, MIN(block.end - index, enc->fast_length), match);
+            main_len = LZMA_hashGetMatches(enc, block, index, MIN(block.end - index, enc->fast_length), match);
         }
         match_index = 0;
         while (len > enc->matches[match_index].length) {
@@ -1208,7 +1208,7 @@ static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
         }
         pos_state = index & enc->pos_mask;
         distance = enc->matches[match_index].dist;
-        slot = GetDistSlot(enc->matches[match_index].dist);
+        slot = LZMA_getDistSlot(enc->matches[match_index].dist);
         /* Test every available match length at the shortest distance. The buffer is sorted */
         /* in order of increasing length, and therefore increasing distance too. */
         for (;; ++len) {
@@ -1234,7 +1234,7 @@ static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
                 }
                 ++match_index;
                 distance = enc->matches[match_index].dist;
-                slot = GetDistSlot(enc->matches[match_index].dist);
+                slot = LZMA_getDistSlot(enc->matches[match_index].dist);
             }
         }
         return main_len;
@@ -1247,7 +1247,7 @@ static size_t InitMatchesPos0Best(LZMA2_ECtx* enc, const FL2_dataBlock block,
 * This function must not be called at a position where no match is
 * available. */
 FORCE_INLINE_TEMPLATE
-size_t InitOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
+size_t LZMA_initOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
     RMF_match match,
     size_t index,
     int const is_hybrid,
@@ -1297,14 +1297,14 @@ size_t InitOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
         enc->opt_buf[0].state = state;
         /* Set the price for literal */
         enc->opt_buf[1].price = GET_PRICE_0(is_match_prob) +
-            GetLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
+            LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
         MakeAsLiteral(enc->opt_buf[1]);
 
         match_price = GET_PRICE_1(is_match_prob);
         rep_match_price = match_price + GET_PRICE_1(is_rep_prob);
         if (match_byte == cur_byte) {
             /* Try 1-byte rep0 */
-            unsigned short_rep_price = rep_match_price + GetRepLen1Price(enc, state, pos_state);
+            unsigned short_rep_price = rep_match_price + LZMA_getRepLen1Price(enc, state, pos_state);
             if (short_rep_price < enc->opt_buf[1].price) {
                 enc->opt_buf[1].price = short_rep_price;
                 MakeAsShortRep(enc->opt_buf[1]);
@@ -1319,7 +1319,7 @@ size_t InitOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
             if (rep_len < 2) {
                 continue;
             }
-            price = rep_match_price + GetRepPrice(enc, i, state, pos_state);
+            price = rep_match_price + LZMA_getRepPrice(enc, i, state, pos_state);
             /* Test every available length of the rep */
             do {
                 unsigned cur_and_len_price = price + enc->states.rep_len_states.prices[pos_state][rep_len - kMatchLenMin];
@@ -1336,19 +1336,19 @@ size_t InitOptimizerPos0(LZMA2_ECtx* enc, const FL2_dataBlock block,
         /* Test the match prices */
         if (!is_hybrid) {
             /* Normal mode */
-            InitMatchesPos0(enc, match, pos_state, len, normal_match_price);
+            LZMA_initMatchesPos0(enc, match, pos_state, len, normal_match_price);
             return MAX(match.length, rep_lens[rep_max_index]);
         }
         else {
             /* Hybrid mode */
-            size_t main_len = InitMatchesPos0Best(enc, block, match, index, len, normal_match_price);
+            size_t main_len = LZMA_initMatchesPos0Best(enc, block, match, index, len, normal_match_price);
             return MAX(main_len, rep_lens[rep_max_index]);
         }
     }
 }
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
+size_t LZMA_encodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
     FL2_matchTable* tbl,
     int const structTbl,
     int const is_hybrid,
@@ -1376,7 +1376,7 @@ size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
         }
         index = start_index;
         /* Set everything up at position 0 */
-        len_end = InitOptimizerPos0(enc, block, match, index, is_hybrid, reps);
+        len_end = LZMA_initOptimizerPos0(enc, block, match, index, is_hybrid, reps);
         match.length = 0;
         cur = 1;
         /* len_end == 0 if a match of fast_length was found */
@@ -1391,14 +1391,14 @@ size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
                 if (match.length >= enc->fast_length) {
                     break;
                 }
-                len_end = OptimalParse(enc, block, match, index, cur, len_end, is_hybrid, reps);
+                len_end = LZMA_optimalParse(enc, block, match, index, cur, len_end, is_hybrid, reps);
             }
             if (cur < len_end && match.length < enc->fast_length) {
                 /* Adjust the end point base on scaling up the price. */
                 cur += (enc->opt_buf[cur].price + enc->opt_buf[cur].price / cur) >= enc->opt_buf[cur + 1].price;
             }
             DEBUGLOG(6, "End optimal parse at %u", (U32)cur);
-            ReverseOptimalChain(enc->opt_buf, cur);
+            LZMA_reverseOptimalChain(enc->opt_buf, cur);
         }
         /* Encode the selections in the buffer */
         prev_index = 0;
@@ -1408,7 +1408,7 @@ size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
             prev_index = enc->opt_buf[i].prev_index;
             if (len == 1 && enc->opt_buf[i].prev_dist == kNullDist)
             {
-                EncodeLiteralBuf(enc, block.data, start_index + i);
+                LZMA_encodeLiteralBuf(enc, block.data, start_index + i);
             }
             else {
                 size_t match_index = start_index + i;
@@ -1422,10 +1422,10 @@ size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
                     }
                 }
                 if (dist < kNumReps) {
-                    EncodeRepMatch(enc, len, dist, match_index & pos_mask);
+                    LZMA_encodeRepMatch(enc, len, dist, match_index & pos_mask);
                 }
                 else {
-                    EncodeNormalMatch(enc, len, dist - kNumReps, match_index & pos_mask);
+                    LZMA_encodeNormalMatch(enc, len, dist - kNumReps, match_index & pos_mask);
                 }
             }
             i += len;
@@ -1438,36 +1438,36 @@ size_t EncodeOptimumSequence(LZMA2_ECtx* enc, const FL2_dataBlock block,
     return start_index;
 }
 
-static void UpdateLengthPrices(LZMA2_ECtx* enc, LengthStates* len_states)
+static void LZMA_updateLengthPrices(LZMA2_ECtx* enc, LengthStates* len_states)
 {
     for (size_t pos_state = 0; pos_state <= enc->pos_mask; ++pos_state) {
-        LengthStates_SetPrices(&enc->rc, len_states, pos_state);
+        LZMA_lengthStates_SetPrices(len_states, pos_state);
     }
 }
 
-static void FillAlignPrices(LZMA2_ECtx* enc)
+static void LZMA_fillAlignPrices(LZMA2_ECtx* enc)
 {
     for (size_t i = 0; i < kAlignTableSize; ++i) {
-        enc->align_prices[i] = GetReverseTreePrice(enc->states.dist_align_encoders, kNumAlignBits, i);
+        enc->align_prices[i] = RC_getReverseTreePrice(enc->states.dist_align_encoders, kNumAlignBits, i);
     }
     enc->align_price_count = 0;
 }
 
-static void FillDistancesPrices(LZMA2_ECtx* enc)
+static void LZMA_fillDistancesPrices(LZMA2_ECtx* enc)
 {
     static const size_t kLastLenToPosState = kNumLenToPosStates - 1;
     for (size_t i = kStartPosModelIndex; i < kNumFullDistances; ++i) {
         size_t dist_slot = distance_table[i];
         unsigned footerBits = (unsigned)((dist_slot >> 1) - 1);
         size_t base = ((2 | (dist_slot & 1)) << footerBits);
-        enc->distance_prices[kLastLenToPosState][i] = GetReverseTreePrice(enc->states.dist_encoders + base - dist_slot - 1,
+        enc->distance_prices[kLastLenToPosState][i] = RC_getReverseTreePrice(enc->states.dist_encoders + base - dist_slot - 1,
             footerBits,
             i - base);
     }
     for (size_t lenToPosState = 0; lenToPosState < kNumLenToPosStates; ++lenToPosState) {
         const Probability* encoder = enc->states.dist_slot_encoders[lenToPosState];
         for (size_t dist_slot = 0; dist_slot < enc->dist_price_table_size; ++dist_slot) {
-            enc->dist_slot_prices[lenToPosState][dist_slot] = GetTreePrice(encoder, kNumPosSlotBits, dist_slot);
+            enc->dist_slot_prices[lenToPosState][dist_slot] = RC_getTreePrice(encoder, kNumPosSlotBits, dist_slot);
         }
         for (size_t dist_slot = kEndPosModelIndex; dist_slot < enc->dist_price_table_size; ++dist_slot) {
             enc->dist_slot_prices[lenToPosState][dist_slot] += (((unsigned)(dist_slot >> 1) - 1) - kNumAlignBits) << kNumBitPriceShiftBits;
@@ -1485,7 +1485,7 @@ static void FillDistancesPrices(LZMA2_ECtx* enc)
 }
 
 FORCE_INLINE_TEMPLATE
-size_t EncodeChunkBest(LZMA2_ECtx* enc,
+size_t LZMA_encodeChunkBest(LZMA2_ECtx* enc,
     FL2_dataBlock const block,
     FL2_matchTable* tbl,
     int const structTbl,
@@ -1493,33 +1493,33 @@ size_t EncodeChunkBest(LZMA2_ECtx* enc,
     size_t uncompressed_end)
 {
     unsigned search_depth = tbl->params.depth;
-    FillDistancesPrices(enc);
-    FillAlignPrices(enc);
-    UpdateLengthPrices(enc, &enc->states.len_states);
-    UpdateLengthPrices(enc, &enc->states.rep_len_states);
+    LZMA_fillDistancesPrices(enc);
+    LZMA_fillAlignPrices(enc);
+    LZMA_updateLengthPrices(enc, &enc->states.len_states);
+    LZMA_updateLengthPrices(enc, &enc->states.rep_len_states);
     while (index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size)
     {
         RMF_match match = RMF_getMatch(block, tbl, search_depth, structTbl, index);
         if (match.length > 1) {
             if (enc->strategy != FL2_ultra) {
-                index = EncodeOptimumSequence(enc, block, tbl, structTbl, 0, index, uncompressed_end, match);
+                index = LZMA_encodeOptimumSequence(enc, block, tbl, structTbl, 0, index, uncompressed_end, match);
             }
             else {
-                index = EncodeOptimumSequence(enc, block, tbl, structTbl, 1, index, uncompressed_end, match);
+                index = LZMA_encodeOptimumSequence(enc, block, tbl, structTbl, 1, index, uncompressed_end, match);
             }
             if (enc->match_price_count >= kDistanceRepriceFrequency) {
-                FillDistancesPrices(enc);
+                LZMA_fillDistancesPrices(enc);
             }
             if (enc->align_price_count >= kAlignRepriceFrequency) {
-                FillAlignPrices(enc);
+                LZMA_fillAlignPrices(enc);
             }
         }
         else {
             if (block.data[index] == block.data[index - enc->states.reps[0] - 1]) {
-                EncodeRepMatch(enc, 1, 0, index & enc->pos_mask);
+                LZMA_encodeRepMatch(enc, 1, 0, index & enc->pos_mask);
             }
             else {
-                EncodeLiteralBuf(enc, block.data, index);
+                LZMA_encodeLiteralBuf(enc, block.data, index);
             }
             ++index;
         }
@@ -1527,7 +1527,7 @@ size_t EncodeChunkBest(LZMA2_ECtx* enc,
     return index;
 }
 
-static void LengthStates_Reset(LengthStates* ls, unsigned fast_length)
+static void LZMA_lengthStates_Reset(LengthStates* ls, unsigned fast_length)
 {
     ls->choice = kProbInitValue;
     ls->choice_2 = kProbInitValue;
@@ -1543,7 +1543,7 @@ static void LengthStates_Reset(LengthStates* ls, unsigned fast_length)
     ls->table_size = fast_length + 1 - kMatchLenMin;
 }
 
-static void EncoderStates_Reset(EncoderStates* es, unsigned lc, unsigned lp, unsigned fast_length)
+static void LZMA_encoderStates_Reset(EncoderStates* es, unsigned lc, unsigned lp, unsigned fast_length)
 {
     es->state = 0;
     for (size_t i = 0; i < kNumReps; ++i) {
@@ -1572,8 +1572,8 @@ static void EncoderStates_Reset(EncoderStates* es, unsigned lc, unsigned lp, uns
     for (size_t i = 0; i < kNumFullDistances - kEndPosModelIndex; ++i) {
         es->dist_encoders[i] = kProbInitValue;
     }
-    LengthStates_Reset(&es->len_states, fast_length);
-    LengthStates_Reset(&es->rep_len_states, fast_length);
+    LZMA_lengthStates_Reset(&es->len_states, fast_length);
+    LZMA_lengthStates_Reset(&es->rep_len_states, fast_length);
     for (size_t i = 0; i < (1 << kNumAlignBits); ++i) {
         es->dist_align_encoders[i] = kProbInitValue;
     }
@@ -1603,11 +1603,11 @@ size_t LZMA2_encMemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned 
     return size * thread_count;
 }
 
-static void Reset(LZMA2_ECtx* enc, size_t max_distance)
+static void LZMA2_reset(LZMA2_ECtx* enc, size_t max_distance)
 {
     DEBUGLOG(5, "LZMA encoder reset : max_distance %u", (unsigned)max_distance);
-    RangeEncReset(&enc->rc);
-    EncoderStates_Reset(&enc->states, enc->lc, enc->lp, enc->fast_length);
+    RC_reset(&enc->rc);
+    LZMA_encoderStates_Reset(&enc->states, enc->lc, enc->lp, enc->fast_length);
     enc->pos_mask = (1 << enc->pb) - 1;
     enc->lit_pos_mask = (1 << enc->lp) - 1;
     U32 i = 0;
@@ -1616,12 +1616,12 @@ static void Reset(LZMA2_ECtx* enc, size_t max_distance)
     enc->dist_price_table_size = i * 2;
 }
 
-static BYTE GetLcLpPbCode(LZMA2_ECtx* enc)
+static BYTE LZMA_getLcLpPbCode(LZMA2_ECtx* enc)
 {
     return (BYTE)((enc->pb * 5 + enc->lp) * 9 + enc->lc);
 }
 
-static BYTE IsChunkRandom(const FL2_matchTable* const tbl,
+static BYTE LZMA2_isChunkRandom(const FL2_matchTable* const tbl,
     const FL2_dataBlock block, size_t const start,
 	unsigned const strategy)
 {
@@ -1710,28 +1710,28 @@ static BYTE IsChunkRandom(const FL2_matchTable* const tbl,
 __pragma(warning(disable:4701))
 #endif
 
-static size_t EncodeChunk(LZMA2_ECtx* enc,
+static size_t LZMA2_encodeChunk(LZMA2_ECtx* enc,
     FL2_matchTable* tbl,
     const FL2_dataBlock block,
     size_t index, size_t end)
 {
     if (enc->strategy == FL2_fast) {
         if (tbl->isStruct) {
-            return EncodeChunkFast(enc, block, tbl, 1,
+            return LZMA_encodeChunkFast(enc, block, tbl, 1,
                 index, end);
         }
         else {
-            return EncodeChunkFast(enc, block, tbl, 0,
+            return LZMA_encodeChunkFast(enc, block, tbl, 0,
                 index, end);
         }
     }
     else {
         if (tbl->isStruct) {
-            return EncodeChunkBest(enc, block, tbl, 1,
+            return LZMA_encodeChunkBest(enc, block, tbl, 1,
                 index, end);
         }
         else {
-            return EncodeChunkBest(enc, block, tbl, 0,
+            return LZMA_encodeChunkBest(enc, block, tbl, 0,
                 index, end);
         }
     }
@@ -1765,15 +1765,15 @@ size_t LZMA2_encode(LZMA2_ECtx* enc,
     enc->strategy = options->strategy;
     enc->fast_length = options->fast_length;
     enc->match_cycles = options->match_cycles;
-    Reset(enc, block.end);
+    LZMA2_reset(enc, block.end);
     if (enc->strategy == FL2_ultra) {
         /* Create a hash chain to put the encoder into hybrid mode */
         if (enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {
-            if(HashCreate(enc, options->second_dict_bits) != 0)
+            if(LZMA_hashCreate(enc, options->second_dict_bits) != 0)
                 return FL2_ERROR(memory_allocation);
         }
         else {
-            HashReset(enc, options->second_dict_bits);
+            LZMA_hashReset(enc, options->second_dict_bits);
         }
         enc->hash_prev_index = (start >= (size_t)enc->hash_dict_3) ? (ptrdiff_t)(start - enc->hash_dict_3) : (ptrdiff_t)-1;
     }
@@ -1784,8 +1784,8 @@ size_t LZMA2_encode(LZMA2_ECtx* enc,
         size_t header_size = (stream_prop >= 0) + (encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize);
         EncoderStates saved_states;
         size_t next_index;
-        RangeEncReset(&enc->rc);
-        SetOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
+        RC_reset(&enc->rc);
+        RC_setOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
         if (!next_is_random) {
             size_t cur = index;
             size_t end;
@@ -1795,21 +1795,21 @@ size_t LZMA2_encode(LZMA2_ECtx* enc,
                 end = MIN(block.end, index + kMaxChunkUncompressedSize - kOptimizerBufferSize);
             saved_states = enc->states;
             if (index == 0) {
-                EncodeLiteral(enc, 0, block.data[0], 0);
+                LZMA_encodeLiteral(enc, 0, block.data[0], 0);
                 ++cur;
             }
             if (index == start) {
                 /* After four bytes we can write data to the match table because the */
                 /* compressed data will never catch up with the table position being read. */
                 enc->rc.chunk_size = kTempMinOutput;
-                cur = EncodeChunk(enc, tbl, block, cur, end);
+                cur = LZMA2_encodeChunk(enc, tbl, block, cur, end);
                 enc->rc.chunk_size = kChunkSize;
                 out_dest = RMF_getTableAsOutputBuffer(tbl, start);
                 memcpy(out_dest, enc->out_buf, header_size + enc->rc.out_index);
                 enc->rc.out_buffer = out_dest + header_size;
             }
-            next_index = EncodeChunk(enc, tbl, block, cur, end);
-            Flush(&enc->rc);
+            next_index = LZMA2_encodeChunk(enc, tbl, block, cur, end);
+            RC_flush(&enc->rc);
         }
         else {
             next_index = MIN(index + kChunkSize, block.end);
@@ -1855,14 +1855,14 @@ size_t LZMA2_encode(LZMA2_ECtx* enc,
             header[3] = (BYTE)((compressed_size - 1) >> 8);
             header[4] = (BYTE)(compressed_size - 1);
             if (encode_properties) {
-                header[5] = GetLcLpPbCode(enc);
+                header[5] = LZMA_getLcLpPbCode(enc);
                 encode_properties = 0;
             }
         }
         if (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size)
         {
             /* Test the next chunk for compressibility */
-            next_is_random = IsChunkRandom(tbl, block, next_index, enc->strategy);
+            next_is_random = LZMA2_isChunkRandom(tbl, block, next_index, enc->strategy);
         }
         out_dest += compressed_size + header_size;
         FL2_atomic_add(*progress, (long)(next_index - index));

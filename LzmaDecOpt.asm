@@ -1,12 +1,12 @@
-; LzmaDecOpt.asm -- ASM version of LzmaDec_DecodeReal_3() function
+; LzmaDecOpt.asm -- ASM version of LZMA_decodeReal_3() function
 ; 2018-02-06: Igor Pavlov : Public domain
 ;
-; 3 - is the code compatibility version of LzmaDec_DecodeReal_*()
+; 3 - is the code compatibility version of LZMA_decodeReal_*()
 ; function for check at link time.
-; That code is tightly coupled with LzmaDec_TryDummy()
-; and with another functions in LzmaDec.c file.
+; That code is tightly coupled with LZMA_tryDummy()
+; and with another functions in lzma2_dec.c file.
 ; CLzmaDec structure, (probs) array layout, input and output of
-; LzmaDec_DecodeReal_*() must be equal in both versions (C / ASM).
+; LZMA_decodeReal_*() must be equal in both versions (C / ASM).
 
 ifndef x64
 ; x64=1
@@ -610,7 +610,7 @@ PARAM_limit     equ REG_PARAM_1
 PARAM_bufLimit  equ REG_PARAM_2
 
 ; MY_ALIGN_64
-MY_PROC LzmaDec_DecodeReal, 3
+MY_PROC LZMA_decodeReal_3, 3
 MY_PUSH_PRESERVED_REGS
 
         lea     r0, [RSP - (SIZEOF CLzmaDec_Asm_Loc)]

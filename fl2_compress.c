@@ -860,6 +860,9 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const endi
 
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input)
 {
+    if (!fcs->lockParams)
+        return FL2_ERROR(init_missing);
+
     CHECK_F(fcs->asyncRes);
 
     DICT_buffer * const buf = &fcs->buf;
@@ -900,6 +903,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer*
 
 FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_outBuffer * dict)
 {
+    if (!fcs->lockParams)
+        return FL2_ERROR(init_missing);
+
     CHECK_F(fcs->asyncRes);
 
     size_t blockOverlap = OVERLAP_FROM_DICT_LOG(fcs->params.rParams.dictionary_log, fcs->params.rParams.overlap_fraction);
@@ -1057,11 +1063,17 @@ static size_t FL2_flushStream_internal(FL2_CStream* fcs, int ending)
 
 FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs)
 {
+    if (!fcs->lockParams)
+        return FL2_ERROR(init_missing);
+
     return FL2_flushStream_internal(fcs, 0);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs)
 {
+    if (!fcs->endMarked && !fcs->lockParams)
+        return FL2_ERROR(init_missing);
+
     size_t cSize = FL2_flushStream_internal(fcs, 1);
 
     CHECK_F(cSize);

@@ -181,7 +181,7 @@ typedef enum
 
 #define LZMA_DIC_MIN (1 << 12)
 
-static BYTE LzmaDec_TryDummy(const LZMA2_DCtx *p)
+static BYTE LZMA_tryDummy(const LZMA2_DCtx *p)
 {
     const Probability *probs = GET_PROBS;
 	unsigned state = p->state;
@@ -369,11 +369,11 @@ Out:
 
 #ifdef LZMA2_DEC_OPT
 
-int LzmaDec_DecodeReal(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit);
+int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit);
 
 #else
 
-static int LzmaDec_DecodeReal(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
+static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
 {
     Probability *probs = GET_PROBS;
 
@@ -723,7 +723,7 @@ static int LzmaDec_DecodeReal(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
 
 #endif
 
-static void LzmaDec_WriteRem(LZMA2_DCtx *p, size_t limit)
+static void LZMA_writeRem(LZMA2_DCtx *p, size_t limit)
 {
     if (p->remainLen != 0 && p->remainLen < kMatchSpecLenStart)
     {
@@ -758,9 +758,9 @@ static void LzmaDec_WriteRem(LZMA2_DCtx *p, size_t limit)
 #error Stop_Compiling_Bad_LZMA_Check
 #endif
 
-static size_t LzmaDec_DecodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
+static size_t LZMA_decodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
 {
-    if (p->buf == bufLimit && !LzmaDec_TryDummy(p))
+    if (p->buf == bufLimit && !LZMA_tryDummy(p))
         return FL2_ERROR(corruption_detected);
     do
     {
@@ -776,14 +776,14 @@ static size_t LzmaDec_DecodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLi
         }
 
         do {
-            if (LzmaDec_DecodeReal(p, limit2, bufLimit) != 0)
+            if (LZMA_decodeReal_3(p, limit2, bufLimit) != 0)
                 return FL2_ERROR(corruption_detected);
-        } while (p->dicPos < limit2 && p->buf == bufLimit && LzmaDec_TryDummy(p));
+        } while (p->dicPos < limit2 && p->buf == bufLimit && LZMA_tryDummy(p));
 
         if (p->checkDicSize == 0 && p->processedPos >= p->prop.dicSize)
             p->checkDicSize = p->prop.dicSize;
 
-        LzmaDec_WriteRem(p, limit);
+        LZMA_writeRem(p, limit);
     } while (p->dicPos < limit && p->buf < bufLimit && p->remainLen < kMatchSpecLenStart);
 
     if (p->remainLen > kMatchSpecLenStart)
@@ -793,7 +793,7 @@ static size_t LzmaDec_DecodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLi
 }
 
 
-static void LzmaDec_InitDicAndState(LZMA2_DCtx *p, BYTE initDic, BYTE initState)
+static void LZMA_initDicAndState(LZMA2_DCtx *p, BYTE initDic, BYTE initState)
 {
     p->needFlush = 1;
     p->remainLen = 0;
@@ -808,13 +808,13 @@ static void LzmaDec_InitDicAndState(LZMA2_DCtx *p, BYTE initDic, BYTE initState)
         p->needInitState = 1;
 }
 
-static void LzmaDec_Init(LZMA2_DCtx *p)
+static void LZMA_init(LZMA2_DCtx *p)
 {
     p->dicPos = 0;
-    LzmaDec_InitDicAndState(p, 1, 1);
+    LZMA_initDicAndState(p, 1, 1);
 }
 
-static void LzmaDec_InitStateReal(LZMA2_DCtx *p)
+static void LZMA_initStateReal(LZMA2_DCtx *p)
 {
     size_t numProbs = LzmaProps_GetNumProbs(&p->prop);
     size_t i;
@@ -826,12 +826,12 @@ static void LzmaDec_InitStateReal(LZMA2_DCtx *p)
     p->needInitState = 0;
 }
 
-static size_t LzmaDec_DecodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, size_t *srcLen,
+static size_t LZMA_decodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, size_t *srcLen,
     ELzmaFinishMode finishMode)
 {
     size_t inSize = *srcLen;
     (*srcLen) = 0;
-    LzmaDec_WriteRem(p, dicLimit);
+    LZMA_writeRem(p, dicLimit);
 
     if (p->needFlush)
     {
@@ -866,7 +866,7 @@ static size_t LzmaDec_DecodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *sr
         }
 
         if (p->needInitState)
-            LzmaDec_InitStateReal(p);
+            LZMA_initStateReal(p);
 
         if (finishMode == LZMA_FINISH_END) {
             bufLimit = src + inSize;
@@ -878,7 +878,7 @@ static size_t LzmaDec_DecodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *sr
             bufLimit = src + inSize - LZMA_REQUIRED_INPUT_MAX;
         }
         p->buf = src;
-        CHECK_F(LzmaDec_DecodeReal2(p, dicLimit, bufLimit));
+        CHECK_F(LZMA_decodeReal2(p, dicLimit, bufLimit));
         processed = (size_t)(p->buf - src);
         (*srcLen) += processed;
         src += processed;
@@ -886,7 +886,7 @@ static size_t LzmaDec_DecodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *sr
     }
 }
 
-static size_t LzmaDec_DecodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+static size_t LZMA_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
 {
     size_t outSize = *destLen;
     size_t inSize = *srcLen;
@@ -910,7 +910,7 @@ static size_t LzmaDec_DecodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, co
             curFinishMode = finishMode;
         }
 
-        res = LzmaDec_DecodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
+        res = LZMA_decodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
         src += inSizeCur;
         inSize -= inSizeCur;
         *srcLen += inSizeCur;
@@ -932,7 +932,7 @@ void LZMA_constructDCtx(LZMA2_DCtx *p)
 	p->probs_1664 = p->probs + 1664;
 }
 
-static void LzmaDec_FreeDict(LZMA2_DCtx *p)
+static void LZMA_freeDict(LZMA2_DCtx *p)
 {
     if (!p->extDic) {
         free(p->dic);
@@ -942,7 +942,7 @@ static void LzmaDec_FreeDict(LZMA2_DCtx *p)
 
 void LZMA_destructDCtx(LZMA2_DCtx *p)
 {
-    LzmaDec_FreeDict(p);
+    LZMA_freeDict(p);
 }
 
 size_t LZMA2_getDictSizeFromProp(BYTE dictProp)
@@ -955,7 +955,7 @@ size_t LZMA2_getDictSizeFromProp(BYTE dictProp)
     return dictSize;
 }
 
-static size_t LZMA2_DictBufSize(size_t dictSize)
+static size_t LZMA2_dictBufSize(size_t dictSize)
 {
     size_t mask = ((size_t)1 << 12) - 1;
     if (dictSize >= ((size_t)1 << 30)) mask = ((size_t)1 << 22) - 1;
@@ -968,7 +968,7 @@ static size_t LZMA2_DictBufSize(size_t dictSize)
 
 size_t LZMA2_decMemoryUsage(size_t dictSize)
 {
-    return sizeof(LZMA2_DCtx) + LZMA2_DictBufSize(dictSize);
+    return sizeof(LZMA2_DCtx) + LZMA2_dictBufSize(dictSize);
 }
 
 size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
@@ -978,10 +978,10 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufS
         return dictSize;
 
     if (dic == NULL) {
-        dicBufSize = LZMA2_DictBufSize(dictSize);
+        dicBufSize = LZMA2_dictBufSize(dictSize);
 
         if (!p->dic || dicBufSize != p->dicBufSize) {
-            LzmaDec_FreeDict(p);
+            LZMA_freeDict(p);
             p->dic = (BYTE *)malloc(dicBufSize);
             if (!p->dic)
                 return FL2_ERROR(memory_allocation);
@@ -989,7 +989,7 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufS
         }
     }
     else {
-        LzmaDec_FreeDict(p);
+        LZMA_freeDict(p);
         p->dic = dic;
         p->extDic = 1;
     }
@@ -1003,11 +1003,11 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufS
     p->needInitDic = 1;
     p->needInitState2 = 1;
     p->needInitProp = 1;
-    LzmaDec_Init(p);
+    LZMA_init(p);
     return FL2_error_no_error;
 }
 
-static void LzmaDec_UpdateWithUncompressed(LZMA2_DCtx *p, const BYTE *src, size_t size)
+static void LZMA_updateWithUncompressed(LZMA2_DCtx *p, const BYTE *src, size_t size)
 {
     memcpy(p->dic + p->dicPos, src, size);
     p->dicPos += size;
@@ -1016,7 +1016,7 @@ static void LzmaDec_UpdateWithUncompressed(LZMA2_DCtx *p, const BYTE *src, size_
     p->processedPos += (U32)size;
 }
 
-static unsigned Lzma2Dec_NextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSize, LZMA2_props *prop, const BYTE *src, ptrdiff_t *srcLen)
+static unsigned LZMA2_nextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSize, LZMA2_props *prop, const BYTE *src, ptrdiff_t *srcLen)
 {
     ptrdiff_t len = *srcLen;
     *srcLen = 0;
@@ -1073,7 +1073,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
 
         if(p->state2 == LZMA2_STATE_CONTROL) {
             ptrdiff_t len = inSize - *srcLen;
-            p->state2 = Lzma2Dec_NextChunkInfo(&p->control, &p->unpackSize, &p->packSize, &p->prop, src, &len);
+            p->state2 = LZMA2_nextChunkInfo(&p->control, &p->unpackSize, &p->packSize, &p->prop, src, &len);
             *srcLen += len;
             src += len;
         }
@@ -1125,7 +1125,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
                 else if (p->needInitDic)
                     break;
                 p->needInitDic = 0;
-                LzmaDec_InitDicAndState(p, initDic, 0);
+                LZMA_initDicAndState(p, initDic, 0);
             }
 
             if (inCur > outCur)
@@ -1133,7 +1133,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
             if (inCur == 0)
                 break;
 
-            LzmaDec_UpdateWithUncompressed(p, src, inCur);
+            LZMA_updateWithUncompressed(p, src, inCur);
 
             src += inCur;
             *srcLen += inCur;
@@ -1150,7 +1150,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
                 if ((!initDic && p->needInitDic) || (!initState && p->needInitState2))
                     break;
 
-                LzmaDec_InitDicAndState(p, initDic, initState);
+                LZMA_initDicAndState(p, initDic, initState);
                 p->needInitDic = 0;
                 p->needInitState2 = 0;
                 p->state2 = LZMA2_STATE_DATA_CONT;
@@ -1159,7 +1159,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
             if (inCur > p->packSize)
                 inCur = (size_t)p->packSize;
 
-            res = LzmaDec_DecodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
+            res = LZMA_decodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
 
             src += inCur;
             *srcLen += inCur;
@@ -1270,7 +1270,7 @@ LZMA2_mtInbuf * LZMA2_createInbufNode(LZMA2_mtInbuf *prev)
     return node;
 }
 
-void LZMA2_FreeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep)
+void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep)
 {
     while (node) {
         LZMA2_mtInbuf *next = node->next;

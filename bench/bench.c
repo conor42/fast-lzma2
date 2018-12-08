@@ -238,7 +238,7 @@ int FL2LIB_CALL main(int argc, char** argv)
         threads = atoi(argv[i] + 2);
     }
     FL2_CCtx* fcs = FL2_createCCtxMt(threads);
-    FL2_DCtx* dctx = FL2_createDCtx();
+    FL2_DCtx* dctx = FL2_createDCtxMt(threads);
     if (fcs == NULL)
         return 1;
     int end_level = parse_params(fcs, argc, argv);

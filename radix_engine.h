@@ -108,7 +108,7 @@ RMF_structuredInit
     if (end <= 2) {
         for (size_t i = 0; i < end; ++i)
             SetNull(i);
-
+        tbl->end_index = 0;
         return 0;
     }
 #ifdef RMF_REFERENCE
@@ -196,7 +196,6 @@ RMF_structuredInit
     SetNull(end - 1);
 
     tbl->end_index = (U32)st_index;
-    tbl->st_index = ATOMIC_INITIAL_VALUE;
 
     return rpt_total;
 }
@@ -890,7 +889,7 @@ static ptrdiff_t RMF_getNextList_st(FL2_matchTable* const tbl)
 }
 
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
-int
+void
 #ifdef RMF_BITPACK
 RMF_bitpackBuildTable
 #else
@@ -902,7 +901,7 @@ RMF_structuredBuildTable
     FL2_dataBlock const block)
 {
     if (block.end == 0)
-        return 0;
+        return;
 
     unsigned const best = !tbl->params.divide_and_conquer;
     unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
@@ -950,7 +949,6 @@ RMF_structuredBuildTable
             RecurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
         }
     }
-    return tbl->st_index >= RADIX_CANCEL_INDEX;
 }
 
 int

@@ -296,6 +296,11 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
     /* initialize to length 2 */
     cctx->matchTable->progress = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
 
+    if (cctx->canceled) {
+        RMF_resetIncompleteBuild(cctx->matchTable);
+        return FL2_ERROR(canceled);
+    }
+
 #ifndef FL2_SINGLETHREAD
 
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
@@ -818,8 +823,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
                 return FL2_ERROR(memory_allocation);
         }
     }
-    else if (fcs->dictMax == 0) {
-        /* Only free the thread if compression not underway */
+    else if (!DICT_async(&fcs->buf) && fcs->dictMax == 0) {
+        /* Only free the thread if not dual buffering and compression not underway */
         FL2POOL_free(fcs->compressThread);
         fcs->compressThread = NULL;
     }
@@ -945,15 +950,16 @@ FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
 
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)
 {
-    RMF_cancelBuild(fcs->matchTable);
-    fcs->canceled = 1;
+    if (fcs->compressThread != NULL) {
+        fcs->canceled = 1;
 
-    if (fcs->compressThread != NULL)
+        RMF_cancelBuild(fcs->matchTable);
         FL2POOL_waitAll(fcs->compressThread, 0);
-    else
-        FL2POOL_waitAll(fcs->factory, 0);
 
-    fcs->canceled = 0;
+        fcs->canceled = 0;
+    }
+
+    FL2_endFrame(fcs);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs)

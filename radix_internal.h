@@ -107,11 +107,11 @@ struct FL2_matchTable_s
 
 size_t RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
 size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
-int RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
+void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
 	size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block);
-int RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
+void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
 	size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block);

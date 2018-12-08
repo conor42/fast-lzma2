@@ -1380,14 +1380,15 @@ size_t LZMA_encodeOptimumSequence(LZMA2_ECtx *const enc, FL2_dataBlock const blo
             for (; cur < (len_end - cur / (kOptimizerBufferSize / 2U)); ++cur, ++index) {
                 if (enc->opt_buf[cur + 1].price < enc->opt_buf[cur].price)
                     continue;
+
                 match = RMF_getMatch(block, tbl, search_depth, structTbl, index);
-                if (match.length >= enc->fast_length) {
+                if (match.length >= enc->fast_length)
                     break;
-                }
+
                 len_end = LZMA_optimalParse(enc, block, match, index, cur, len_end, is_hybrid, reps);
             }
             if (cur < len_end && match.length < enc->fast_length) {
-                /* Adjust the end point base on scaling up the price. */
+                /* Adjust the end point based on scaling up the price. */
                 cur += (enc->opt_buf[cur].price + enc->opt_buf[cur].price / cur) >= enc->opt_buf[cur + 1].price;
             }
             DEBUGLOG(6, "End optimal parse at %u", (U32)cur);

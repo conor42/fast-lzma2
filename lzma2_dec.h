@@ -194,23 +194,23 @@ typedef enum
 /* ELzmaStatus is used only as output value for function call */
 
 
-void LZMA_destructDCtx(LZMA2_DCtx *state);
+void LZMA_destructDCtx(LZMA2_DCtx *const p);
 
-size_t LZMA2_getDictSizeFromProp(BYTE dictProp);
+size_t LZMA2_getDictSizeFromProp(BYTE const dictProp);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t LZMA2_getUnpackSize(const BYTE *src, size_t srcLen);
+size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const srcLen);
 
-size_t LZMA2_decMemoryUsage(size_t dictSize);
+size_t LZMA2_decMemoryUsage(size_t const dictSize);
 
-size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
+size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dictProp, BYTE *const dic, size_t dicBufSize);
 
-size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit,
+    const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode);
 
-size_t LZMA2_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen,
+    const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode);
 
 typedef struct LZMA2_mtInbuf_s LZMA2_mtInbuf;
 
@@ -242,10 +242,11 @@ typedef struct
 #  define LZMA2_MT_INPUT_SIZE 0x40000
 #endif
 
-LZMA2_mtInbuf *LZMA2_createInbufNode(LZMA2_mtInbuf *prev);
-void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep);
+LZMA2_mtInbuf *LZMA2_createInbufNode(LZMA2_mtInbuf *const prev);
 
-LZMA2_parseRes LZMA2_parseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, LZMA2_chunk *inf);
+void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *const keep);
+
+LZMA2_parseRes LZMA2_parseInput(const BYTE* const inBuf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf);
 
 #if defined (__cplusplus)
 }

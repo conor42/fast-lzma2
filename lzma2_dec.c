@@ -1,5 +1,5 @@
 /* lzma2_dec.c -- LZMA2 Decoder
-2018-02-28 : Igor Pavlov : Public domain
+Based upon LzmaDec.c 2018-02-28 : Igor Pavlov : Public domain
 Modified for FL2 by Conor McCarthy */
 
 #include <stdlib.h>
@@ -181,7 +181,7 @@ typedef enum
 
 #define LZMA_DIC_MIN (1 << 12)
 
-static BYTE LZMA_tryDummy(const LZMA2_DCtx *p)
+static BYTE LZMA_tryDummy(const LZMA2_DCtx *const p)
 {
     const Probability *probs = GET_PROBS;
 	unsigned state = p->state;
@@ -375,20 +375,20 @@ int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit);
 
 static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
 {
-    Probability *probs = GET_PROBS;
+    Probability *const probs = GET_PROBS;
 
     unsigned state = p->state;
     U32 rep0 = p->reps[0], rep1 = p->reps[1], rep2 = p->reps[2], rep3 = p->reps[3];
-    unsigned pbMask = ((unsigned)1 << (p->prop.pb)) - 1;
-    unsigned lc = p->prop.lc;
-    unsigned lpMask = ((unsigned)0x100 << p->prop.lp) - ((unsigned)0x100 >> lc);
+    unsigned const pbMask = ((unsigned)1 << (p->prop.pb)) - 1;
+    unsigned const lc = p->prop.lc;
+    unsigned const lpMask = ((unsigned)0x100 << p->prop.lp) - ((unsigned)0x100 >> lc);
 
-    BYTE *dic = p->dic;
-    size_t dicBufSize = p->dicBufSize;
+    BYTE *const dic = p->dic;
+    size_t const dicBufSize = p->dicBufSize;
     size_t dicPos = p->dicPos;
 
     U32 processedPos = p->processedPos;
-    U32 checkDicSize = p->checkDicSize;
+    U32 const checkDicSize = p->checkDicSize;
     unsigned len = 0;
 
     const BYTE *buf = p->buf;
@@ -723,16 +723,16 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
 
 #endif
 
-static void LZMA_writeRem(LZMA2_DCtx *p, size_t limit)
+static void LZMA_writeRem(LZMA2_DCtx *const p, size_t const limit)
 {
     if (p->remainLen != 0 && p->remainLen < kMatchSpecLenStart)
     {
-        BYTE *dic = p->dic;
+        BYTE *const dic = p->dic;
         size_t dicPos = p->dicPos;
-        size_t dicBufSize = p->dicBufSize;
+        size_t const dicBufSize = p->dicBufSize;
         unsigned len = p->remainLen;
-        size_t rep0 = p->reps[0]; /* we use size_t to avoid the BUG of VC14 for AMD64 */
-        size_t rem = limit - dicPos;
+        size_t const rep0 = p->reps[0];
+        size_t const rem = limit - dicPos;
         if (rem < len)
             len = (unsigned)(rem);
 
@@ -758,7 +758,7 @@ static void LZMA_writeRem(LZMA2_DCtx *p, size_t limit)
 #error Stop_Compiling_Bad_LZMA_Check
 #endif
 
-static size_t LZMA_decodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit)
+static size_t LZMA_decodeReal2(LZMA2_DCtx *const p, size_t const limit, const BYTE *const bufLimit)
 {
     if (p->buf == bufLimit && !LZMA_tryDummy(p))
         return FL2_ERROR(corruption_detected);
@@ -767,7 +767,7 @@ static size_t LZMA_decodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit
         size_t limit2 = limit;
         if (p->checkDicSize == 0)
         {
-            U32 rem = p->prop.dicSize - p->processedPos;
+            U32 const rem = p->prop.dicSize - p->processedPos;
             if (limit - p->dicPos > rem)
                 limit2 = p->dicPos + rem;
             if (p->processedPos == 0)
@@ -793,7 +793,7 @@ static size_t LZMA_decodeReal2(LZMA2_DCtx *p, size_t limit, const BYTE *bufLimit
 }
 
 
-static void LZMA_initDicAndState(LZMA2_DCtx *p, BYTE initDic, BYTE initState)
+static void LZMA_initDicAndState(LZMA2_DCtx *const p, BYTE const initDic, BYTE const initState)
 {
     p->needFlush = 1;
     p->remainLen = 0;
@@ -808,25 +808,24 @@ static void LZMA_initDicAndState(LZMA2_DCtx *p, BYTE initDic, BYTE initState)
         p->needInitState = 1;
 }
 
-static void LZMA_init(LZMA2_DCtx *p)
+static void LZMA_init(LZMA2_DCtx *const p)
 {
     p->dicPos = 0;
     LZMA_initDicAndState(p, 1, 1);
 }
 
-static void LZMA_initStateReal(LZMA2_DCtx *p)
+static void LZMA_initStateReal(LZMA2_DCtx *const p)
 {
-    size_t numProbs = LzmaProps_GetNumProbs(&p->prop);
-    size_t i;
+    size_t const numProbs = LzmaProps_GetNumProbs(&p->prop);
     Probability *probs = p->probs;
-    for (i = 0; i < numProbs; i++)
+    for (size_t i = 0; i < numProbs; i++)
         probs[i] = kBitModelTotal >> 1;
     p->reps[0] = p->reps[1] = p->reps[2] = p->reps[3] = 1;
     p->state = 0;
     p->needInitState = 0;
 }
 
-static size_t LZMA_decodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, size_t *srcLen,
+static size_t LZMA_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit, const BYTE *src, size_t *const srcLen,
     ELzmaFinishMode finishMode)
 {
     size_t inSize = *srcLen;
@@ -854,9 +853,6 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, 
     }
 
     while (1) {
-        size_t processed;
-        const BYTE *bufLimit;
-
         if (p->dicPos >= dicLimit)
         {
             if (p->remainLen == 0 && p->code == 0) {
@@ -868,6 +864,7 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, 
         if (p->needInitState)
             LZMA_initStateReal(p);
 
+        const BYTE *bufLimit;
         if (finishMode == LZMA_FINISH_END) {
             bufLimit = src + inSize;
         }
@@ -878,27 +875,29 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *p, size_t dicLimit, const BYTE *src, 
             bufLimit = src + inSize - LZMA_REQUIRED_INPUT_MAX;
         }
         p->buf = src;
+
         CHECK_F(LZMA_decodeReal2(p, dicLimit, bufLimit));
-        processed = (size_t)(p->buf - src);
+
+        size_t const processed = (size_t)(p->buf - src);
         (*srcLen) += processed;
         src += processed;
         inSize -= processed;
     }
 }
 
-static size_t LZMA_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+static size_t LZMA_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen, const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode)
 {
     size_t outSize = *destLen;
     size_t inSize = *srcLen;
     *srcLen = *destLen = 0;
     for (;;)
     {
-        size_t inSizeCur = inSize, outSizeCur, dicPos;
-        ELzmaFinishMode curFinishMode;
-        size_t res;
         if (p->dicPos == p->dicBufSize)
             p->dicPos = 0;
-        dicPos = p->dicPos;
+        size_t dicPos = p->dicPos;
+
+        size_t outSizeCur;
+        ELzmaFinishMode curFinishMode;
         if (outSize > p->dicBufSize - dicPos)
         {
             outSizeCur = p->dicBufSize;
@@ -910,7 +909,9 @@ static size_t LZMA_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const
             curFinishMode = finishMode;
         }
 
-        res = LZMA_decodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
+        size_t inSizeCur = inSize;
+        size_t res = LZMA_decodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
+
         src += inSizeCur;
         inSize -= inSizeCur;
         *srcLen += inSizeCur;
@@ -932,7 +933,7 @@ void LZMA_constructDCtx(LZMA2_DCtx *p)
 	p->probs_1664 = p->probs + 1664;
 }
 
-static void LZMA_freeDict(LZMA2_DCtx *p)
+static void LZMA_freeDict(LZMA2_DCtx *const p)
 {
     if (!p->extDic) {
         free(p->dic);
@@ -940,40 +941,43 @@ static void LZMA_freeDict(LZMA2_DCtx *p)
     p->dic = NULL;
 }
 
-void LZMA_destructDCtx(LZMA2_DCtx *p)
+void LZMA_destructDCtx(LZMA2_DCtx *const p)
 {
     LZMA_freeDict(p);
 }
 
-size_t LZMA2_getDictSizeFromProp(BYTE dictProp)
+size_t LZMA2_getDictSizeFromProp(BYTE const dictProp)
 {
     if (dictProp > 40)
         return FL2_ERROR(corruption_detected);
-    size_t dictSize = (dictProp == 40)
+
+    size_t const dictSize = (dictProp == 40)
         ? (size_t)-1
         : (((size_t)2 | (dictProp & 1)) << (dictProp / 2 + 11));
     return dictSize;
 }
 
-static size_t LZMA2_dictBufSize(size_t dictSize)
+static size_t LZMA2_dictBufSize(size_t const dictSize)
 {
     size_t mask = ((size_t)1 << 12) - 1;
     if (dictSize >= ((size_t)1 << 30)) mask = ((size_t)1 << 22) - 1;
     else if (dictSize >= ((size_t)1 << 22)) mask = ((size_t)1 << 20) - 1;
+
     size_t dicBufSize = ((size_t)dictSize + mask) & ~mask;
     if (dicBufSize < dictSize)
         dicBufSize = dictSize;
+
     return dicBufSize;
 }
 
-size_t LZMA2_decMemoryUsage(size_t dictSize)
+size_t LZMA2_decMemoryUsage(size_t const dictSize)
 {
     return sizeof(LZMA2_DCtx) + LZMA2_dictBufSize(dictSize);
 }
 
-size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufSize)
+size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dictProp, BYTE *const dic, size_t dicBufSize)
 {
-    size_t dictSize = LZMA2_getDictSizeFromProp(dictProp);
+    size_t const dictSize = LZMA2_getDictSizeFromProp(dictProp);
     if (FL2_isError(dictSize))
         return dictSize;
 
@@ -1007,7 +1011,7 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *p, BYTE dictProp, BYTE *dic, size_t dicBufS
     return FL2_error_no_error;
 }
 
-static void LZMA_updateWithUncompressed(LZMA2_DCtx *p, const BYTE *src, size_t size)
+static void LZMA_updateWithUncompressed(LZMA2_DCtx *const p, const BYTE *const src, size_t const size)
 {
     memcpy(p->dic + p->dicPos, src, size);
     p->dicPos += size;
@@ -1016,9 +1020,12 @@ static void LZMA_updateWithUncompressed(LZMA2_DCtx *p, const BYTE *src, size_t s
     p->processedPos += (U32)size;
 }
 
-static unsigned LZMA2_nextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSize, LZMA2_props *prop, const BYTE *src, ptrdiff_t *srcLen)
+static unsigned LZMA2_nextChunkInfo(BYTE *const control,
+    U32 *const unpackSize, U32 *const packSize,
+    LZMA2_props *const prop,
+    const BYTE *const src, ptrdiff_t *const srcLen)
 {
-    ptrdiff_t len = *srcLen;
+    ptrdiff_t const len = *srcLen;
     *srcLen = 0;
     if (len <= 0)
         return LZMA2_STATE_CONTROL;
@@ -1036,21 +1043,20 @@ static unsigned LZMA2_nextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSiz
         *unpackSize = (((U32)src[1] << 8) | src[2]) + 1;
     }
     else {
-        S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
+        S32 const hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
         if (len < 5 + hasProp)
             return LZMA2_STATE_CONTROL;
         *srcLen = 5 + hasProp;
         *unpackSize = ((U32)(*control & 0x1F) << 16) + ((U32)src[1] << 8) + src[2] + 1;
         *packSize = ((U32)src[3] << 8) + src[4] + 1;
         if (hasProp) {
-            unsigned lc, lp;
             BYTE b = src[5];
             if (b >= (9 * 5 * 5))
                 return LZMA2_STATE_ERROR;
-            lc = b % 9;
+            BYTE const lc = b % 9;
             b /= 9;
             prop->pb = b / 5;
-            lp = b % 5;
+            BYTE const lp = b % 5;
             if (lc + lp > LZMA2_LCLP_MAX)
                 return LZMA2_STATE_ERROR;
             prop->lc = (BYTE)lc;
@@ -1060,17 +1066,15 @@ static unsigned LZMA2_nextChunkInfo(BYTE *control, U32 *unpackSize, U32 *packSiz
     return LZMA2_STATE_DATA;
 }
 
-size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit,
+    const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode)
 {
-    size_t inSize = *srcLen;
+    size_t const inSize = *srcLen;
     size_t res = FL2_error_no_error;
     *srcLen = 0;
 
     while (p->state2 != LZMA2_STATE_ERROR)
     {
-        size_t dicPos;
-
         if(p->state2 == LZMA2_STATE_CONTROL) {
             ptrdiff_t len = inSize - *srcLen;
             p->state2 = LZMA2_nextChunkInfo(&p->control, &p->unpackSize, &p->packSize, &p->prop, src, &len);
@@ -1079,16 +1083,12 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
         }
 
         if (p->state2 == LZMA2_STATE_FINISHED)
-        {
             return LZMA_STATUS_FINISHED_WITH_MARK;
-        }
 
-        dicPos = p->dicPos;
+        size_t const dicPos = p->dicPos;
 
         if (dicPos == dicLimit && finishMode == LZMA_FINISH_ANY)
-        {
             return LZMA_STATUS_NOT_FINISHED;
-        }
 
         if (p->state2 != LZMA2_STATE_DATA && p->state2 != LZMA2_STATE_DATA_CONT)
         {
@@ -1119,7 +1119,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
 
             if (p->state2 == LZMA2_STATE_DATA)
             {
-                BYTE initDic = (p->control == LZMA2_CONTROL_COPY_RESET_DIC);
+                BYTE const initDic = (p->control == LZMA2_CONTROL_COPY_RESET_DIC);
                 if (initDic)
                     p->needInitProp = p->needInitState2 = 1;
                 else if (p->needInitDic)
@@ -1144,9 +1144,9 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
         {
             if (p->state2 == LZMA2_STATE_DATA)
             {
-                unsigned mode = LZMA2_GET_LZMA_MODE(p->control);
-                BYTE initDic = (mode == 3);
-                BYTE initState = (mode != 0);
+                unsigned const mode = LZMA2_GET_LZMA_MODE(p->control);
+                BYTE const initDic = (mode == 3);
+                BYTE const initState = (mode != 0);
                 if ((!initDic && p->needInitDic) || (!initState && p->needInitState2))
                     break;
 
@@ -1198,22 +1198,19 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *p, size_t dicLimit,
 }
 
 
-size_t LZMA2_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode)
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen, const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode)
 {
     size_t outSize = *destLen, inSize = *srcLen;
     *srcLen = *destLen = 0;
 
     for (;;)
     {
-        size_t inCur = inSize, outCur, dicPos;
-        ELzmaFinishMode curFinishMode;
-        size_t res;
-
         if (p->dicPos == p->dicBufSize)
             p->dicPos = 0;
-        dicPos = p->dicPos;
-        curFinishMode = LZMA_FINISH_ANY;
-        outCur = p->dicBufSize - dicPos;
+
+        size_t const dicPos = p->dicPos;
+        ELzmaFinishMode curFinishMode = LZMA_FINISH_ANY;
+        size_t outCur = p->dicBufSize - dicPos;
 
         if (outCur >= outSize)
         {
@@ -1221,7 +1218,8 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE 
             curFinishMode = finishMode;
         }
 
-        res = LZMA2_decodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
+        size_t inCur = inSize;
+        size_t const res = LZMA2_decodeToDic(p, dicPos + outCur, src, &inCur, curFinishMode);
 
         src += inCur;
         inSize -= inCur;
@@ -1238,13 +1236,13 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *p, BYTE *dest, size_t *destLen, const BYTE 
     }
 }
 
-size_t LZMA2_getUnpackSize(const BYTE *src, size_t srcLen)
+size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const srcLen)
 {
     size_t unpackTotal = 0;
     size_t pos = 1;
     while (pos < srcLen) {
         LZMA2_chunk inf;
-        int type = LZMA2_parseInput(src, pos, srcLen - pos, &inf);
+        int const type = LZMA2_parseInput(src, pos, srcLen - pos, &inf);
         if (type == CHUNK_FINAL)
             return unpackTotal;
         pos += inf.packSize;
@@ -1255,9 +1253,9 @@ size_t LZMA2_getUnpackSize(const BYTE *src, size_t srcLen)
     return LZMA2_CONTENTSIZE_ERROR;
 }
 
-LZMA2_mtInbuf * LZMA2_createInbufNode(LZMA2_mtInbuf *prev)
+LZMA2_mtInbuf * LZMA2_createInbufNode(LZMA2_mtInbuf *const prev)
 {
-    LZMA2_mtInbuf *node = malloc(sizeof(LZMA2_mtInbuf) + LZMA2_MT_INPUT_SIZE - 1);
+    LZMA2_mtInbuf *const node = malloc(sizeof(LZMA2_mtInbuf) + LZMA2_MT_INPUT_SIZE - 1);
     if(!node)
         return NULL;
     node->next = NULL;
@@ -1270,10 +1268,10 @@ LZMA2_mtInbuf * LZMA2_createInbufNode(LZMA2_mtInbuf *prev)
     return node;
 }
 
-void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep)
+void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *const keep)
 {
     while (node) {
-        LZMA2_mtInbuf *next = node->next;
+        LZMA2_mtInbuf *const next = node->next;
         if(node != keep)
             free(node);
         else 
@@ -1282,14 +1280,15 @@ void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *keep)
     }
 }
 
-LZMA2_parseRes LZMA2_parseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, LZMA2_chunk *inf)
+LZMA2_parseRes LZMA2_parseInput(const BYTE* const inBuf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf)
 {
     inf->packSize = 0;
     inf->unpackSize = 0;
-    BYTE control;
+
     if (len <= 0)
         return CHUNK_ERROR;
-    control = inBuf[pos];
+
+    BYTE const control = inBuf[pos];
     if (control == 0) {
         inf->packSize = 1;
         return CHUNK_FINAL;
@@ -1303,7 +1302,7 @@ LZMA2_parseRes LZMA2_parseInput(const BYTE* inBuf, size_t pos, ptrdiff_t len, LZ
         inf->packSize = 3 + inf->unpackSize;
     }
     else {
-        S32 hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(control));
+        S32 const hasProp = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(control));
         if (len < 5 + hasProp)
             return CHUNK_MORE_DATA;
         inf->unpackSize = ((U32)(control & 0x1F) << 16) + ((U32)inBuf[pos + 1] << 8) + inBuf[pos + 2] + 1;

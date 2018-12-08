@@ -40,21 +40,21 @@ typedef struct
 
 LZMA2_ECtx* LZMA2_createECtx(void);
 
-void LZMA2_freeECtx(LZMA2_ECtx* enc);
+void LZMA2_freeECtx(LZMA2_ECtx *const enc);
 
-int LZMA2_hashAlloc(LZMA2_ECtx* enc, const FL2_lzma2Parameters* options);
+int LZMA2_hashAlloc(LZMA2_ECtx *const enc, const FL2_lzma2Parameters* const options);
 
-size_t LZMA2_encode(LZMA2_ECtx* enc,
-    FL2_matchTable* tbl,
-    const FL2_dataBlock block,
-    const FL2_lzma2Parameters* options,
+size_t LZMA2_encode(LZMA2_ECtx *const enc,
+    FL2_matchTable* const tbl,
+    FL2_dataBlock const block,
+    const FL2_lzma2Parameters* const options,
     int stream_prop,
-    FL2_atomic *progress,
-    int *canceled);
+    FL2_atomic *const progress,
+    int *const canceled);
 
-BYTE LZMA2_getDictSizeProp(size_t dictionary_size);
+BYTE LZMA2_getDictSizeProp(size_t const dictionary_size);
 
-size_t LZMA2_encMemoryUsage(unsigned chain_log, FL2_strategy strategy, unsigned thread_count);
+size_t LZMA2_encMemoryUsage(unsigned const chain_log, FL2_strategy const strategy, unsigned const thread_count);
 
 #if defined (__cplusplus)
 }

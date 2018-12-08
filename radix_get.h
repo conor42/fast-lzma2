@@ -1,3 +1,13 @@
+/*
+* Copyright (c) 2018, Conor McCarthy
+* All rights reserved.
+*
+* This source code is licensed under both the BSD-style license (found in the
+* LICENSE file in the root directory of this source tree) and the GPLv2 (found
+* in the COPYING file in the root directory of this source tree).
+* You may select, at your option, one of the above-listed licenses.
+*/
+
 typedef struct
 {
     U32 length;
@@ -12,19 +22,22 @@ static size_t RMF_bitpackExtendMatch(const BYTE* const data,
     size_t const length)
 {
     ptrdiff_t end_index = start_index + length;
-    ptrdiff_t dist = start_index - link;
+    ptrdiff_t const dist = start_index - link;
+
     if (limit > start_index + (ptrdiff_t)kMatchLenMax)
         limit = start_index + kMatchLenMax;
-    while (end_index < limit && end_index - (ptrdiff_t)(table[end_index] & RADIX_LINK_MASK) == dist) {
+
+    while (end_index < limit && end_index - (ptrdiff_t)(table[end_index] & RADIX_LINK_MASK) == dist)
         end_index += table[end_index] >> RADIX_LINK_BITS;
-    }
+
     if (end_index >= limit) {
         DEBUGLOG(7, "RMF_bitpackExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(limit - start_index));
         return limit - start_index;
     }
-    while (end_index < limit && data[end_index - dist] == data[end_index]) {
+
+    while (end_index < limit && data[end_index - dist] == data[end_index])
         ++end_index;
-    }
+
     DEBUGLOG(7, "RMF_bitpackExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(end_index - start_index));
     return end_index - start_index;
 }
@@ -41,19 +54,22 @@ static size_t RMF_structuredExtendMatch(const BYTE* const data,
     size_t const length)
 {
     ptrdiff_t end_index = start_index + length;
-    ptrdiff_t dist = start_index - link;
+    ptrdiff_t const dist = start_index - link;
+
     if (limit > start_index + (ptrdiff_t)kMatchLenMax)
         limit = start_index + kMatchLenMax;
-    while (end_index < limit && end_index - (ptrdiff_t)GetMatchLink(table, end_index) == dist) {
+
+    while (end_index < limit && end_index - (ptrdiff_t)GetMatchLink(table, end_index) == dist)
         end_index += GetMatchLength(table, end_index);
-    }
+
     if (end_index >= limit) {
         DEBUGLOG(7, "RMF_structuredExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(limit - start_index));
         return limit - start_index;
     }
-    while (end_index < limit && data[end_index - dist] == data[end_index]) {
+
+    while (end_index < limit && data[end_index - dist] == data[end_index])
         ++end_index;
-    }
+
     DEBUGLOG(7, "RMF_structuredExtendMatch : pos %u, link %u, init length %u, full length %u", (U32)start_index, link, (U32)length, (U32)(end_index - start_index));
     return end_index - start_index;
 }
@@ -67,52 +83,50 @@ RMF_match RMF_getMatch(FL2_dataBlock block,
 {
     if (structTbl)
     {
+        U32 const link = GetMatchLink(tbl->table, index);
+
         RMF_match match;
-        U32 link = GetMatchLink(tbl->table, index);
-        size_t length;
-        size_t dist;
         match.length = 0;
+
         if (link == RADIX_NULL_LINK)
             return match;
-        length = GetMatchLength(tbl->table, index);
-        dist = index - link - 1;
-        if (length > block.end - index) {
+
+        size_t const length = GetMatchLength(tbl->table, index);
+        size_t const dist = index - link - 1;
+
+        if (length > block.end - index) 
             match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
-        {
+        else if (length == max_depth || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
             match.length = (U32)RMF_structuredExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
+        else
             match.length = (U32)length;
-        }
+
         match.dist = (U32)dist;
+
         return match;
     }
     else {
-        RMF_match match;
         U32 link = tbl->table[index];
-        size_t length;
-        size_t dist;
+
+        RMF_match match;
         match.length = 0;
+
         if (link == RADIX_NULL_LINK)
             return match;
-        length = link >> RADIX_LINK_BITS;
+
+        size_t const length = link >> RADIX_LINK_BITS;
         link &= RADIX_LINK_MASK;
-        dist = index - link - 1;
-        if (length > block.end - index) {
+        size_t const dist = index - link - 1;
+
+        if (length > block.end - index)
             match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
-        {
+        else if (length == max_depth || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
             match.length = (U32)RMF_bitpackExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
+        else
             match.length = (U32)length;
-        }
+
         match.dist = (U32)dist;
+
         return match;
     }
 }
@@ -126,60 +140,58 @@ RMF_match RMF_getNextMatch(FL2_dataBlock block,
 {
     if (structTbl)
     {
+        U32 const link = GetMatchLink(tbl->table, index);
+
         RMF_match match;
-        U32 link = GetMatchLink(tbl->table, index);
-        size_t length;
-        size_t dist;
         match.length = 0;
+
         if (link == RADIX_NULL_LINK)
             return match;
-        length = GetMatchLength(tbl->table, index);
-        dist = index - link - 1;
-        if (link - 1 == GetMatchLink(tbl->table, index - 1)) {
-            /* same as the previous match, one byte shorter */
+
+        size_t const length = GetMatchLength(tbl->table, index);
+        size_t const dist = index - link - 1;
+
+        /* same distance, one byte shorter */
+        if (link - 1 == GetMatchLink(tbl->table, index - 1))
             return match;
-        }
-        if (length > block.end - index) {
+
+        if (length > block.end - index)
             match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
-        {
+        else if (length == max_depth || length == STRUCTURED_MAX_LENGTH /* from HandleRepeat */)
             match.length = (U32)RMF_structuredExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
+        else
             match.length = (U32)length;
-        }
+
         match.dist = (U32)dist;
+
         return match;
     }
     else {
-        RMF_match match;
         U32 link = tbl->table[index];
-        size_t length;
-        size_t dist;
+
+        RMF_match match;
         match.length = 0;
+
         if (link == RADIX_NULL_LINK)
             return match;
-        length = link >> RADIX_LINK_BITS;
+
+        size_t const length = link >> RADIX_LINK_BITS;
         link &= RADIX_LINK_MASK;
-        dist = index - link - 1;
-        if (link - 1 == (tbl->table[index - 1] & RADIX_LINK_MASK)) {
-            /* same distance, one byte shorter */
+        size_t const dist = index - link - 1;
+
+        /* same distance, one byte shorter */
+        if (link - 1 == (tbl->table[index - 1] & RADIX_LINK_MASK))
             return match;
-        }
-        if (length > block.end - index) {
+
+        if (length > block.end - index)
             match.length = (U32)(block.end - index);
-        }
-        else if (length == max_depth
-            || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
-        {
+        else if (length == max_depth || length == BITPACK_MAX_LENGTH /* from HandleRepeat */)
             match.length = (U32)RMF_bitpackExtendMatch(block.data, tbl->table, index, block.end, link, length);
-        }
-        else {
+        else
             match.length = (U32)length;
-        }
+
         match.dist = (U32)dist;
+
         return match;
     }
 }

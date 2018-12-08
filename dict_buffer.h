@@ -20,36 +20,36 @@ typedef struct {
 #endif
 } DICT_buffer;
 
-int DICT_construct(DICT_buffer *buf, int async);
+int DICT_construct(DICT_buffer *const buf, int const async);
 
-int DICT_init(DICT_buffer *buf, size_t dictSize, int doHash);
+int DICT_init(DICT_buffer *const buf, size_t const dictSize, int const doHash);
 
-void DICT_destruct(DICT_buffer *buf);
+void DICT_destruct(DICT_buffer *const buf);
 
-size_t DICT_size(const DICT_buffer *buf);
+size_t DICT_size(const DICT_buffer *const buf);
 
-size_t DICT_get(DICT_buffer *buf, size_t overlap, FL2_outBuffer* dict);
+size_t DICT_get(DICT_buffer *const buf, size_t const overlap, FL2_outBuffer* const dict);
 
-int DICT_update(DICT_buffer *buf, size_t addedSize);
+int DICT_update(DICT_buffer *const buf, size_t const addedSize);
 
-void DICT_put(DICT_buffer *buf, FL2_inBuffer* input);
+void DICT_put(DICT_buffer *const buf, FL2_inBuffer* const input);
 
-size_t DICT_availSpace(const DICT_buffer *buf);
+size_t DICT_availSpace(const DICT_buffer *const buf);
 
-int DICT_hasUnprocessed(const DICT_buffer *buf);
+int DICT_hasUnprocessed(const DICT_buffer *const buf);
 
-void DICT_getBlock(DICT_buffer *buf, FL2_dataBlock *block);
+void DICT_getBlock(DICT_buffer *const buf, FL2_dataBlock *const block);
 
-int DICT_needShift(DICT_buffer *buf, size_t overlap);
+int DICT_needShift(DICT_buffer *const buf, size_t const overlap);
 
-int DICT_async(const DICT_buffer *buf);
+int DICT_async(const DICT_buffer *const buf);
 
-void DICT_shift(DICT_buffer *buf, size_t overlap);
+void DICT_shift(DICT_buffer *const buf, size_t overlap);
 
 #ifndef NO_XXHASH
-XXH32_hash_t DICT_getDigest(const DICT_buffer *buf);
+XXH32_hash_t DICT_getDigest(const DICT_buffer *const buf);
 #endif
 
-size_t DICT_memUsage(const DICT_buffer *buf);
+size_t DICT_memUsage(const DICT_buffer *const buf);
 
 #endif /* FL2_DICT_BUFFER_H_ */

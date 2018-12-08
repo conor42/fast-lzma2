@@ -631,21 +631,6 @@ int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, 
     }
 }
 
-size_t RMF_getMatch(FL2_matchTable* const tbl,
-    const BYTE* const data,
-    size_t const index,
-    size_t const limit,
-    unsigned max_depth,
-    size_t* const offset_ptr)
-{
-    if (tbl->isStruct) {
-        return RMF_structuredGetMatch(tbl, data, index, limit, max_depth, offset_ptr);
-    }
-    else {
-        return RMF_bitpackGetMatch(tbl, data, index, limit, max_depth, offset_ptr);
-    }
-}
-
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index)
 {
     if (tbl->isStruct) {

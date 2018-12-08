@@ -140,7 +140,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WholeProgramOptimization>true</WholeProgramOptimization>
-      <PreprocessorDefinitions>LZMA2_DEC_OPT;FL2_DEBUG=1;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>

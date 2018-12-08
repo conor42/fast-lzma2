@@ -3,7 +3,7 @@
 
 #define ALIGNMENT_MASK (~(size_t)15)
 
-int DICT_construct(DICT_buffer * buf, int async)
+int DICT_construct(DICT_buffer * const buf, int const async)
 {
     buf->data[0] = NULL;
     buf->data[1] = NULL;
@@ -18,7 +18,7 @@ int DICT_construct(DICT_buffer * buf, int async)
     return 0;
 }
 
-int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
+int DICT_init(DICT_buffer * const buf, size_t const dictSize, int const doHash)
 {
     if (buf->data[0] == NULL || dictSize > buf->bufSize) {
         DICT_destruct(buf);
@@ -58,7 +58,7 @@ int DICT_init(DICT_buffer * buf, size_t dictSize, int doHash)
     return 0;
 }
 
-void DICT_destruct(DICT_buffer * buf)
+void DICT_destruct(DICT_buffer * const buf)
 {
     free(buf->data[0]);
     free(buf->data[1]);
@@ -71,12 +71,12 @@ void DICT_destruct(DICT_buffer * buf)
 #endif
 }
 
-size_t DICT_size(const DICT_buffer * buf)
+size_t DICT_size(const DICT_buffer * const buf)
 {
     return buf->bufSize;
 }
 
-size_t DICT_get(DICT_buffer * buf, size_t overlap, FL2_outBuffer * dict)
+size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * const dict)
 {
     DICT_shift(buf, overlap);
 
@@ -87,16 +87,16 @@ size_t DICT_get(DICT_buffer * buf, size_t overlap, FL2_outBuffer * dict)
     return dict->size - dict->pos;
 }
 
-int DICT_update(DICT_buffer * buf, size_t addedSize)
+int DICT_update(DICT_buffer * const buf, size_t const addedSize)
 {
     buf->end += addedSize;
     assert(buf->end <= buf->bufSize);
     return !DICT_availSpace(buf);
 }
 
-void DICT_put(DICT_buffer * buf, FL2_inBuffer * input)
+void DICT_put(DICT_buffer * const buf, FL2_inBuffer * const input)
 {
-    size_t toRead = MIN(buf->bufSize - buf->end, input->size - input->pos);
+    size_t const toRead = MIN(buf->bufSize - buf->end, input->size - input->pos);
 
     DEBUGLOG(5, "CStream : reading %u bytes", (U32)toRead);
 
@@ -106,17 +106,17 @@ void DICT_put(DICT_buffer * buf, FL2_inBuffer * input)
     buf->end += toRead;
 }
 
-size_t DICT_availSpace(const DICT_buffer * buf)
+size_t DICT_availSpace(const DICT_buffer * const buf)
 {
     return buf->bufSize - buf->end;
 }
 
-int DICT_hasUnprocessed(const DICT_buffer * buf)
+int DICT_hasUnprocessed(const DICT_buffer * const buf)
 {
     return buf->start < buf->end;
 }
 
-void DICT_getBlock(DICT_buffer * buf, FL2_dataBlock * block)
+void DICT_getBlock(DICT_buffer * const buf, FL2_dataBlock * const block)
 {
     block->data = buf->data[buf->index];
     block->start = buf->start;
@@ -130,17 +130,17 @@ void DICT_getBlock(DICT_buffer * buf, FL2_dataBlock * block)
     buf->start = buf->end;
 }
 
-int DICT_needShift(DICT_buffer * buf, size_t overlap)
+int DICT_needShift(DICT_buffer * const buf, size_t const overlap)
 {
     return buf->start == buf->end && (overlap == 0 || buf->end > overlap + ALIGNMENT_MASK);
 }
 
-int DICT_async(const DICT_buffer * buf)
+int DICT_async(const DICT_buffer * const buf)
 {
     return (int)buf->async;
 }
 
-void DICT_shift(DICT_buffer * buf, size_t overlap)
+void DICT_shift(DICT_buffer * const buf, size_t overlap)
 {
     if (buf->start < buf->end)
         return;
@@ -152,8 +152,8 @@ void DICT_shift(DICT_buffer * buf, size_t overlap)
     }
     else if (buf->end > overlap + ALIGNMENT_MASK) {
         size_t const from = (buf->end - overlap) & ALIGNMENT_MASK;
-        BYTE *src = buf->data[buf->index];
-        BYTE *dst = buf->data[buf->index ^ buf->async];
+        const BYTE *const src = buf->data[buf->index];
+        BYTE *const dst = buf->data[buf->index ^ buf->async];
 
         overlap = buf->end - from;
 
@@ -175,13 +175,13 @@ void DICT_shift(DICT_buffer * buf, size_t overlap)
 }
 
 #ifndef NO_XXHASH
-XXH32_hash_t DICT_getDigest(const DICT_buffer * buf)
+XXH32_hash_t DICT_getDigest(const DICT_buffer * const buf)
 {
     return XXH32_digest(buf->xxh);
 }
 #endif
 
-size_t DICT_memUsage(const DICT_buffer * buf)
+size_t DICT_memUsage(const DICT_buffer * const buf)
 {
     return (1 + buf->async) * buf->bufSize;
 }

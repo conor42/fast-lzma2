@@ -14,7 +14,7 @@
 #define MAX_READ_BEYOND_DEPTH 2
 
 /* If a repeating byte is found, fill that section of the table with matches of distance 1 */
-static size_t HandleRepeat(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
+static size_t RMF_handleRepeat(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
 {
     ptrdiff_t const rpt_index = i - (MAX_REPEAT / 2 - 2);
     /* Set the head to the first byte of the repeat and adjust the count */
@@ -39,7 +39,7 @@ static size_t HandleRepeat(FL2_matchTable* const tbl, const BYTE* const data_blo
 }
 
 /* If a 2-byte repeat is found, fill that section of the table with matches of distance 2 */
-static size_t HandleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
+static size_t RMF_handleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
 {
     ptrdiff_t const rpt_index = i - (MAX_REPEAT - 3);
 
@@ -69,7 +69,7 @@ static size_t HandleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_bl
 
 /* Initialization for the reference algortithm */
 #ifdef RMF_REFERENCE
-static void RadixInitReference(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
+static void RMF_initReference(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
 {
     const BYTE* const data_block = (const BYTE*)data;
     ptrdiff_t const block_size = end - 1;
@@ -113,7 +113,7 @@ RMF_structuredInit
     }
 #ifdef RMF_REFERENCE
     if (tbl->params.use_ref_mf) {
-        RadixInitReference(tbl, data, start, end);
+        RMF_initReference(tbl, data, start, end);
         return 0;
     }
 #endif
@@ -164,11 +164,11 @@ RMF_structuredInit
                     ptrdiff_t const prev_i = i;
                     /* Eliminate the repeat from the linked list to save time */
                     if (dist == 1) {
-                        i = HandleRepeat(tbl, data_block, start, end, i, radix_16);
+                        i = RMF_handleRepeat(tbl, data_block, start, end, i, radix_16);
                         rpt_total += i - prev_i + MAX_REPEAT / 2U - 1;
                     }
                     else {
-                        i = HandleRepeat2(tbl, data_block, start, end, i, radix_16);
+                        i = RMF_handleRepeat2(tbl, data_block, start, end, i, radix_16);
                         rpt_total += i - prev_i + MAX_REPEAT - 2;
                     }
 					if (i < block_size)
@@ -207,7 +207,7 @@ RMF_structuredInit
 
 /* Copy the list into a buffer and recurse it there. This decreases cache misses and allows */
 /* data characters to be loaded every fourth pass and stored for use in the next 4 passes */
-static void RecurseListsBuffered(RMF_builder* const tbl,
+static void RMF_recurseListsBuffered(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
     size_t link,
@@ -276,7 +276,7 @@ static void RecurseListsBuffered(RMF_builder* const tbl,
 
 /* Parse the list with bounds checks on data reads. Stop at the point where bound checks are not required. */
 /* Buffering is used so that parsing can continue below the bound to find a few matches without altering the main table. */
-static void RecurseListsBound(RMF_builder* const tbl,
+static void RMF_recurseListsBound(RMF_builder* const tbl,
     const BYTE* const data_block,
     ptrdiff_t const block_size,
     RMF_tableHead* const list_head,
@@ -409,7 +409,7 @@ static void RecurseListsBound(RMF_builder* const tbl,
 }
 
 /* Compare each string with all others to find the best match */
-static void BruteForce(RMF_builder* const tbl,
+static void RMF_bruteForce(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
     size_t link,
@@ -457,7 +457,7 @@ static void BruteForce(RMF_builder* const tbl,
     } while (i < list_count - 1 && buffer[i] >= block_start);
 }
 
-static void RecurseLists16(RMF_builder* const tbl,
+static void RMF_recurseLists16(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
     size_t link,
@@ -552,7 +552,7 @@ static void RecurseLists16(RMF_builder* const tbl,
         U32 const depth = GetMatchLength(link);
         if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE) {
             /* Quicker to use brute force, each string compared with all previous strings */
-            BruteForce(tbl, data_block,
+            RMF_bruteForce(tbl, data_block,
                 block_start,
                 link,
                 list_count,
@@ -561,7 +561,7 @@ static void RecurseLists16(RMF_builder* const tbl,
             continue;
         }
         /* Send to the buffer at depth 4 */
-        RecurseListsBuffered(tbl,
+        RMF_recurseListsBuffered(tbl,
             data_block,
             block_start,
             link,
@@ -573,7 +573,7 @@ static void RecurseLists16(RMF_builder* const tbl,
 }
 
 #if 0
-static void RecurseListsUnbuf16(RMF_builder* const tbl,
+static void RMF_recurseListsUnbuf16(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
     size_t link,
@@ -664,7 +664,7 @@ static void RecurseListsUnbuf16(RMF_builder* const tbl,
         U32 depth = GetMatchLength(link);
         if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE) {
             /* Quicker to use brute force, each string compared with all previous strings */
-            BruteForce(tbl, data_block,
+            RMF_bruteForce(tbl, data_block,
                 block_start,
                 link,
                 list_count,
@@ -781,7 +781,7 @@ static void RecurseListsUnbuf16(RMF_builder* const tbl,
 #ifdef RMF_REFERENCE
 
 /* Simple, slow, complete parsing for reference */
-static void RecurseListsReference(RMF_builder* const tbl,
+static void RMF_recurseListsReference(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_size,
     size_t link,
@@ -931,22 +931,22 @@ RMF_structuredBuildTable
 
 #ifdef RMF_REFERENCE
         if (tbl->params.use_ref_mf) {
-            RecurseListsReference(tbl->builders[job], block.data, block.end, list_head.head, list_head.count, max_depth);
+            RMF_recurseListsReference(tbl->builders[job], block.data, block.end, list_head.head, list_head.count, max_depth);
             continue;
         }
 #endif
         if (list_head.head >= bounded_start) {
-            RecurseListsBound(tbl->builders[job], block.data, block.end, &list_head, (BYTE)max_depth);
+            RMF_recurseListsBound(tbl->builders[job], block.data, block.end, &list_head, (BYTE)max_depth);
             if (list_head.count < 2 || list_head.head < block.start)
                 continue;
         }
         if (best && list_head.count > tbl->builders[job]->match_buffer_limit)
         {
             /* Not worth buffering or too long */
-            RecurseLists16(tbl->builders[job], block.data, block.start, list_head.head, list_head.count, max_depth);
+            RMF_recurseLists16(tbl->builders[job], block.data, block.start, list_head.head, list_head.count, max_depth);
         }
         else {
-            RecurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
+            RMF_recurseListsBuffered(tbl->builders[job], block.data, block.start, list_head.head, 2, (BYTE)max_depth, list_head.count, 0);
         }
     }
 }

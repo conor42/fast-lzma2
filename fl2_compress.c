@@ -32,15 +32,15 @@
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
-    { 21, 2, 7, 0, 14, 32, 1, 8, FL2_fast }, /* 2 */
-    { 21, 2, 7, 0, 14, 40, 1, 8, FL2_opt }, /* 3 */
-    { 22, 2, 7, 0, 26, 40, 1, 8, FL2_opt }, /* 4 */
-    { 24, 2, 8, 0, 42, 48, 1, 8, FL2_opt }, /* 5 */
-    { 24, 2, 9, 0, 42, 48, 1, 8, FL2_ultra }, /* 6 */
-    { 25, 2, 10, 0, 50, 64, 1, 8, FL2_ultra }, /* 7 */
-    { 26, 2, 11, 1, 60, 64, 1, 9, FL2_ultra }, /* 8 */
-    { 27, 2, 12, 2, 126, 96, 1, 10, FL2_ultra }, /* 9 */
+    { 20, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
+    { 21, 2, 7, 0, 14, 32, 1, 4, FL2_fast }, /* 2 */
+    { 21, 2, 7, 0, 14, 40, 1, 4, FL2_opt }, /* 3 */
+    { 22, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 4 */
+    { 24, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
+    { 24, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
+    { 25, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
+    { 26, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 8 */
+    { 27, 2, 12, 2, 126, 96, 1, 2, FL2_ultra }, /* 9 */
 };
 
 #elif defined(FL2_7ZIP_BUILD)
@@ -50,15 +50,15 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
-    { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
-    { 21, 2, 7, 0, 16, 32, 1, 8, FL2_fast }, /* 3 */
-    { 20, 2, 7, 0, 16, 32, 1, 8, FL2_opt }, /* 4 */
-    { 24, 2, 9, 0, 40, 48, 1, 8, FL2_ultra }, /* 5 */
-    { 25, 2, 10, 0, 48, 64, 1, 8, FL2_ultra }, /* 6 */
-    { 26, 2, 11, 1, 60, 96, 1, 9, FL2_ultra }, /* 7 */
-    { 27, 2, 12, 2, 128, 128, 1, 10, FL2_ultra }, /* 8 */
-    { 27, 3, 14, 3, 252, 160, 0, 10, FL2_ultra } /* 9 */
+    { 20, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
+    { 20, 2, 7, 0, 12, 32, 1, 4, FL2_fast }, /* 2 */
+    { 21, 2, 7, 0, 16, 32, 1, 4, FL2_fast }, /* 3 */
+    { 20, 2, 7, 0, 16, 32, 1, 4, FL2_opt }, /* 4 */
+    { 24, 2, 9, 0, 40, 48, 1, 4, FL2_ultra }, /* 5 */
+    { 25, 2, 10, 0, 48, 64, 1, 4, FL2_ultra }, /* 6 */
+    { 26, 2, 11, 1, 60, 96, 1, 3, FL2_ultra }, /* 7 */
+    { 27, 2, 12, 2, 128, 128, 1, 2, FL2_ultra }, /* 8 */
+    { 27, 3, 14, 3, 252, 160, 0, 2, FL2_ultra } /* 9 */
 };
 
 #else
@@ -68,33 +68,33 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 20, 1, 7, 0, 6, 32, 1, 8, FL2_fast }, /* 1 */
-    { 20, 2, 7, 0, 12, 32, 1, 8, FL2_fast }, /* 2 */
-    { 21, 2, 7, 0, 14, 32, 1, 8, FL2_fast }, /* 3 */
-    { 20, 2, 7, 0, 12, 32, 1, 8, FL2_opt }, /* 4 */
-    { 21, 2, 7, 0, 14, 40, 1, 8, FL2_opt }, /* 5 */
-    { 22, 2, 7, 0, 26, 40, 1, 8, FL2_opt }, /* 6 */
-    { 23, 2, 8, 0, 42, 48, 1, 8, FL2_opt }, /* 7 */
-    { 24, 2, 9, 0, 42, 48, 1, 8, FL2_ultra }, /* 8 */
-    { 25, 2, 10, 0, 50, 64, 1, 8, FL2_ultra }, /* 9 */
-    { 26, 2, 11, 1, 60, 64, 1, 9, FL2_ultra }, /* 10 */
-    { 27, 2, 12, 2, 126, 96, 1, 10, FL2_ultra }, /* 11 */
-    { 28, 2, 14, 3, 254, 160, 1, 10, FL2_ultra } /* 12 */
+    { 20, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
+    { 20, 2, 7, 0, 12, 32, 1, 4, FL2_fast }, /* 2 */
+    { 21, 2, 7, 0, 14, 32, 1, 4, FL2_fast }, /* 3 */
+    { 20, 2, 7, 0, 12, 32, 1, 4, FL2_opt }, /* 4 */
+    { 21, 2, 7, 0, 14, 40, 1, 4, FL2_opt }, /* 5 */
+    { 22, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 6 */
+    { 23, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 7 */
+    { 24, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 8 */
+    { 25, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 9 */
+    { 26, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 10 */
+    { 27, 2, 12, 2, 126, 96, 1, 2, FL2_ultra }, /* 11 */
+    { 28, 2, 14, 3, 254, 160, 1, 2, FL2_ultra } /* 12 */
 };
 
 #endif
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 20, 3, 9, 1, 60, 128, 0, 8, FL2_ultra }, /* 1 */
-    { 21, 3, 10, 1, 60, 128, 0, 8, FL2_ultra }, /* 2 */
-    { 22, 3, 11, 2, 60, 128, 0, 8, FL2_ultra }, /* 3 */
-    { 23, 3, 12, 2, 60, 128, 0, 8, FL2_ultra }, /* 4 */
-    { 24, 3, 13, 3, 60, 128, 0, 8, FL2_ultra }, /* 5 */
-    { 25, 3, 14, 3, 60, 160, 0, 8, FL2_ultra }, /* 6 */
-    { 26, 3, 14, 4, 60, 160, 0, 8, FL2_ultra }, /* 7 */
-    { 27, 3, 14, 4, 128, 160, 0, 8, FL2_ultra }, /* 8 */
-    { 28, 3, 14, 5, 128, 160, 0, 9, FL2_ultra } /* 9 */
+    { 20, 3, 9, 1, 60, 128, 0, 4, FL2_ultra }, /* 1 */
+    { 21, 3, 10, 1, 60, 128, 0, 4, FL2_ultra }, /* 2 */
+    { 22, 3, 11, 2, 60, 128, 0, 4, FL2_ultra }, /* 3 */
+    { 23, 3, 12, 2, 60, 128, 0, 4, FL2_ultra }, /* 4 */
+    { 24, 3, 13, 3, 60, 128, 0, 4, FL2_ultra }, /* 5 */
+    { 25, 3, 14, 3, 60, 160, 0, 4, FL2_ultra }, /* 6 */
+    { 26, 3, 14, 4, 60, 160, 0, 4, FL2_ultra }, /* 7 */
+    { 27, 3, 14, 4, 128, 160, 0, 4, FL2_ultra }, /* 8 */
+    { 28, 3, 14, 5, 128, 160, 0, 3, FL2_ultra } /* 9 */
 };
 
 FL2LIB_API int FL2LIB_CALL FL2_maxCLevel(void)
@@ -120,10 +120,10 @@ static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParame
     cParams->random_filter = 0;
 
     RMF_parameters* const rParams = &cctx->params.rParams;
-    rParams->dictionary_log = MIN(params->dictionaryLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
-    rParams->match_buffer_log = params->bufferLog;
+    rParams->dictionary_size = (size_t)1 << MIN(params->dictionaryLog, FL2_DICTLOG_MAX); /* allow for reduced dict in 32-bit version */
+    rParams->match_buffer_log = RMF_BUFFER_LOG_BASE - params->bufferLog;
     rParams->overlap_fraction = params->overlapFraction;
-    rParams->block_size_log = rParams->dictionary_log + 2;
+    rParams->block_size_multiplier = 4;
     rParams->divide_and_conquer = params->divideAndConquer;
     rParams->depth = params->searchDepth;
 }
@@ -349,14 +349,12 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
         if (FL2_isError(cctx->jobs[u].cSize))
             return cctx->jobs[u].cSize;
 
-    cctx->blockTotal += encodeSize;
-
     cctx->threadCount = nbThreads;
 
     return FL2_error_no_error;
 }
 
-/* FL2_compressRadixChunk() : FL2POOL_function type */
+/* FL2_compressCurBlock_async() : FL2POOL_function type */
 static void FL2_compressCurBlock_async(void* const jobDescription, size_t const n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
@@ -373,6 +371,8 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
 
     /* update largest dict size used */
     cctx->dictMax = MAX(cctx->dictMax, cctx->curBlock.end);
+
+    cctx->blockTotal += cctx->curBlock.end - cctx->curBlock.start;
 
     cctx->outThread = 0;
     cctx->threadCount = 0;
@@ -405,7 +405,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     else
         cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, streamProp);
 
-    return FL2_error_no_error;
+    return cctx->asyncRes;
 }
 
 static BYTE FL2_getProp(FL2_CCtx* const cctx, size_t const dictionarySize)
@@ -470,8 +470,8 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
         return 0;
 
     BYTE* dstBuf = dst;
-    size_t const dictionarySize = (size_t)1 << cctx->params.rParams.dictionary_log;
-    size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(cctx->params.rParams.dictionary_log, cctx->params.rParams.overlap_fraction);
+    size_t const dictionarySize = cctx->params.rParams.dictionary_size;
+    size_t const blockOverlap = OVERLAP_FROM_DICT_SIZE(dictionarySize, cctx->params.rParams.overlap_fraction);
     int streamProp = cctx->params.omitProp ? -1 : FL2_getProp(cctx, MIN(srcSize, dictionarySize));
 
     cctx->curBlock.data = src;
@@ -481,16 +481,15 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
         cctx->curBlock.end = cctx->curBlock.start + MIN(srcSize, dictionarySize - cctx->curBlock.start);
 
         CHECK_F(FL2_compressCurBlock(cctx, streamProp));
-        FL2POOL_waitAll(cctx->compressThread, 0);
 
         streamProp = -1;
 
         for (size_t u = 0; u < cctx->threadCount; ++u) {
             DEBUGLOG(5, "Write thread %u : %u bytes", (U32)u, (U32)cctx->jobs[u].cSize);
 
-            if (dstCapacity < cctx->jobs[u].cSize) {
+            if (dstCapacity < cctx->jobs[u].cSize) 
                 return FL2_ERROR(dstSize_tooSmall);
-            }
+
             const BYTE* const outBuf = RMF_getTableAsOutputBuffer(cctx->matchTable, cctx->jobs[u].block.start);
             memcpy(dstBuf, outBuf, cctx->jobs[u].cSize);
 
@@ -498,8 +497,8 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
             dstCapacity -= cctx->jobs[u].cSize;
         }
         srcSize -= cctx->curBlock.end - cctx->curBlock.start;
-        if (cctx->params.rParams.block_size_log
-            && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, srcSize) > ((U64)1 << cctx->params.rParams.block_size_log)) {
+        if (cctx->params.rParams.block_size_multiplier
+            && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, srcSize) > dictionarySize * cctx->params.rParams.block_size_multiplier) {
             /* periodically reset the dictionary for mt decompression */
             cctx->curBlock.start = 0;
             cctx->blockTotal = 0;
@@ -524,6 +523,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
         FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, compressionLevel);
 
     DEBUGLOG(4, "FL2_compressCCtx : level %u, %u src => %u avail", cctx->params.compressionLevel, (U32)srcSize, (U32)dstCapacity);
+
+    /* No async compression for in-memory function */
+    FL2POOL_free(cctx->compressThread);
+    cctx->compressThread = NULL;
+    cctx->timeout = 0;
 
     FL2_preBeginFrame(cctx, srcSize);
     CHECK_F(FL2_beginFrame(cctx, srcSize));
@@ -587,7 +591,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compress(void* dst, size_t dstCapacity,
 
 FL2LIB_API BYTE FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx)
 {
-    return LZMA2_getDictSizeProp(cctx->dictMax ? cctx->dictMax : (size_t)1 << cctx->params.rParams.dictionary_log);
+    return LZMA2_getDictSizeProp(cctx->dictMax ? cctx->dictMax : cctx->params.rParams.dictionary_size);
 }
 
 #define MAXCHECK(val,max) do {            \
@@ -627,7 +631,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_dictionaryLog:
         CLAMPCHECK(value, FL2_DICTLOG_MIN, FL2_DICTLOG_MAX);
-        cctx->params.rParams.dictionary_log = value;
+        cctx->params.rParams.dictionary_size = (size_t)1 << value;
+        break;
+
+    case FL2_p_dictionarySize:
+        CLAMPCHECK(value, FL2_DICTSIZE_MIN, FL2_DICTSIZE_MAX);
+        cctx->params.rParams.dictionary_size = value;
         break;
 
     case FL2_p_overlapFraction:
@@ -635,15 +644,15 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         cctx->params.rParams.overlap_fraction = value;
         break;
 
-    case FL2_p_blockSizeLog:
+    case FL2_p_blockSizeMultiplier:
         if (value != 0)
-            CLAMPCHECK(value, FL2_BLOCK_LOG_MIN, FL2_BLOCK_LOG_MAX);
-        cctx->params.rParams.block_size_log = value;
+            CLAMPCHECK(value, FL2_BLOCK_MUL_MIN, FL2_BLOCK_MUL_MAX);
+        cctx->params.rParams.block_size_multiplier = value;
         break;
 
     case FL2_p_bufferLog:
-        CLAMPCHECK(value, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);
-        cctx->params.rParams.match_buffer_log = value;
+        MAXCHECK(value, RMF_BUFFER_LOG_BASE - FL2_BUFFER_SIZE_LOG_MIN);
+        cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - value;
         break;
 
     case FL2_p_chainLog:
@@ -723,17 +732,24 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_highCompression:
         return cctx->params.highCompression;
 
-    case FL2_p_dictionaryLog:
-        return cctx->params.rParams.dictionary_log;
+    case FL2_p_dictionaryLog: {
+        size_t dictLog = FL2_DICTLOG_MIN;
+        while (((size_t)1 << dictLog) < cctx->params.rParams.dictionary_size)
+            ++dictLog;
+        return dictLog;
+    }
+
+    case FL2_p_dictionarySize:
+        return cctx->params.rParams.dictionary_size;
 
     case FL2_p_overlapFraction:
         return cctx->params.rParams.overlap_fraction;
 
-    case FL2_p_blockSizeLog:
-        return cctx->params.rParams.block_size_log;
+    case FL2_p_blockSizeMultiplier:
+        return cctx->params.rParams.block_size_multiplier;
 
     case FL2_p_bufferLog:
-        return cctx->params.rParams.match_buffer_log;
+        return RMF_BUFFER_LOG_BASE - cctx->params.rParams.match_buffer_log;
 
     case FL2_p_chainLog:
         return cctx->params.cParams.second_dict_bits;
@@ -798,7 +814,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
     FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, compressionLevel);
 
     DICT_buffer *const buf = &fcs->buf;
-    size_t const dictSize = (size_t)1 << fcs->params.rParams.dictionary_log;
+    size_t const dictSize = fcs->params.rParams.dictionary_size;
 
     /* Free unsuitable objects before reallocating anything new */
     if (DICT_size(buf) < dictSize)
@@ -849,7 +865,7 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const endi
 
         if (!fcs->wroteProp && !fcs->params.omitProp) {
             size_t dictionarySize = ending ? MAX(fcs->dictMax, fcs->curBlock.end)
-                : (size_t)1 << fcs->params.rParams.dictionary_log;
+                : fcs->params.rParams.dictionary_size;
             streamProp = FL2_getProp(fcs, dictionarySize);
             DEBUGLOG(4, "Writing property byte : 0x%X", streamProp);
             fcs->wroteProp = 1;
@@ -870,16 +886,24 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer*
     CHECK_F(fcs->asyncRes);
 
     DICT_buffer * const buf = &fcs->buf;
-    size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(fcs->params.rParams.dictionary_log, fcs->params.rParams.overlap_fraction);
+    size_t const blockOverlap = OVERLAP_FROM_DICT_SIZE(fcs->params.rParams.dictionary_size, fcs->params.rParams.overlap_fraction);
     size_t const prevIn = input->pos;
 
     while (input->pos < input->size) {
         /* read input and/or write output until a buffer is full */
-        if (DICT_needShift(buf, blockOverlap)) {
+        size_t overlap = blockOverlap;
+        if (!DICT_hasUnprocessed(buf)
+            && fcs->params.rParams.block_size_multiplier != 0
+            && fcs->blockTotal >= (fcs->params.rParams.dictionary_size * fcs->params.rParams.block_size_multiplier)) {
+            /* periodically reset the dictionary for mt decompression */
+            overlap = 0;
+            fcs->blockTotal = 0;
+        }
+        if (DICT_needShift(buf, overlap)) {
             /* cannot shift single dict during compression */
             if(!DICT_async(buf))
                 CHECK_F(FL2_waitStream(fcs));
-            DICT_shift(buf, blockOverlap);
+            DICT_shift(buf, overlap);
         }
         
         CHECK_F(fcs->asyncRes);
@@ -893,7 +917,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer*
             if (res == 0)
                 break;
         }
+
+        CHECK_F(fcs->asyncRes);
     }
+
     if (prevIn == input->pos) {
         ++fcs->loopCount;
         if (fcs->loopCount > 1)
@@ -902,6 +929,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer*
     else {
         fcs->loopCount = 0;
     }
+
     return fcs->outThread == fcs->threadCount;
 }
 
@@ -912,7 +940,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_out
 
     CHECK_F(fcs->asyncRes);
 
-    size_t const blockOverlap = OVERLAP_FROM_DICT_LOG(fcs->params.rParams.dictionary_log, fcs->params.rParams.overlap_fraction);
+    size_t const blockOverlap = OVERLAP_FROM_DICT_SIZE(fcs->params.rParams.dictionary_size, fcs->params.rParams.overlap_fraction);
 
     if (DICT_needShift(&fcs->buf, blockOverlap) && !DICT_async(&fcs->buf))
         CHECK_F(FL2_waitStream(fcs));
@@ -1104,12 +1132,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int h
     return FL2_error_no_error;
 }
 
-static size_t FL2_memoryUsage_internal(unsigned const dictionaryLog, unsigned const bufferLog,
+static size_t FL2_memoryUsage_internal(size_t const dictionarySize, unsigned const bufferLog,
     unsigned const searchDepth, unsigned const chainLog,
     FL2_strategy const strategy,
     unsigned const nbThreads)
 {
-    return RMF_memoryUsage(dictionaryLog, bufferLog, searchDepth, nbThreads)
+    return RMF_memoryUsage(dictionarySize, bufferLog, searchDepth, nbThreads)
         + LZMA2_encMemoryUsage(chainLog, strategy, nbThreads);
 }
 
@@ -1125,7 +1153,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigne
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters * params, unsigned nbThreads)
 {
-    return FL2_memoryUsage_internal(params->dictionaryLog,
+    return FL2_memoryUsage_internal((size_t)1 << params->dictionaryLog,
         params->bufferLog,
         params->searchDepth,
         params->chainLog,
@@ -1135,7 +1163,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressio
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx * cctx)
 {
-    return FL2_memoryUsage_internal(cctx->params.rParams.dictionary_log,
+    return FL2_memoryUsage_internal(cctx->params.rParams.dictionary_size,
         cctx->params.rParams.match_buffer_log,
         cctx->params.rParams.depth,
         cctx->params.cParams.second_dict_bits,

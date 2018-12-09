@@ -20,16 +20,18 @@ extern "C" {
 
 typedef struct FL2_matchTable_s FL2_matchTable;
 
-#define OVERLAP_FROM_DICT_LOG(d, o) (((size_t)1 << ((d) - 4)) * (o))
+#define OVERLAP_FROM_DICT_SIZE(d, o) (((d) >> 4) * (o))
 
 #define RMF_MIN_BYTES_PER_THREAD 1024
 
+#define RMF_BUFFER_LOG_BASE 12
+
 typedef struct
 {
-    unsigned dictionary_log;
+    size_t dictionary_size;
     unsigned match_buffer_log;
     unsigned overlap_fraction;
-    unsigned block_size_log;
+    unsigned block_size_multiplier;
     unsigned divide_and_conquer;
     unsigned depth;
 #ifdef RMF_REFERENCE
@@ -53,7 +55,7 @@ void RMF_resetIncompleteBuild(FL2_matchTable* const tbl);
 int RMF_integrityCheck(const FL2_matchTable* const tbl, const BYTE* const data, size_t const index, size_t const end, unsigned const max_depth);
 void RMF_limitLengths(FL2_matchTable* const tbl, size_t const index);
 BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index);
-size_t RMF_memoryUsage(unsigned const dict_log, unsigned const buffer_log, unsigned const depth, unsigned const thread_count);
+size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_log, unsigned const depth, unsigned const thread_count);
 
 #if defined (__cplusplus)
 }

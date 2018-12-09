@@ -358,6 +358,10 @@ FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void);
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
+FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned timeout);
+FL2LIB_API size_t FL2LIB_CALL FL2_waitDStream(FL2_DStream * fds);
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getDStreamProgress(const FL2_DStream * fds);
+
 /*===== Streaming decompression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds);
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned char prop);
@@ -375,8 +379,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 
 #define FL2_DICTLOG_MAX_32   27
 #define FL2_DICTLOG_MAX_64   30
-#define FL2_DICTLOG_MAX    ((unsigned)(sizeof(size_t) == 4 ? FL2_DICTLOG_MAX_32 : FL2_DICTLOG_MAX_64))
+#define FL2_DICTLOG_MAX      ((unsigned)(sizeof(size_t) == 4 ? FL2_DICTLOG_MAX_32 : FL2_DICTLOG_MAX_64))
 #define FL2_DICTLOG_MIN      20
+#define FL2_DICTSIZE_MAX     (1U << FL2_DICTLOG_MAX)
+#define FL2_DICTSIZE_MIN     (1U << FL2_DICTLOG_MIN)
 #define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
 #define FL2_SEARCHLOG_MAX     (FL2_CHAINLOG_MAX-1)
@@ -385,8 +391,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
-#define FL2_BLOCK_LOG_MIN 21
-#define FL2_BLOCK_LOG_MAX 32
+#define FL2_BLOCK_MUL_MIN 2
+#define FL2_BLOCK_MUL_MAX 16      /* small enough to fit FL2_DICTSIZE_MAX * FL2_BLOCK_MUL_MAX in 32-bit size_t */
 #define FL2_SEARCH_DEPTH_MIN 6
 #define FL2_SEARCH_DEPTH_MAX 254
 #define FL2_BUFFER_SIZE_LOG_MIN 6
@@ -429,11 +435,12 @@ typedef enum {
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                               * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
                               * Special: value 0 means "do not change dictionaryLog". */
+    FL2_p_dictionarySize,
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
-    FL2_p_blockSizeLog,     /* Block size for multithreaded decompression. A dictionary reset will occur
+    FL2_p_blockSizeMultiplier,/* Block size for multithreaded decompression. A dictionary reset will occur
                                after each 2 ^ blockSizeLog bytes of input. */
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
                              * 2 ^ (dictionaryLog - bufferLog). Lower number = slower, better compression,

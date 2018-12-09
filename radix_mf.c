@@ -92,14 +92,14 @@ static RMF_builder** RMF_createBuilderTable(U32* const matchTable, size_t const 
     return builders;
 }
 
-static int RMF_isStruct(unsigned const dictionary_log, unsigned const depth)
+static int RMF_isStruct(size_t const dictionary_size, unsigned const depth)
 {
-    return dictionary_log > RADIX_LINK_BITS || depth > BITPACK_MAX_LENGTH;
+    return dictionary_size > ((size_t)1 << RADIX_LINK_BITS) || depth > BITPACK_MAX_LENGTH;
 }
 
 static int RMF_isStructParam(const RMF_parameters* const params)
 {
-    return RMF_isStruct(params->dictionary_log, params->depth);
+    return RMF_isStruct(params->dictionary_size, params->depth);
 }
 
 /** RMF_clampParams() :
@@ -111,7 +111,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
         if (val<(min)) val=(min);        \
         else if (val>(max)) val=(max);   \
     }
-    CLAMP(params.dictionary_log, DICTIONARY_LOG_MIN, MEM_64bits() ? DICTIONARY_LOG_MAX_64 : DICTIONARY_LOG_MAX_32);
+    CLAMP(params.dictionary_size, DICTIONARY_SIZE_MIN, MEM_64bits() ? DICTIONARY_SIZE_MAX_64 : DICTIONARY_SIZE_MAX_32);
     CLAMP(params.match_buffer_log, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);
     CLAMP(params.overlap_fraction, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
     CLAMP(params.depth, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
@@ -122,15 +122,15 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
 static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_parameters* const params)
 {
     int const isStruct = RMF_isStructParam(params);
-    unsigned const dictionary_log = tbl->params.dictionary_log;
+    size_t const dictionary_size = tbl->params.dictionary_size;
     /* dictionary is allocated with the struct and is immutable */
-    if (params->dictionary_log > tbl->params.dictionary_log
-        || (params->dictionary_log == tbl->params.dictionary_log && isStruct > tbl->allocStruct))
+    if (params->dictionary_size > tbl->params.dictionary_size
+        || (params->dictionary_size == tbl->params.dictionary_size && isStruct > tbl->allocStruct))
         return FL2_ERROR(parameter_unsupported);
 
-    size_t const match_buffer_size = (size_t)1 << (params->dictionary_log - params->match_buffer_log);
+    size_t const match_buffer_size = params->dictionary_size >> params->match_buffer_log;
     tbl->params = *params;
-    tbl->params.dictionary_log = dictionary_log;
+    tbl->params.dictionary_size = dictionary_size;
     tbl->isStruct = isStruct;
     if (tbl->builders == NULL
         || match_buffer_size > tbl->builders[0]->match_buffer_size)
@@ -153,8 +153,8 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_
 static void RMF_reduceDict(RMF_parameters* const params, size_t const dict_reduce)
 {
     if (dict_reduce)
-        while (params->dictionary_log > DICTIONARY_LOG_MIN && (size_t)1 << (params->dictionary_log - 1) >= dict_reduce) {
-            --params->dictionary_log;
+        for (size_t dict_size = params->dictionary_size; dict_size > DICTIONARY_SIZE_MIN && (dict_size >> 1) >= dict_reduce; dict_size >>= 1) {
+            /* Use unchanged match buffer size for reduced dict */
             params->match_buffer_log = MAX(params->match_buffer_log - 1, FL2_BUFFER_SIZE_LOG_MIN);
         }
 }
@@ -175,7 +175,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     RMF_reduceDict(&params, dict_reduce);
 
     int const isStruct = RMF_isStructParam(&params);
-    size_t dictionary_size = (size_t)1 << params.dictionary_log;
+    size_t dictionary_size = params.dictionary_size;
 
     DEBUGLOG(3, "RMF_createMatchTable : isStruct %d, dict %u", isStruct, (U32)dictionary_size);
 
@@ -215,8 +215,8 @@ BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_paramet
 {
     RMF_parameters params = RMF_clampParams(*p);
     RMF_reduceDict(&params, dict_reduce);
-    return tbl->params.dictionary_log > params.dictionary_log
-        || (tbl->params.dictionary_log == params.dictionary_log && tbl->allocStruct >= RMF_isStructParam(&params));
+    return tbl->params.dictionary_size > params.dictionary_size
+        || (tbl->params.dictionary_size == params.dictionary_size && tbl->allocStruct >= RMF_isStructParam(&params));
 }
 
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const p, size_t const dict_reduce)
@@ -249,7 +249,7 @@ size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t c
         return RMF_bitpackInit(tbl, data, start, end);
 }
 
-static void HandleRepeat(RMF_buildMatch* const match_buffer,
+static void RMF_handleRepeat(RMF_buildMatch* const match_buffer,
     const BYTE* const data_block,
     size_t const next,
     U32 count,
@@ -286,7 +286,7 @@ typedef struct
 	union src_data_u src;
 } BruteForceMatch;
 
-static void BruteForceBuffered(RMF_builder* const tbl,
+static void RMF_bruteForceBuffered(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
     size_t index,
@@ -420,7 +420,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
         size_t slot = (depth - base_depth) & 3;
         if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE) {
             /* Quicker to use brute force, each string compared with all previous strings */
-            BruteForceBuffered(tbl,
+            RMF_bruteForceBuffered(tbl,
                 data_block,
                 block_start,
                 index,
@@ -511,7 +511,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 size_t const next_link = tbl->match_buffer[next_index].from;
                 if ((link - next_link) > rpt_depth) {
                     if (rpt > 0) {
-                        HandleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
+                        RMF_handleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
                     }
                     rpt = -1;
                     U32 const prev = tbl->tails_8[radix_8].prev_index;
@@ -533,7 +533,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     U32 const dist = (U32)(link - next_link);
                     if (rpt < 0 || dist != rpt_dist) {
                         if (rpt > 0) {
-                            HandleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
+                            RMF_handleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
                         }
                         rpt = 0;
                         rpt_head_next = next_index;
@@ -560,7 +560,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             } while (--list_count != 0);
 
             if (rpt > 0)
-                HandleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
+                RMF_handleRepeat(tbl->match_buffer, data_block, rpt_head_next, rpt, rpt_dist, rpt_depth, tbl->max_len);
 
             size_t const radix_8 = tbl->match_buffer[index].src.chars[slot];
             U32 const prev = tbl->tails_8[radix_8].prev_index;
@@ -613,12 +613,10 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     U32 const list_count,
     size_t const stack_base)
 {
-    if (max_depth > 6) {
+    if (max_depth > 6)
         RMF_recurseListChunk_generic(tbl, data_block, block_start, depth, max_depth, list_count, stack_base);
-    }
-    else {
+    else
         RMF_recurseListChunk_generic(tbl, data_block, block_start, depth, 6, list_count, stack_base);
-    }
 }
 
 /* Iterate the head table concurrently with other threads, and recurse each list until max_depth is reached */
@@ -676,10 +674,10 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
         return RMF_bitpackAsOutputBuffer(tbl, index);
 }
 
-size_t RMF_memoryUsage(unsigned const dict_log, unsigned const buffer_log, unsigned const depth, unsigned const thread_count)
+size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_log, unsigned const depth, unsigned const thread_count)
 {
-    size_t size = (size_t)(4U + RMF_isStruct(dict_log, depth)) << dict_log;
-    U32 const buf_size = (U32)1 << (dict_log - buffer_log);
+    size_t size = (size_t)(4U + RMF_isStruct(dict_size, depth)) * dict_size;
+    size_t const buf_size = dict_size >> buffer_log;
     size += ((buf_size - 1) * sizeof(RMF_buildMatch) + sizeof(RMF_builder)) * thread_count;
     return size;
 }

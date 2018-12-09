@@ -286,7 +286,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     void* const compressedBuffer = malloc(compressedBufferSize);
     void* const decodedBuffer = malloc(CNBuffSize);
     FL2_CStream *const cstream = FL2_createCStreamMt(nbThreads, 1);
-    FL2_DStream *const dstream = FL2_createDStream();
+    FL2_DStream *const dstream = FL2_createDStreamMt(nbThreads);
     int testResult = 0;
     U32 testNb=0;
     size_t cSize;
@@ -532,6 +532,28 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             r = FL2_decompressStream(dstream, &out, &in);
             if (FL2_isError(r)) goto _output_error;
         } while (r);
+        {   size_t diff = findDiff(CNBuffer, decodedBuffer, out.pos);
+            if (diff < CNBuffSize) goto _output_error;
+        }
+    }
+    DISPLAYLEVEL(4, "OK \n");
+
+    DISPLAYLEVEL(4, "test%3i : decompress stream with progress : ", testNb++);
+    {   FL2_inBuffer in = { compressedBuffer, cSize, 0 };
+        FL2_outBuffer out = { decodedBuffer, CNBuffSize, 0 };
+        size_t r;
+        FL2_setDStreamTimeout(dstream, 100);
+        CHECK(FL2_initDStream(dstream));
+        DISPLAYLEVEL(4, "  0%c", '%');
+        do {
+            r = FL2_decompressStream(dstream, &out, &in);
+            if (FL2_isTimedOut(r)) do {
+                DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)(FL2_getDStreamProgress(dstream) * 100 / CNBuffSize), '%');
+                r = FL2_waitDStream(dstream);
+            } while (FL2_isTimedOut(r));
+            if (FL2_isError(r)) goto _output_error;
+        } while (r);
+        FL2_setDStreamTimeout(dstream, 0);
         {   size_t diff = findDiff(CNBuffer, decodedBuffer, out.pos);
             if (diff < CNBuffSize) goto _output_error;
         }

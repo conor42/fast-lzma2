@@ -64,9 +64,8 @@ void RC_encodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned
 	size_t tree_index = 1;
     assert(bit_count > 0);
     do {
-        unsigned bit;
 		--bit_count;
-		bit = (symbol >> bit_count) & 1;
+        unsigned bit = (symbol >> bit_count) & 1;
 		RC_encodeBit(rc, &probs[tree_index], bit);
 		tree_index = (tree_index << 1) | bit;
 	} while (bit_count != 0);

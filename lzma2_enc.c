@@ -16,6 +16,7 @@ Public domain
 #include "range_enc.h"
 
 #ifdef FL2_XZ_BUILD
+#  include "tuklib_integer.h"
 #  define MEM_readLE32(a) unaligned_read32le(a)
 
 #  ifdef TUKLIB_FAST_UNALIGNED_ACCESS

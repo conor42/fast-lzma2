@@ -64,6 +64,7 @@ struct FL2_CCtx_s {
     size_t asyncRes;
     size_t threadCount;
     size_t outThread;
+    size_t outPos;
     size_t dictMax;
     U64 blockTotal;
     U64 streamTotal;

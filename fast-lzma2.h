@@ -53,9 +53,9 @@ Introduction
 *********************************************************************************************************/
 
 /*------   Version   ------*/
-#define FL2_VERSION_MAJOR    1
-#define FL2_VERSION_MINOR    0
-#define FL2_VERSION_RELEASE  0
+#define FL2_VERSION_MAJOR    0
+#define FL2_VERSION_MINOR    9
+#define FL2_VERSION_RELEASE  9
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -272,7 +272,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
  *  input is consumed. A call to FL2_compressStream() will block when all dictionary space is
  *  filled. FL2_compressStream() must not be called again until all compressed data is read.
  *  Returns zero to indicte compressed data must be read, or nonzero otherwise. */
-FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_inBuffer* input);
+FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer *output, FL2_inBuffer* input);
 
 /*! FL2_getDictionaryBuffer() :
  *  Returns a buffer in the FL2_outBuffer object, which the caller can directly read data into.
@@ -319,14 +319,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, 
  *  to call FL2_flushStream() twice and read the compressed data in between. Flushing is not
  *  normally useful and produces larger output.
  *  Returns amount of compressed data to be read from the CStream object. */
-FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer *output);
 
 /*! FL2_endStream() :
  *  Compress all data remaining in the dictionary buffer(s) and write the stream end marker. With
  *  dual buffers it may be necessary to call FL2_endStream() twice and read the compressed data
  *  each time.
  *  Returns zero when compression is complete and the final output can be read. */
-FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs);
+FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *output);
 
 /*-***************************************************************************
  *  Streaming decompression - HowTo

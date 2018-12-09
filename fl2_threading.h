@@ -19,6 +19,8 @@
 #  else
 #    define MYTHREAD_POSIX  /* posix assumed ; need a better detection method */
 #  endif
+#elif defined(HAVE_CONFIG_H)
+#  include <config.h>
 #endif
 
 #if defined (__cplusplus)

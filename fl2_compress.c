@@ -1063,29 +1063,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inB
     CHECK_F(FL2_waitStream(fcs));
 
     if (fcs->outThread < fcs->threadCount) {
-        cbuf->src = RMF_getTableAsOutputBuffer(fcs->matchTable, fcs->jobs[fcs->outThread].block.start);
-        cbuf->size = fcs->jobs[fcs->outThread].cSize;
+        cbuf->src = RMF_getTableAsOutputBuffer(fcs->matchTable, fcs->jobs[fcs->outThread].block.start) + fcs->outPos;
+        cbuf->size = fcs->jobs[fcs->outThread].cSize - fcs->outPos;
         ++fcs->outThread;
+        fcs->outPos = 0;
     }
     return cbuf->size;
-}
-
-FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity)
-{
-    size_t cSize = 0;
-    for (; fcs->outThread < fcs->threadCount; ++fcs->outThread) {
-        size_t toWrite = fcs->jobs[fcs->outThread].cSize;
-        if (dstCapacity - cSize < toWrite)
-            return FL2_ERROR(dstSize_tooSmall);
-
-        DEBUGLOG(5, "CStream : writing %u bytes", (U32)toWrite);
-
-        const BYTE* const outBuf = RMF_getTableAsOutputBuffer(fcs->matchTable, fcs->jobs[fcs->outThread].block.start);
-
-        memcpy((BYTE*)dst + cSize, outBuf, toWrite);
-        cSize += toWrite;
-    }
-    return cSize;
 }
 
 static void FL2_writeEnd(FL2_CStream* const fcs)
@@ -1189,7 +1172,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
 
     if (output != NULL && res != 0) {
         FL2_copyCStreamOutput(fcs, output);
-        res = fcs->outThread < fcs->threadCount;
+        res = fcs->outThread < fcs->threadCount || DICT_hasUnprocessed(&fcs->buf);
     }
 
     CHECK_F(FL2_loopCheck(fcs, output != NULL && prevOut == output->pos));

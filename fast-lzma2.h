@@ -309,11 +309,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
  *  thread used. It is sometimes less but never more than that. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
 
-/*! FL2_getCStreamOutput() :
- *  Copies the compressed data to a single buffer, which must have a capacity of at least
- *  FL2_remainingOutputSize() bytes. */
-FL2LIB_API size_t FL2LIB_CALL FL2_getCStreamOutput(FL2_CStream* fcs, void *dst, size_t dstCapacity);
-
 /*! FL2_flushStream() :
  *  Compress all data remaining in the dictionary buffer(s). With dual buffers it may be necessary
  *  to call FL2_flushStream() twice and read the compressed data in between. Flushing is not

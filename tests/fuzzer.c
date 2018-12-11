@@ -1031,8 +1031,9 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                         CHECK(FL2_isError(r), "FL2_updateDictionary failed : %s", FL2_getErrorName(r));
                     }
                     else do {
-                        r = FL2_compressStream(cstream, &out, &in);
+                        r = FL2_compressStream(cstream, NULL, &in);
                     } while (FL2_isTimedOut(r));
+                    CHECK(FL2_isError(r), "FL2_compressStream failed : %s", FL2_getErrorName(r));
                     if (r && (FUZ_rand(&lseed) % flushFreq) == 0) {
                         for (unsigned i = 0; i < flushes; ++i) {
                             do {
@@ -1041,7 +1042,6 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                             CHECK(FL2_isError(r), "FL2_flushStream failed : %s", FL2_getErrorName(r));
                         }
                     }
-                    CHECK(FL2_isError(r), "FL2_compressStream failed : %s", FL2_getErrorName(r));
                     if (!r) {
                         if (FUZ_rand(&lseed) & 1) {
                             r = FL2_compressStream(cstream, &out, &in);

@@ -16,14 +16,14 @@ objects = ../error_private.o \
 ../tests/datagen.o \
 bench.o
 
-CFLAGS := -Wall -O3 -pthread
+CFLAGS := -Wall -O3 -pthread -DLZMA2_DEC_OPT
 CC := gcc
 
 ../LzmaDecOpt.o: ../LzmaDecOpt.S
 	as -o $@ $<
 
 bench : $(objects) ../LzmaDecOpt.o
-	$(CC) -pthread -o bench.exe $(objects) -lm
+	$(CC) -pthread -o bench.exe $(objects) ../LzmaDecOpt.o -lm -Wl,-Map=output.map
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
 error_private.o : ../error_private.h

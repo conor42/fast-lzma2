@@ -21,6 +21,8 @@
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 
+#define FL2_MAX_LOOPS 5U
+
 /*-=====  Pre-defined compression levels  =====-*/
 
 #define FL2_MAX_HIGH_CLEVEL 9
@@ -955,7 +957,7 @@ static size_t FL2_loopCheck(FL2_CStream* fcs, int unchanged)
 {
     if (unchanged) {
         ++fcs->loopCount;
-        if (fcs->loopCount > 2)
+        if (fcs->loopCount > FL2_MAX_LOOPS)
             return FL2_ERROR(infinite_loop);
     }
     else {

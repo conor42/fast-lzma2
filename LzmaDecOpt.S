@@ -13,11 +13,6 @@
 # 7zAsm.asm -- ASM macros
 # 2018-02-03 : Igor Pavlov : Public domain
 
-.macro MY_ENDP
-  ret
-  proc_name ENDP
-.endm
-
   .equ REG_SIZE, 8
   .equ REG_LOGAR_SIZE, 3
 
@@ -71,19 +66,41 @@
   .equ x15, r15d
 
 
-# for System V AMD64 ABI:
-
-# .equ REG_PARAM_0, r7
-# .equ REG_PARAM_1, r6
-# .equ REG_PARAM_2, r2
-# .equ REG_PARAM_3, r1
-
+.ifdef WIN64
 # for WIN64-x64 ABI:
-
 .equ REG_PARAM_0, r1
 .equ REG_PARAM_1, r2
 .equ REG_PARAM_2, r8
 .equ REG_PARAM_3, r9
+
+.macro MY_PUSH_PRESERVED_REGS
+    push    r3
+    push    r5
+    push    r6 # WIN64
+    push    r7 # WIN64
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+.endm
+
+.macro MY_POP_PRESERVED_REGS
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop		r7 # WIN64
+    pop		r6 # WIN64
+    pop     r5
+    pop     r3
+.endm
+
+.else
+# for System V AMD64 ABI:
+.equ REG_PARAM_0, r7
+.equ REG_PARAM_1, r6
+.equ REG_PARAM_2, r2
+.equ REG_PARAM_3, r1
 
 .macro MY_PUSH_PRESERVED_REGS
     push    r3
@@ -94,7 +111,6 @@
     push    r15
 .endm
 
-
 .macro MY_POP_PRESERVED_REGS
     pop     r15
     pop     r14
@@ -104,10 +120,9 @@
     pop     r3
 .endm
 
-#    .code
+.endif
 
 
-# _TEXT$LZMADECOPT SEGMENT ALIGN(64) 'CODE'
 
 .macro MY_ALIGN  num:req
         .balign  \num, 0x90
@@ -967,15 +982,15 @@ decode_dist_end:
         # rep0 = distance + 1#
 
         inc     sym
-        mov     t0, [LOC + rep0]
-        mov     t1, [LOC + rep1]
-        mov     x1, [LOC + rep2]
-        mov     [LOC + rep0], sym
+        mov     t0, [LOC + rep0_Loc]
+        mov     t1, [LOC + rep1_Loc]
+        mov     x1, [LOC + rep2_Loc]
+        mov     [LOC + rep0_Loc], sym
         # mov     sym, [LOC + remainLen_Loc]
         mov     sym, len_temp
-        mov     [LOC + rep1], t0
-        mov     [LOC + rep2], t1
-        mov     [LOC + rep3], x1
+        mov     [LOC + rep1_Loc], t0
+        mov     [LOC + rep2_Loc], t1
+        mov     [LOC + rep3_Loc], x1
         
         # state = (state < kNumStates + kNumLitStates) ? kNumLitStates : kNumLitStates + 3#
         cmp     state, (kNumStates + kNumLitStates) * PMULT
@@ -1005,7 +1020,7 @@ copy_match:
         cmovae  cnt, sym # 32-bit
 
         mov     dic, [LOC + dic_Spec_Loc]
-        mov     x1, [LOC + rep0]
+        mov     x1, [LOC + rep0_Loc]
 
         mov     t0_R, dicPos
         add     dicPos, cnt_R
@@ -1078,7 +1093,7 @@ lz_end:
         LIT_PROBS [LOC + lpMask]
         
         # matchByte = dic[dicPos - rep0 + (dicPos < rep0 ? dicBufSize : 0)]#
-        mov     x1, [LOC + rep0]
+        mov     x1, [LOC + rep0_Loc]
         # mov     dic, [LOC + dic_Spec_Loc]
         mov     [LOC + dicPos_Spec_Loc], dicPos
         
@@ -1150,7 +1165,7 @@ IsRep0Short_label:
         # dic[dicPos] = dic[dicPos - rep0 + (dicPos < rep0 ? dicBufSize : 0)]#
         mov     dic, [LOC + dic_Spec_Loc]
         mov     t0_R, dicPos
-        mov     probBranch, [LOC + rep0]
+        mov     probBranch, [LOC + rep0_Loc]
         sub     t0_R, dic
         
         sub     probs, RepLenCoder * PMULT
@@ -1195,30 +1210,30 @@ IsRep_label:
 MY_ALIGN_32
 IsRepG0_label:
         UPDATE_1 probs_state_R, 0, IsRepG0
-        mov     dist2, [LOC + rep0]
-        mov     dist, [LOC + rep1]
-        mov     [LOC + rep1], dist2
+        mov     dist2, [LOC + rep0_Loc]
+        mov     dist, [LOC + rep1_Loc]
+        mov     [LOC + rep1_Loc], dist2
         
         IF_BIT_1 probs_state_R, 0, IsRepG1, IsRepG1_label
-        mov     [LOC + rep0], dist
+        mov     [LOC + rep0_Loc], dist
         jmp     len_decode
         
 # MY_ALIGN_32
 IsRepG1_label:
         UPDATE_1 probs_state_R, 0, IsRepG1
-        mov     dist2, [LOC + rep2]
-        mov     [LOC + rep2], dist
+        mov     dist2, [LOC + rep2_Loc]
+        mov     [LOC + rep2_Loc], dist
         
         IF_BIT_1 probs_state_R, 0, IsRepG2, IsRepG2_label
-        mov     [LOC + rep0], dist2
+        mov     [LOC + rep0_Loc], dist2
         jmp     len_decode
 
 # MY_ALIGN_32
 IsRepG2_label:
         UPDATE_1 probs_state_R, 0, IsRepG2
-        mov     dist, [LOC + rep3]
-        mov     [LOC + rep3], dist2
-        mov     [LOC + rep0], dist
+        mov     dist, [LOC + rep3_Loc]
+        mov     [LOC + rep3_Loc], dist2
+        mov     [LOC + rep0_Loc], dist
         jmp     len_decode
 
         
@@ -1320,6 +1335,7 @@ fin:
 
 MY_POP_PRESERVED_REGS
 
+		ret
 # _TEXT$LZMADECOPT ENDS
 
 .end

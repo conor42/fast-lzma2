@@ -66,7 +66,7 @@
   .equ x15, r15d
 
 
-.ifdef WIN64
+.if MS_x64_CALL
 # for WIN64-x64 ABI:
 .equ REG_PARAM_0, r1
 .equ REG_PARAM_1, r2
@@ -764,7 +764,7 @@ MY_PUSH_PRESERVED_REGS
         mov     kBitModelTotal_reg, kBitModelTotal
         xor     sym, sym
 
-        # if (processedPos != 0 || checkDicSize != 0)
+        ## if (processedPos != 0 || checkDicSize != 0)
         or      x1, processedPos
         jz      1f
         
@@ -968,7 +968,7 @@ direct_end:
 
 decode_dist_end:
 
-        # if (distance >= (checkDicSize == 0 ? processedPos: checkDicSize))
+        ## if (distance >= (checkDicSize == 0 ? processedPos: checkDicSize))
 
         mov     t0, [LOC + checkDicSize_Loc]
         test    t0, t0
@@ -1005,7 +1005,7 @@ copy_match:
         # len += kMatchMinLen#
         # add     sym, kMatchMinLen
 
-        # if ((rem = limit - dicPos) == 0)
+        ## if ((rem = limit - dicPos) == 0)
         # {
         #   p->dicPos = dicPos#
         #   return SZ_ERROR_DATA#
@@ -1042,7 +1042,7 @@ copy_match:
         cmp     cnt_R, r1
         ja      copy_match_cross
 1:
-        # if (curLen <= dicBufSize - pos)
+        ## if (curLen <= dicBufSize - pos)
 
 # ---------- COPY MATCH FAST ----------
         # Byte *dest = dic + dicPos#

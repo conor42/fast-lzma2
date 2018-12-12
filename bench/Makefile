@@ -25,12 +25,13 @@ x86_64 := 0
 
 ifeq ($(OS),Windows_NT)
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-    ASFLAGS += --defsym WIN64=1
+    ASFLAGS += -D MS_x64_CALL=1
 	x86_64 := 1
 endif
 else
 	UNAME_P := $(shell uname -p)
 ifeq ($(UNAME_P),x86_64)
+    ASFLAGS += -D MS_x64_CALL=0
 	x86_64 := 1
 endif
 endif
@@ -44,7 +45,7 @@ bench : $(objects)
 	$(CC) -pthread -o bench.exe $(objects) -lm
 
 ../LzmaDecOpt.o: ../LzmaDecOpt.S
-	as $(ASFLAGS) -o $@ $<
+	$(CC) -c $(ASFLAGS) -o $@ $<
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
 error_private.o : ../error_private.h

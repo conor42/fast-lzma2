@@ -23,7 +23,10 @@ ASFLAGS :=
 
 x86_64 := 0
 
+exe_ext :=
+
 ifeq ($(OS),Windows_NT)
+	exe_ext :=.exe
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
     ASFLAGS += -D MS_x64_CALL=1
 	x86_64 := 1
@@ -42,10 +45,7 @@ ifeq ($(x86_64),1)
 endif
 
 bench : $(objects)
-	$(CC) -pthread -o bench.exe $(objects) -lm
-
-../LzmaDecOpt.o: ../LzmaDecOpt.S
-	$(CC) -c $(ASFLAGS) -o $@ $<
+	$(CC) -pthread -o bench$(exe_ext) $(objects) -lm
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
 error_private.o : ../error_private.h

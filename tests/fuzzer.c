@@ -262,14 +262,6 @@ static size_t findDiff(const void* buf1, const void* buf2, size_t max)
     return u;
 }
 
-static int callback(const void *src, size_t size, void *opaque)
-{
-    FL2_outBuffer *out = (FL2_outBuffer*)opaque;
-    memcpy((BYTE*)out->dst + out->pos, src, size);
-    out->pos += size;
-    return 0;
-}
-
 /*=============================================
 *   Unit tests
 =============================================*/
@@ -317,7 +309,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             FL2_getLevelParameters(level, 0, &params);
             DISPLAYLEVEL(4, "\n %2d    %9u  %10u  %10u",
                 level,
-                params.dictionarySize,
+                (unsigned)params.dictionarySize,
                 (unsigned)FL2_estimateCCtxSize(level, nbThreads),
                 (unsigned)FL2_estimateCStreamSize(level, nbThreads, 1));
         }
@@ -603,7 +595,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         DISPLAYLEVEL(4, "  0%c", '%');
         CHECK(FL2_initCStream(cstream, 9));
         FL2_setCStreamTimeout(cstream, 300);
-        CHECK(FL2_compressStream(cstream, NULL, &in));
+        CHECK(FL2_compressStream(cstream, &out, &in));
         do {
             r = FL2_endStream(cstream, NULL);
             if (FL2_isTimedOut(r)) {
@@ -775,7 +767,7 @@ static int decompressionTests(U32 seed, U32 nbTests, unsigned startTest, U32 con
     clock_t const maxClockSpan = maxDurationS * CLOCKS_PER_SEC;
     int testResult = 0;
     U32 testNb = 0;
-    U32 coreSeed = seed, lseed = 0;
+    U32 coreSeed = seed;
     size_t cSize;
 
     /* Create compressible noise */

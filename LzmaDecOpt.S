@@ -125,7 +125,7 @@
 
 
 .macro MY_ALIGN  num:req
-        .balign  \num, 0x90
+        .balign  \num
 .endm
 
 .macro MY_ALIGN_16

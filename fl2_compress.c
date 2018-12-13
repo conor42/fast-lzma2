@@ -149,7 +149,6 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
         cctx->jobs[u].enc = NULL;
 
     cctx->params.highCompression = 0;
-    FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, FL2_CLEVEL_DEFAULT);
 #ifndef NO_XXHASH
     cctx->params.doXXH = 1;
 #endif
@@ -193,6 +192,8 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
     cctx->endMarked = 0;
     cctx->wroteProp = 0;
     cctx->lockParams = 0;
+
+    FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, FL2_CLEVEL_DEFAULT);
 
     return cctx;
 }

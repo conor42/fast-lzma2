@@ -317,7 +317,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             FL2_getLevelParameters(level, 0, &params);
             DISPLAYLEVEL(4, "\n %2d    %9u  %10u  %10u",
                 level,
-                1U << params.dictionaryLog,
+                params.dictionarySize,
                 (unsigned)FL2_estimateCCtxSize(level, nbThreads),
                 (unsigned)FL2_estimateCStreamSize(level, nbThreads, 1));
         }

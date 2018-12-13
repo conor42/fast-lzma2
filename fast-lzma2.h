@@ -407,14 +407,14 @@ typedef enum {
 } FL2_strategy;
 
 typedef struct {
-    unsigned dictionaryLog;    /* largest match distance : larger == more compression, more memory needed during decompression; >= 27 == more memory, slower */
+    size_t   dictionarySize;   /* largest match distance : larger == more compression, more memory needed during decompression; >= 27 == more memory, slower */
     unsigned overlapFraction;  /* overlap between consecutive blocks in 1/16 units: larger == more compression, slower */
     unsigned chainLog;         /* fully searched segment : larger == more compression, slower, more memory; hybrid mode only (ultra) */
     unsigned searchLog;        /* nb of searches : larger == more compression, slower; hybrid mode only (ultra) */
     unsigned searchDepth;      /* maximum depth for resolving string matches : larger == more compression, slower; >= 64 == more memory, slower */
     unsigned fastLength;       /* acceptable match size for parser, not less than searchDepth : larger == more compression, slower; fast bytes parameter from 7-zip */
     unsigned divideAndConquer; /* split long chains of 2-byte matches into shorter chains with a small overlap : faster, somewhat less compression; enabled by default */
-    unsigned bufferLog;        /* buffer size for processing match chains is (dictionaryLog - bufferLog) : when divideAndConquer enabled, affects compression; */
+    unsigned bufferLog;        /* buffer size for processing match chains is (dictionarySize >> (12 - bufferLog)) : when divideAndConquer enabled, affects compression; */
                                /* when divideAndConquer disabled, affects speed in a hardware-dependent manner */
     FL2_strategy strategy;     /* encoder strategy : fast, optimized or ultra (hybrid) */
 } FL2_compressionParameters;
@@ -422,14 +422,12 @@ typedef struct {
 typedef enum {
     /* compression parameters */
     FL2_p_compressionLevel, /* Update all compression parameters according to pre-defined cLevel table
-                              * Default level is FL2_CLEVEL_DEFAULT==9.
-                              * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table.
-                              * Special: value 0 means "do not change cLevel". */
+                              * Default level is FL2_CLEVEL_DEFAULT==8.
+                              * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table. */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
                               * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
-                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
-                              * Special: value 0 means "do not change dictionaryLog". */
+                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
     FL2_p_dictionarySize,
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
@@ -443,13 +441,11 @@ typedef enum {
     FL2_p_chainLog,         /* Size of the full-search table, as a power of 2.
                               * Resulting table size is (1 << (chainLog+2)).
                               * Larger tables result in better and slower compression.
-                              * This parameter is useless when using "fast" strategy.
-                              * Special: value 0 means "do not change chainLog". */
+                              * This parameter is useless when using "fast" strategy. */
     FL2_p_searchLog,        /* Number of search attempts, as a power of 2, made by the HC3 match finder
                               * used only in hybrid mode.
                               * More attempts result in slightly better and slower compression.
-                              * This parameter is not used by the "fast" and "optimize" strategies.
-                              * Special: value 0 means "do not change searchLog". */
+                              * This parameter is not used by the "fast" and "optimize" strategies. */
     FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder */
     FL2_p_literalPosBits,   /* lp value for LZMA2 encoder */
     FL2_p_posBits,          /* pb value for LZMA2 encoder */
@@ -457,15 +453,13 @@ typedef enum {
                              * match exists further back in the input, it will not be found. */
     FL2_p_fastLength,       /* Only useful for strategies >= opt.
                              * Length of Match considered "good enough" to stop search.
-                             * Larger values make compression stronger and slower.
-                             * Special: value 0 means "do not change fastLength". */
+                             * Larger values make compression stronger and slower. */
     FL2_p_divideAndConquer, /* Split long chains of 2-byte matches into shorter chains with a small overlap
                              * during further processing. Allows buffering of all chains at length 2.
                              * Faster, less compression. Generally a good tradeoff. Enabled by default. */
     FL2_p_strategy,         /* 1 = fast; 2 = optimize, 3 = ultra (hybrid mode).
                              * The higher the value of the selected strategy, the more complex it is,
-                             * resulting in stronger and slower compression.
-                             * Special: value 0 means "do not change strategy". */
+                             * resulting in stronger and slower compression. */
 #ifndef NO_XXHASH
     FL2_p_doXXHash,         /* Calculate a 32-bit xxhash value from the input data and store it 
                              * after the stream terminator. The value will be checked on decompression.

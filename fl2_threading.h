@@ -85,6 +85,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 
 #elif !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_POSIX)
 /* ===   POSIX Systems   === */
+#  include <sys/time.h>
 #  include <pthread.h>
 
 #define ZSTD_pthread_mutex_t            pthread_mutex_t
@@ -132,15 +133,13 @@ mythread_condtime_set(struct timespec *condtime, uint32_t timeout_ms)
 /* Waits on a condition or until a timeout expires. If the timeout expires,
  * non-zero is returned, otherwise zero is returned.
  */
-static inline int
+static inline void
 ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mutex,
     uint32_t timeout_ms)
 {
     struct timespec condtime;
     mythread_condtime_set(&condtime, timeout_ms);
-	int ret = pthread_cond_timedwait(cond, mutex, &condtime);
-	assert(ret == 0 || ret == ETIMEDOUT);
-	return ret;
+	pthread_cond_timedwait(cond, mutex, &condtime);
 }
 
 

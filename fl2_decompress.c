@@ -15,6 +15,7 @@
 #include "mem.h"
 #include "util.h"
 #include "lzma2_dec.h"
+#include "fl2_threading.h"
 #include "fl2_pool.h"
 #include "atomic.h"
 #ifndef NO_XXHASH

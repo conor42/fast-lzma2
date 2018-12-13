@@ -28,7 +28,9 @@ int g_ZSTD_threading_useles_symbol;
 /* ===  Dependencies  === */
 #include <process.h>
 #include <errno.h>
+#include "fast-lzma2.h"
 #include "fl2_threading.h"
+#include "util.h"
 
 
 /* ===  Implementation  === */
@@ -73,3 +75,20 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void **value_ptr)
 }
 
 #endif   /* FL2_SINGLETHREAD */
+
+unsigned FL2_checkNbThreads(unsigned nbThreads)
+{
+#ifndef FL2_SINGLETHREAD
+    if (nbThreads == 0) {
+        nbThreads = UTIL_countPhysicalCores();
+        nbThreads += !nbThreads;
+    }
+    if (nbThreads > FL2_MAXTHREADS) {
+        nbThreads = FL2_MAXTHREADS;
+    }
+#else
+    nbThreads = 1;
+#endif
+    return nbThreads;
+}
+

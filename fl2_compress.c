@@ -802,6 +802,16 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     }
 }
 
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value)
+{
+    return FL2_CCtx_setParameter(fcs, param, value);
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_getParameter(FL2_CStream* fcs, FL2_cParameter param)
+{
+    return FL2_CCtx_getParameter(fcs, param);
+}
+
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
 {
     return FL2_createCCtx_internal(1, 0);
@@ -810,6 +820,11 @@ FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void)
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads, int dualBuffer)
 {
     return FL2_createCCtx_internal(nbThreads, dualBuffer);
+}
+
+FL2LIB_API void FL2LIB_CALL FL2_freeCStream(FL2_CStream * fcs)
+{
+    FL2_freeCCtx(fcs);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel)
@@ -1250,4 +1265,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compres
 {
     return FL2_estimateCCtxSize_byParams(params, nbThreads)
         + (params->dictionarySize << (dualBuffer != 0));
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs)
+{
+    return FL2_estimateCCtxSize_usingCCtx(fcs);
 }

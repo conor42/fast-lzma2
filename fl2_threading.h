@@ -27,6 +27,9 @@
 extern "C" {
 #endif
 
+unsigned FL2_checkNbThreads(unsigned nbThreads);
+
+
 #if !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_VISTA)
 
 /**
@@ -48,6 +51,7 @@ extern "C" {
 #endif
 
 #include <windows.h>
+#include <synchapi.h>
 
 
 /* mutex */

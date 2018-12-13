@@ -249,10 +249,7 @@ typedef struct FL2_CCtx_s FL2_CStream;
 /*===== FL2_CStream management functions =====*/
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStream(void);
 FL2LIB_API FL2_CStream* FL2LIB_CALL FL2_createCStreamMt(unsigned nbThreads, int dualBuffer);
-
-static void FL2_freeCStream(FL2_CStream * fcs) {
-    FL2_freeCCtx(fcs);
-}
+FL2LIB_API void FL2LIB_CALL FL2_freeCStream(FL2_CStream * fcs);
 
 /*===== Streaming compression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
@@ -482,13 +479,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParameter param);
 
-static size_t FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value) {
-    return FL2_CCtx_setParameter(fcs, param, value);
-}
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value);
 
-static size_t FL2_CStream_getParameter(FL2_CStream* fcs, FL2_cParameter param) {
-    return FL2_CCtx_getParameter(fcs, param);
-}
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_getParameter(FL2_CStream* fcs, FL2_cParameter param);
 
 FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters *params);
 
@@ -508,10 +501,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressio
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx* cctx);           /*!< memory usage determined by settings */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize(int compressionLevel, unsigned nbThreads, int dualBuffer);
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads, int dualBuffer);
-
-static size_t FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs) {
-    return FL2_estimateCCtxSize_usingCCtx(fcs);
-}
+FL2LIB_API size_t FL2LIB_CALL FL2_estimateCStreamSize_usingCStream(const FL2_CStream* fcs);
 
 /*! FL2_getDictSizeFromProp() :
  *  Get the dictionary size from the property byte for a stream. The property byte is the first byte

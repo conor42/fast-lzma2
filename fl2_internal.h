@@ -19,7 +19,6 @@
 #include "mem.h"
 #include "compiler.h"
 #include "error_private.h"
-#include "util.h"
 
 #if defined (__cplusplus)
 extern "C" {
@@ -30,22 +29,6 @@ extern "C" {
 #ifndef NO_XXHASH
 #  define XXHASH_SIZEOF sizeof(XXH32_canonical_t)
 #endif
-
-static unsigned FL2_checkNbThreads(unsigned nbThreads)
-{
-#ifndef FL2_SINGLETHREAD
-    if (nbThreads == 0) {
-        nbThreads = UTIL_countPhysicalCores();
-        nbThreads += !nbThreads;
-    }
-    if (nbThreads > FL2_MAXTHREADS) {
-        nbThreads = FL2_MAXTHREADS;
-    }
-#else
-    nbThreads = 1;
-#endif
-    return nbThreads;
-}
 
 /*-*************************************
 *  Debug

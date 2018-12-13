@@ -63,3 +63,6 @@ range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
 util.o : ../util.h
 xxhash.o : ../xxhash.h
 bench.o : ../fast-lzma2.h ../mem.h ../util.h ../tests/datagen.h
+
+clean:
+	rm bench$(exe_ext) $(objects)

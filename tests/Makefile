@@ -63,3 +63,6 @@ range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
 util.o : ../util.h
 xxhash.o : ../xxhash.h
 fuzzer.o : ../fast-lzma2.h ../fl2_errors.h ../mem.h ../xxhash.h datagen.h
+
+clean:
+	rm fuzzer$(exe_ext) $(objects)

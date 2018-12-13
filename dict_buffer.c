@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "dict_buffer.h"
 #include "fl2_internal.h"
 

@@ -6,10 +6,11 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 add_library(flzma2
+  dict_buffer.c
   error_private.c
   fl2_compress.c
   lzma2_dec.c
-  pool.c
+  fl2_pool.c
   radix_mf.c
   range_enc.c
   xxhash.c
@@ -18,7 +19,8 @@ add_library(flzma2
   lzma2_enc.c
   radix_bitpack.c
   radix_struct.c
-  threading.c)
+  fl2_threading.c
+  util.c)
 
 add_executable(fuzzer tests/fuzzer.c tests/datagen.c)
 target_link_libraries(fuzzer flzma2)

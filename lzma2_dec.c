@@ -885,46 +885,6 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit, const
     }
 }
 
-static size_t LZMA_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen, const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode)
-{
-    size_t outSize = *destLen;
-    size_t inSize = *srcLen;
-    *srcLen = *destLen = 0;
-    for (;;)
-    {
-        if (p->dicPos == p->dicBufSize)
-            p->dicPos = 0;
-        size_t dicPos = p->dicPos;
-
-        size_t outSizeCur;
-        ELzmaFinishMode curFinishMode;
-        if (outSize > p->dicBufSize - dicPos)
-        {
-            outSizeCur = p->dicBufSize;
-            curFinishMode = LZMA_FINISH_ANY;
-        }
-        else
-        {
-            outSizeCur = dicPos + outSize;
-            curFinishMode = finishMode;
-        }
-
-        size_t inSizeCur = inSize;
-        size_t res = LZMA_decodeToDic(p, outSizeCur, src, &inSizeCur, curFinishMode);
-
-        src += inSizeCur;
-        inSize -= inSizeCur;
-        *srcLen += inSizeCur;
-        outSizeCur = p->dicPos - dicPos;
-        memcpy(dest, p->dic + dicPos, outSizeCur);
-        dest += outSizeCur;
-        outSize -= outSizeCur;
-        *destLen += outSizeCur;
-        if (ERR_isError(res) || outSizeCur == 0 || outSize == 0)
-            return res;
-    }
-}
-
 void LZMA_constructDCtx(LZMA2_DCtx *p)
 {
     p->dic = NULL;

@@ -544,6 +544,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             r = FL2_decompressStream(dstream, &out, &in);
             if (FL2_isTimedOut(r)) do {
                 DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)(FL2_getDStreamProgress(dstream) * 100 / CNBuffSize), '%');
+                fflush(stdout);
                 r = FL2_waitDStream(dstream);
             } while (FL2_isTimedOut(r));
             if (FL2_isError(r)) goto _output_error;
@@ -578,6 +579,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             r = FL2_endStream(cstream, &out);
             if (FL2_isTimedOut(r)) {
                 DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)(FL2_getCStreamProgress(cstream) * 100 / CNBuffSize), '%');
+                fflush(stdout);
             }
             else {
                 CHECK(r);

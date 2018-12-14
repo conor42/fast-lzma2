@@ -113,7 +113,8 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
     }
     CLAMP(params.dictionary_size, DICTIONARY_SIZE_MIN, MEM_64bits() ? DICTIONARY_SIZE_MAX_64 : DICTIONARY_SIZE_MAX_32);
     CLAMP(params.match_buffer_log, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);
-    CLAMP(params.overlap_fraction, FL2_BLOCK_OVERLAP_MIN, FL2_BLOCK_OVERLAP_MAX);
+    if (params.overlap_fraction > FL2_BLOCK_OVERLAP_MAX)
+        params.overlap_fraction = FL2_BLOCK_OVERLAP_MAX;
     CLAMP(params.depth, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
     return params;
 #   undef CLAMP
@@ -642,7 +643,7 @@ int RMF_buildTable(FL2_matchTable* const tbl,
 void RMF_cancelBuild(FL2_matchTable * const tbl)
 {
     if(tbl != NULL)
-        FL2_atomic_add(tbl->st_index, (long)RADIX_CANCEL_INDEX - ATOMIC_INITIAL_VALUE);
+        FL2_atomic_add(tbl->st_index, RADIX_CANCEL_INDEX - ATOMIC_INITIAL_VALUE);
 }
 
 void RMF_resetIncompleteBuild(FL2_matchTable * const tbl)

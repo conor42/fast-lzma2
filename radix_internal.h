@@ -49,7 +49,7 @@ extern "C" {
 #define UNIT_BITS 2
 #define UNIT_MASK ((1U << UNIT_BITS) - 1)
 
-#define RADIX_CANCEL_INDEX (RADIX16_TABLE_SIZE + FL2_MAXTHREADS + 2)
+#define RADIX_CANCEL_INDEX (long)(RADIX16_TABLE_SIZE + FL2_MAXTHREADS + 2)
 
 typedef struct
 {

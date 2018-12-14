@@ -481,7 +481,7 @@ static Lzma2DecMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
     return decmt;
 }
 
-static LZMA2_parseRes FL2_ParseMt(Lzma2DecMt* const decmt, InputBlock* const inBlock)
+static LZMA2_parseRes FL2_ParseMt(InputBlock* const inBlock)
 {
     LZMA2_parseRes res = CHUNK_MORE_DATA;
     LZMA2_mtInbuf* node = inBlock->last;
@@ -616,7 +616,7 @@ static size_t FL2_LoadInputMt(Lzma2DecMt *const decmt, FL2_inBuffer* const input
     LZMA2_parseRes res = CHUNK_CONTINUE;
     while (input->pos < input->size || inBlock->endPos < inBlock->last->length) {
         if (inBlock->endPos < inBlock->last->length) {
-            res = FL2_ParseMt(decmt, inBlock);
+            res = FL2_ParseMt(inBlock);
 
             if (res == CHUNK_ERROR)
                 return FL2_ERROR(corruption_detected);
@@ -909,6 +909,8 @@ static void FL2_decompressStream_async(void* const jobDescription, size_t const 
 
     fds->asyncRes = FL2_decompressStream_blocking(fds, fds->asyncOutput, fds->asyncInput);
     fds->wait = 0;
+
+    (void)n;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)

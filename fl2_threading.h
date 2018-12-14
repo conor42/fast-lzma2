@@ -116,7 +116,7 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
  * in the future.
  */
 static inline void
-mythread_condtime_set(struct timespec *condtime, uint32_t timeout_ms)
+mythread_condtime_set(struct timespec *condtime, U32 timeout_ms)
 {
 	condtime->tv_sec = timeout_ms / 1000;
 	condtime->tv_nsec = (timeout_ms % 1000) * 1000000;
@@ -139,7 +139,7 @@ mythread_condtime_set(struct timespec *condtime, uint32_t timeout_ms)
  */
 static inline void
 ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mutex,
-    uint32_t timeout_ms)
+    U32 timeout_ms)
 {
     struct timespec condtime;
     mythread_condtime_set(&condtime, timeout_ms);

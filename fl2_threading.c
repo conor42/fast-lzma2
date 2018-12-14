@@ -17,6 +17,10 @@
 /* create fake symbol to avoid empty translation unit warning */
 int g_ZSTD_threading_useles_symbol;
 
+#include "fast-lzma2.h"
+#include "fl2_threading.h"
+#include "util.h"
+
 #if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
 
 /**
@@ -28,9 +32,6 @@ int g_ZSTD_threading_useles_symbol;
 /* ===  Dependencies  === */
 #include <process.h>
 #include <errno.h>
-#include "fast-lzma2.h"
-#include "fl2_threading.h"
-#include "util.h"
 
 
 /* ===  Implementation  === */

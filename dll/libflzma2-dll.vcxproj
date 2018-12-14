@@ -200,7 +200,7 @@
     <ClInclude Include="..\xxhash.h" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="..\LzmaDecOpt.asm">
+    <MASM Include="..\lzma_dec_x86_64.asm">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/Dx64 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">-Dx64 %(AdditionalOptions)</AdditionalOptions>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>

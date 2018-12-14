@@ -41,7 +41,7 @@ endif
 
 ifeq ($(x86_64),1)
 	CFLAGS += -DLZMA2_DEC_OPT
-	objects += ../LzmaDecOpt.o
+	objects += ../lzma_dec_x86_64.o
 endif
 
 fuzzer : $(objects)

@@ -1,4 +1,4 @@
-; LzmaDecOpt.asm -- ASM version of LZMA_decodeReal_3() function
+; lzma_dec_x86_64.asm -- ASM version of LZMA_decodeReal_3() function
 ; 2018-02-06: Igor Pavlov : Public domain
 ;
 ; 3 - is the code compatibility version of LZMA_decodeReal_*()

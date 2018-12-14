@@ -136,7 +136,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="..\LzmaDecOpt.asm">
+    <MASM Include="..\lzma_dec_x86_64.asm">
       <Filter>Source Files</Filter>
     </MASM>
   </ItemGroup>

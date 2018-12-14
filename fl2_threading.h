@@ -13,6 +13,8 @@
 #ifndef THREADING_H_938743
 #define THREADING_H_938743
 
+#include "mem.h"
+
 #ifndef FL2_XZ_BUILD
 #  ifdef _WIN32
 #    define MYTHREAD_VISTA

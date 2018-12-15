@@ -74,6 +74,7 @@ Public domain
 #define kNullDist (U32)-1
 
 #define kChunkSize ((1UL << 16U) - 8192U)
+#define kSqrtChunkSize 239U
 #define kTempMinOutput (LZMA_REQUIRED_INPUT_MAX * 4U)
 #define kTempBufferSize (kTempMinOutput + kOptimizerBufferSize + kOptimizerBufferSize / 16U)
 #define kMaxChunkUncompressedSize ((1UL << 21U) - kMatchLenMax)
@@ -1612,6 +1613,24 @@ static BYTE LZMA_getLcLpPbCode(LZMA2_ECtx *const enc)
     return (BYTE)((enc->pb * 5 + enc->lp) * 9 + enc->lc);
 }
 
+/* From: https://stackoverflow.com/a/1101217 */
+static U32 LZMA2_isqrt(U32 op)
+{
+    U32 res = 0;
+    /* "one" starts at the highest power of four <= than the argument. */
+    U32 one = (U32)1 << (ZSTD_highbit32(op) & ~1);
+
+    while (one != 0) {
+        if (op >= res + one) {
+            op -= res + one;
+            res = res + 2U * one;
+        }
+        res >>= 1;
+        one >>= 2;
+    }
+    return res;
+}
+
 static BYTE LZMA2_isChunkRandom(const FL2_matchTable* const tbl,
     FL2_dataBlock const block, size_t const start,
 	unsigned const strategy)
@@ -1622,7 +1641,7 @@ static BYTE LZMA2_isChunkRandom(const FL2_matchTable* const tbl,
 			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 }, /* opt */
 			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 } }; /* ultra */
 		static const size_t margin_divisor[3] = { 60U, 45U, 120U };
-		static const double dev_table[3] = { 6.0, 6.0, 5.0 };
+		static const U32 dev_table[3] = { 24, 24, 20};
 
 		size_t const end = MIN(start + kChunkSize, block.end);
 		size_t const chunk_size = end - start;
@@ -1678,19 +1697,20 @@ static BYTE LZMA2_isChunkRandom(const FL2_matchTable* const tbl,
 		}
 
         U32 char_count[256];
-        double char_total = 0.0;
+        U32 char_total = 0;
         /* Expected normal character count */
-        double const avg = (double)chunk_size / 256.0;
+        U32 const avg = (U32)(chunk_size / 64U);
 
         memset(char_count, 0, sizeof(char_count));
         for (size_t index = start; index < end; ++index)
-            ++char_count[block.data[index]];
+            char_count[block.data[index]] += 4;
         /* Sum the deviations */
         for (size_t i = 0; i < 256; ++i) {
-            double delta = (double)char_count[i] - avg;
+            S32 delta = char_count[i] - avg;
             char_total += delta * delta;
         }
-        return sqrt(char_total) / sqrt((double)chunk_size) <= dev_table[strategy];
+        U32 sqrt_chunk = (chunk_size == kChunkSize) ? kSqrtChunkSize : LZMA2_isqrt((U32)chunk_size);
+        return LZMA2_isqrt(char_total) / sqrt_chunk <= dev_table[strategy];
 	}
 	return 0;
 }

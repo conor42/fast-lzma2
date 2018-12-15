@@ -617,6 +617,32 @@ FL2LIB_API BYTE FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx)
 
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value)
 {
+    switch (param)
+    {
+    /* lc, lp, pb can be changed between encoder chunks.
+     * Set lc and lp even if lc+lp > 4 to allow sequential setting.
+    /* If lc+lp is still >4 when encoding begins, lc will be reduced. */
+    case FL2_p_literalCtxBits:
+        MAXCHECK(value, FL2_LC_MAX);
+        cctx->params.cParams.lc = value;
+        if (value + cctx->params.cParams.lp > FL2_LCLP_MAX)
+            return FL2_ERROR(lclpMax_exceeded);
+        return value;
+
+    case FL2_p_literalPosBits:
+        MAXCHECK(value, FL2_LP_MAX);
+        cctx->params.cParams.lp = value;
+        if (cctx->params.cParams.lc + value > FL2_LCLP_MAX)
+            return FL2_ERROR(lclpMax_exceeded);
+        return value;
+
+    case FL2_p_posBits:
+        MAXCHECK(value, FL2_PB_MAX);
+        cctx->params.cParams.pb = value;
+        return value;
+
+    }
+
     if (cctx->lockParams)
         return FL2_ERROR(stage_wrong);
 
@@ -673,25 +699,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_searchLog:
         MAXCHECK(value, FL2_SEARCHLOG_MAX);
         cctx->params.cParams.match_cycles = 1U << value;
-        break;
-
-    case FL2_p_literalCtxBits:
-        MAXCHECK(value, FL2_LC_MAX);
-        if (value + cctx->params.cParams.lp > FL2_LCLP_MAX)
-            return FL2_ERROR(lclpMax_exceeded);
-        cctx->params.cParams.lc = value;
-        break;
-
-    case FL2_p_literalPosBits:
-        MAXCHECK(value, FL2_LP_MAX);
-        if (cctx->params.cParams.lc + value > FL2_LCLP_MAX)
-            return FL2_ERROR(lclpMax_exceeded);
-        cctx->params.cParams.lp = value;
-        break;
-
-    case FL2_p_posBits:
-        MAXCHECK(value, FL2_PB_MAX);
-        cctx->params.cParams.pb = value;
         break;
 
     case FL2_p_searchDepth:

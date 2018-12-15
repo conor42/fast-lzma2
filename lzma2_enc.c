@@ -1748,16 +1748,18 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         return 0;
 
     enc->lc = options->lc;
-    enc->lp = options->lp;
-    if (enc->lc + enc->lp > 4) {
-        enc->lc = 3;
-        enc->lp = 0;
-    }
+    enc->lp = MIN(options->lp, 4);
+
+    if (enc->lc + enc->lp > 4)
+        enc->lc = 4 - enc->lp;
+
     enc->pb = options->pb;
     enc->strategy = options->strategy;
     enc->fast_length = options->fast_length;
     enc->match_cycles = options->match_cycles;
+
     LZMA2_reset(enc, block.end);
+
     if (enc->strategy == FL2_ultra) {
         /* Create a hash chain to put the encoder into hybrid mode */
         if (enc->hash_alloc_3 < ((ptrdiff_t)1 << options->second_dict_bits)) {

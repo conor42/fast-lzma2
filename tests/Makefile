@@ -45,7 +45,7 @@ ifeq ($(x86_64),1)
 endif
 
 fuzzer : $(objects)
-	$(CC) -pthread -o fuzzer$(exe_ext) $(objects) -lm
+	$(CC) -pthread -o fuzzer$(exe_ext) $(objects)
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
 error_private.o : ../error_private.h

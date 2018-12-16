@@ -1,5 +1,6 @@
 ; lzma_dec_x86_64.asm -- ASM version of LZMA_decodeReal_3() function
 ; 2018-02-06: Igor Pavlov : Public domain
+; Modified for FL2 by Conor McCarthy
 ;
 ; 3 - is the code compatibility version of LZMA_decodeReal_*()
 ; function for check at link time.
@@ -8,16 +9,93 @@
 ; CLzmaDec structure, (probs) array layout, input and output of
 ; LZMA_decodeReal_*() must be equal in both versions (C / ASM).
 
-ifndef x64
-; x64=1
-; .err <x64_IS_REQUIRED>
-endif
+x0 equ EAX
+x1 equ ECX
+x2 equ EDX
+x3 equ EBX
+x4 equ ESP
+x5 equ EBP
+x6 equ ESI
+x7 equ EDI
 
-include 7zAsm.asm
+x0_W equ AX
+x1_W equ CX
+x2_W equ DX
+x3_W equ BX
 
-MY_ASM_START
+x5_W equ BP
+x6_W equ SI
+x7_W equ DI
 
-_TEXT$LZMADECOPT SEGMENT ALIGN(64) 'CODE'
+x0_L equ AL
+x1_L equ CL
+x2_L equ DL
+x3_L equ BL
+
+x0_H equ AH
+x1_H equ CH
+x2_H equ DH
+x3_H equ BH
+
+x5_L equ BPL
+x6_L equ SIL
+x7_L equ DIL
+
+r0 equ RAX
+r1 equ RCX
+r2 equ RDX
+r3 equ RBX
+r4 equ RSP
+r5 equ RBP
+r6 equ RSI
+r7 equ RDI
+x8 equ r8d
+x9 equ r9d
+x10 equ r10d
+x11 equ r11d
+x12 equ r12d
+x13 equ r13d
+x14 equ r14d
+x15 equ r15d
+
+MY_PUSH_4_REGS macro
+    push    r3
+    push    r5
+    push    r6
+    push    r7
+endm
+
+MY_POP_4_REGS macro
+    pop     r7
+    pop     r6
+    pop     r5
+    pop     r3
+endm
+
+
+; for WIN64-x64 ABI:
+
+REG_PARAM_0 equ r1
+REG_PARAM_1 equ r2
+REG_PARAM_2 equ r8
+REG_PARAM_3 equ r9
+
+MY_PUSH_PRESERVED_REGS macro
+    MY_PUSH_4_REGS
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+endm
+
+
+MY_POP_PRESERVED_REGS macro
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    MY_POP_4_REGS
+endm
 
 MY_ALIGN macro num:req
         align  num
@@ -25,10 +103,6 @@ endm
 
 MY_ALIGN_16 macro
         MY_ALIGN 16
-endm
-
-MY_ALIGN_32 macro
-        MY_ALIGN 32
 endm
 
 MY_ALIGN_64 macro
@@ -148,11 +222,9 @@ kBitModelOffset         equ ((1 SHL kNumMoveBits) - 1)
 kTopValue               equ (1 SHL 24)
 
 NORM_2 macro
-        ; movzx   t0, BYTE PTR [buf]
         shl     cod, 8
         mov     cod_L, BYTE PTR [buf]
         shl     range, 8
-        ; or      cod, t0
         inc     buf
 endm
 
@@ -428,8 +500,6 @@ REV_1_VAR macro prob:req
 endm
 
 
-
-
 LIT_PROBS macro lpMaskParam:req
         ; prob += (UInt32)3 * ((((processedPos << 8) + dic[(dicPos == 0 ? dicBufSize : dicPos) - 1]) & lpMask) << lc);
         mov     t0, processedPos
@@ -602,16 +672,19 @@ endm
 
 
 
-; RSP is (16x + 8) bytes aligned in WIN64-x64
-; LocalSize equ ((((SIZEOF CLzmaDec_Asm_Loc) + 7) / 16 * 16) + 8)
-
 PARAM_lzma      equ REG_PARAM_0
 PARAM_limit     equ REG_PARAM_1
 PARAM_bufLimit  equ REG_PARAM_2
 
-; MY_ALIGN_64
-MY_PROC LZMA_decodeReal_3, 3
+		.code
+
+_TEXT$LZMADECOPT SEGMENT ALIGN(64) 'CODE'
+
+LZMA_decodeReal_3 PROC
 MY_PUSH_PRESERVED_REGS
+
+; RSP is (16x + 8) bytes aligned in WIN64-x64
+; LocalSize equ ((((SIZEOF CLzmaDec_Asm_Loc) + 7) / 16 * 16) + 8)
 
         lea     r0, [RSP - (SIZEOF CLzmaDec_Asm_Loc)]
         and     r0, -128
@@ -652,7 +725,6 @@ MY_PUSH_PRESERVED_REGS
         mov     x2, 100h
         mov     t0, x2
         shr     x2, x1_L
-        ; inc     x1
         add     x1_L, PSHIFT
         mov     LOC_0 lc2, x1
         mov     x1_L, GLOB_2 lp
@@ -661,8 +733,6 @@ MY_PUSH_PRESERVED_REGS
         mov     LOC_0 lpMask, t0
         mov     lpMask_reg, t0
         
-        ; mov     probs, GLOB_2 probs_Spec
-        ; add     probs, kStartOffset SHL PSHIFT
         mov     probs, GLOB_2 probs_1664
         mov     LOC_0 probs_Spec, probs
 
@@ -735,7 +805,6 @@ lit_loop:
 
         BIT_2   x2, 256 - 1
         
-        ; mov     dic, LOC dic_Spec
         mov     probs, LOC probs_Spec
         IsMatchBranch_Pre
         mov     byte ptr[dicPos], sym_L
@@ -745,10 +814,8 @@ lit_loop:
 lit_end:
         IF_BIT_0_NOUP probs_state_R, pbPos_R, IsMatch, lit_start
 
-        ; jmp     IsMatch_label
-        
 ; ---------- MATCHES ----------
-; MY_ALIGN_32
+MY_ALIGN_16
 IsMatch_label:
         UPDATE_1 probs_state_R, pbPos_R, IsMatch
         IF_BIT_1 probs_state_R, 0, IsRep, IsRep_label
@@ -769,7 +836,7 @@ len_decode:
         mov     sym, 1
         PLOAD   x1, probs + 1 * PMULT
 
-MY_ALIGN_32
+MY_ALIGN_16
 len8_loop:
         BIT_1   x1, x2
         mov     x1, x2
@@ -779,7 +846,7 @@ len8_loop:
         mov     len_temp, (kLenNumHighSymbols - kLenNumLowSymbols * 2) - 1 - kMatchMinLen
         jmp     len_mid_2
         
-MY_ALIGN_32
+MY_ALIGN_16
 len_mid_0:
         UPDATE_0 probs, 0, 0
         add     probs, pbPos_R
@@ -803,7 +870,6 @@ len_mid_2:
         add     probs, t0_R
         
         ; sym = Len
-        ; mov     LOC remainLen, sym
         mov     len_temp, sym
 
     ifdef _LZMA_SIZE_OPT
@@ -844,12 +910,9 @@ slot_loop:
         lea     sym2_R, [probs + 2 * PMULT]
         
         jmp     direct_norm
-        ; lea     t1, [sym_R + (1 SHL kNumAlignBits)]
-        ; cmp     range, kTopValue
-        ; jb      direct_norm
         
 ; ---------- DIRECT DISTANCE ----------
-MY_ALIGN_32
+MY_ALIGN_16
 direct_loop:
         shr     range, 1
         mov     t0, cod
@@ -857,14 +920,6 @@ direct_loop:
         cmovs   cod, t0
         cmovns  sym, t1
         
-        comment ~
-        sub     cod, range
-        mov     x2, cod
-        sar     x2, 31
-        lea     sym, dword ptr [r2 + sym_R * 2 + 1]
-        and     x2, range
-        add     cod, x2
-        ~
         dec     x1
         je      direct_end
 
@@ -877,7 +932,7 @@ direct_norm:
         NORM_2
         jmp     direct_loop
 
-MY_ALIGN_32
+MY_ALIGN_16
 direct_end:
         ;  prob =  + kAlign;
         ;  distance <<= kNumAlignBits;
@@ -906,7 +961,6 @@ decode_dist_end:
         mov     t1, LOC rep1
         mov     x1, LOC rep2
         mov     LOC rep0, sym
-        ; mov     sym, LOC remainLen
         mov     sym, len_temp
         mov     LOC rep1, t0
         mov     LOC rep2, t1
@@ -921,9 +975,6 @@ decode_dist_end:
         
 ; ---------- COPY MATCH ----------
 copy_match:
-
-        ; len += kMatchMinLen;
-        ; add     sym, kMatchMinLen
 
         ; if ((rem = limit - dicPos) == 0)
         ; {
@@ -966,25 +1017,15 @@ copy_match:
 
 ; ---------- COPY MATCH FAST ----------
         ; Byte *dest = dic + dicPos;
-        ; mov     r1, dic
         ; ptrdiff_t src = (ptrdiff_t)pos - (ptrdiff_t)dicPos;
-        ; sub   t0_R, dicPos
         ; dicPos += curLen;
 
-        ; const Byte *lim = dest + curLen;
         add     t0_R, dic
         movzx   sym, byte ptr[t0_R]
         add     t0_R, cnt_R
         neg     cnt_R
-        ; lea     r1, [dicPos - 1]
 copy_common:
         dec     dicPos
-        ; cmp   LOC rep0, 1
-        ; je    rep0Label
-
-        ; t0_R - src_lim
-        ; r1 - dest_lim - 1
-        ; cnt_R - (-cnt)
 
         IsMatchBranch_Pre
         inc     cnt_R
@@ -1001,7 +1042,6 @@ lz_end_match:
         mov     byte ptr[dicPos], sym_L
         inc     dicPos
   
-        ; IsMatchBranch_Pre
         CheckLimits
 lz_end:
         IF_BIT_1_NOUP probs_state_R, pbPos_R, IsMatch, IsMatch_label
@@ -1014,7 +1054,6 @@ lz_end:
         
         ; matchByte = dic[dicPos - rep0 + (dicPos < rep0 ? dicBufSize : 0)];
         mov     x1, LOC rep0
-        ; mov     dic, LOC dic_Spec
         mov     LOC dicPos_Spec, dicPos
         
         ; state -= (state < 10) ? 3 : 6;
@@ -1028,12 +1067,6 @@ lz_end:
         jae     @f
         add     dicPos, LOC dicBufSize
 @@:
-        comment ~
-        xor     t0, t0
-        sub     dicPos, r1
-        cmovb   t0_R, LOC dicBufSize
-        ~
-        
         movzx   match, byte ptr[dic + dicPos * 1]
 
     ifdef _LZMA_SIZE_OPT
@@ -1064,7 +1097,6 @@ litm_loop:
         
         mov     probs, LOC probs_Spec
         IsMatchBranch_Pre
-        ; mov     dic, LOC dic_Spec
         mov     dicPos, LOC dicPos_Spec
         mov     byte ptr[dicPos], sym_L
         inc     dicPos
@@ -1072,7 +1104,6 @@ litm_loop:
         CheckLimits
 lit_matched_end:
         IF_BIT_1_NOUP probs_state_R, pbPos_R, IsMatch, IsMatch_label
-        ; IsMatchBranch
         mov     lpMask_reg, LOC lpMask
         sub     state, 3 * PMULT
         jmp     lit_start_2
@@ -1080,7 +1111,7 @@ lit_matched_end:
 
 
 ; ---------- REP 0 LITERAL ----------
-MY_ALIGN_32
+MY_ALIGN_16
 IsRep0Short_label:
         UPDATE_0 probs_state_R, pbPos_R, IsRep0Long
 
@@ -1104,17 +1135,13 @@ IsRep0Short_label:
         jmp     lz_end_match
   
         
-MY_ALIGN_32
+MY_ALIGN_16
 IsRep_label:
         UPDATE_1 probs_state_R, 0, IsRep
 
-        ; The (checkDicSize == 0 && processedPos == 0) case was checked before in LzmaDec.c with kBadRepCode.
+        ; The (checkDicSize == 0 && processedPos == 0) case was checked before in lzma2_dec.c with kBadRepCode.
         ; So we don't check it here.
         
-        ; mov     t0, processedPos
-        ; or      t0, LOC checkDicSize
-        ; jz      fin_ERROR_2
-
         ; state = state < kNumLitStates ? 8 : 11;
         cmp     state, kNumLitStates * PMULT
         mov     state, 8 * PMULT
@@ -1129,7 +1156,7 @@ IsRep_label:
         UPDATE_1 probs_state_R, pbPos_R, IsRep0Long
         jmp     len_decode
 
-MY_ALIGN_32
+MY_ALIGN_16
 IsRepG0_label:
         UPDATE_1 probs_state_R, 0, IsRepG0
         mov     dist2, LOC rep0
@@ -1140,7 +1167,7 @@ IsRepG0_label:
         mov     LOC rep0, dist
         jmp     len_decode
         
-; MY_ALIGN_32
+MY_ALIGN_16
 IsRepG1_label:
         UPDATE_1 probs_state_R, 0, IsRepG1
         mov     dist2, LOC rep2
@@ -1150,7 +1177,7 @@ IsRepG1_label:
         mov     LOC rep0, dist2
         jmp     len_decode
 
-; MY_ALIGN_32
+MY_ALIGN_16
 IsRepG2_label:
         UPDATE_1 probs_state_R, 0, IsRepG2
         mov     dist, LOC rep3
@@ -1162,7 +1189,7 @@ IsRepG2_label:
 
 ; ---------- SPEC SHORT DISTANCE ----------
 
-MY_ALIGN_32
+MY_ALIGN_16
 short_dist:
         sub     x1, 32 + 1
         jbe     decode_dist_end
@@ -1170,7 +1197,7 @@ short_dist:
         shl     sym, x1_L
         lea     sym_R, [probs + sym_R * PMULT + SpecPos * PMULT + 1 * PMULT]
         mov     sym2, PMULT ; step
-MY_ALIGN_32
+MY_ALIGN_16
 spec_loop:
         REV_1_VAR x2
         dec     x1
@@ -1212,7 +1239,6 @@ copy_match_cross:
 
 fin_ERROR:
         mov     LOC remainLen, len_temp
-; fin_ERROR_2:
         mov     sym, 1
         jmp     fin
 
@@ -1250,8 +1276,9 @@ fin:
         
         mov     RSP, LOC Old_RSP
 
-MY_POP_PRESERVED_REGS
-MY_ENDP
+		MY_POP_PRESERVED_REGS
+		ret
+LZMA_decodeReal_3 ENDP
 
 _TEXT$LZMADECOPT ENDS
 

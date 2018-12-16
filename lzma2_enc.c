@@ -1613,7 +1613,7 @@ static BYTE LZMA_getLcLpPbCode(LZMA2_ECtx *const enc)
     return (BYTE)((enc->pb * 5 + enc->lp) * 9 + enc->lc);
 }
 
-/* From: https://stackoverflow.com/a/1101217 */
+/* Integer square root from https://stackoverflow.com/a/1101217 */
 static U32 LZMA2_isqrt(U32 op)
 {
     U32 res = 0;
@@ -1631,7 +1631,7 @@ static U32 LZMA2_isqrt(U32 op)
     return res;
 }
 
-static BYTE LZMA2_isChunkRandom(const FL2_matchTable* const tbl,
+static BYTE LZMA2_isChunkCompressible(const FL2_matchTable* const tbl,
     FL2_dataBlock const block, size_t const start,
 	unsigned const strategy)
 {
@@ -1876,7 +1876,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         if (next_is_random || uncompressed_size + 3 <= compressed_size + (compressed_size >> kRandomFilterMarginBits) + header_size)
         {
             /* Test the next chunk for compressibility */
-            next_is_random = LZMA2_isChunkRandom(tbl, block, next_index, enc->strategy);
+            next_is_random = LZMA2_isChunkCompressible(tbl, block, next_index, enc->strategy);
         }
         out_dest += compressed_size + header_size;
         FL2_atomic_add(*progress, (long)(next_index - index));

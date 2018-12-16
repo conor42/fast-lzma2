@@ -390,7 +390,6 @@ typedef struct
     size_t srcThread;
     size_t srcPos;
     size_t hashPos;
-    size_t rewind;
     int isFinal;
     int failState;
     BYTE prop;
@@ -451,6 +450,7 @@ static void FL2_Lzma2DecMt_Init(Lzma2DecMt *const decmt)
         decmt->hashPos = 0;
         FL2_FreeOutputBuffers(decmt);
         LZMA2_freeInbufNodeChain(decmt->head->next, NULL);
+        decmt->head->next = NULL;
         decmt->head->length = 0;
         decmt->threads[0].inBlock.first = decmt->head;
         decmt->threads[0].inBlock.last = decmt->head;
@@ -719,14 +719,18 @@ static size_t FL2_decompressFailedMt(FL2_DStream* const fds, FL2_outBuffer* cons
 
     if (!decmt->failState) {
         FL2_FreeOutputBuffers(decmt);
-        decmt->rewind = MIN(input->pos, LZMA_REQUIRED_INPUT_MAX);
-        input->pos -= decmt->rewind;
         decmt->srcPos = decmt->threads[0].inBlock.startPos;
         decmt->failState = 1;
         CHECK_F(LZMA2_initDecoder(&fds->dec, decmt->prop, NULL, 0));
     }
     while (output->pos < output->size && decmt->threads[0].inBlock.first != NULL) {
         LZMA2_mtInbuf *cur = decmt->threads[0].inBlock.first;
+        if (cur->length <= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX) {
+            size_t toRead = MIN(input->size - input->pos, LZMA_REQUIRED_INPUT_MAX);
+            memcpy(cur->inBuf + cur->length, (BYTE*)input->src + input->pos, toRead);
+            cur->length += toRead;
+            input->pos += toRead;
+        }
         FL2_inBuffer temp;
         temp.src = cur->inBuf;
         temp.pos = decmt->srcPos;
@@ -734,18 +738,35 @@ static size_t FL2_decompressFailedMt(FL2_DStream* const fds, FL2_outBuffer* cons
         CHECK_F(FL2_decompressInput(fds, output, &temp));
         decmt->srcPos = temp.pos;
         if (temp.pos + LZMA_REQUIRED_INPUT_MAX >= temp.size) {
-            decmt->srcPos -= cur->length - LZMA_REQUIRED_INPUT_MAX;
-            decmt->threads[0].inBlock.first = cur->next;
             if (cur->next == NULL) {
-                if(decmt->srcPos > decmt->rewind)
-                    return FL2_ERROR(internal);
-                input->pos += decmt->srcPos;
+                size_t rem = temp.size - temp.pos;
+                if (rem > input->pos && fds->stage == FL2DEC_STAGE_DECOMP) {
+                    if (temp.pos == 0)
+                        break;
+                    memmove(cur->inBuf, cur->inBuf + temp.pos, rem);
+                    decmt->srcPos = 0;
+                    cur->length = rem;
+                }
+                else {
+                    if (rem <= input->pos)
+                        input->pos -= rem;
+                    decmt->threads[0].inBlock.first = NULL;
+                }
+            }
+            else {
+                decmt->srcPos -= cur->length - LZMA_REQUIRED_INPUT_MAX;
+                decmt->threads[0].inBlock.first = cur->next;
             }
         }
     }
     if (decmt->threads[0].inBlock.first == NULL) {
+#ifdef FL2_TEST_DECMT_FALLBACK
+        LZMA2_freeInbufNodeChain(decmt->head->next, NULL);
+        decmt->head->next = NULL;
+#else
         FL2_Lzma2DecMt_Free(decmt);
         fds->decmt = NULL;
+#endif
         if (output->pos < output->size)
             return FL2_decompressInput(fds, output, input);
     }

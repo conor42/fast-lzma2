@@ -212,15 +212,6 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit,
 size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen,
     const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode);
 
-typedef struct LZMA2_mtInbuf_s LZMA2_mtInbuf;
-
-struct LZMA2_mtInbuf_s
-{
-    LZMA2_mtInbuf *next;
-    size_t length;
-    BYTE inBuf[1];
-};
-
 typedef enum
 {
     CHUNK_MORE_DATA,
@@ -241,10 +232,6 @@ typedef struct
 #else
 #  define LZMA2_MT_INPUT_SIZE 0x40000
 #endif
-
-LZMA2_mtInbuf *LZMA2_createInbufNode(LZMA2_mtInbuf *const prev);
-
-void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *const keep);
 
 LZMA2_parseRes LZMA2_parseInput(const BYTE* const inBuf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf);
 

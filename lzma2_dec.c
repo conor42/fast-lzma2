@@ -1213,33 +1213,6 @@ size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const srcLen)
     return LZMA2_CONTENTSIZE_ERROR;
 }
 
-LZMA2_mtInbuf * LZMA2_createInbufNode(LZMA2_mtInbuf *const prev)
-{
-    LZMA2_mtInbuf *const node = malloc(sizeof(LZMA2_mtInbuf) + LZMA2_MT_INPUT_SIZE - 1);
-    if(!node)
-        return NULL;
-    node->next = NULL;
-    node->length = 0;
-    if (prev) {
-        memcpy(node->inBuf, prev->inBuf + prev->length - LZMA_REQUIRED_INPUT_MAX, LZMA_REQUIRED_INPUT_MAX);
-        prev->next = node;
-        node->length = LZMA_REQUIRED_INPUT_MAX;
-    }
-    return node;
-}
-
-void LZMA2_freeInbufNodeChain(LZMA2_mtInbuf *node, LZMA2_mtInbuf *const keep)
-{
-    while (node) {
-        LZMA2_mtInbuf *const next = node->next;
-        if(node != keep)
-            free(node);
-        else 
-            node->next = NULL;
-        node = next;
-    }
-}
-
 LZMA2_parseRes LZMA2_parseInput(const BYTE* const inBuf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf)
 {
     inf->packSize = 0;

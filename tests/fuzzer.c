@@ -1099,6 +1099,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             BYTE *send = (BYTE*)cBuffer + cSize;
             BYTE *oend = (BYTE*)dstBuffer + sampleSize;
             ptrdiff_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
+            FL2_setDStreamMemoryLimitMt(dstream, FUZ_rand(&lseed) % (sampleSize * 4U));
             size_t r;
             size_t total = 0;
             CHECK(FL2_isError(FL2_initDStream(dstream)), "FL2_initDStream failed");

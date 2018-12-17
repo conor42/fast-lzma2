@@ -10,9 +10,6 @@
 */
 
 #include <string.h>
-#ifdef FL2_TEST_DECMT_FALLBACK
-#include <stdlib.h>
-#endif
 #include "fast-lzma2.h"
 #include "fl2_internal.h"
 #include "mem.h"
@@ -363,10 +360,19 @@ typedef enum
     FL2DEC_STAGE_FINISHED
 } FL2_decStage;
 
+typedef struct FL2_decInbuf_s FL2_decInbuf;
+
+struct FL2_decInbuf_s
+{
+    FL2_decInbuf *next;
+    size_t length;
+    BYTE inBuf[1];
+};
+
 typedef struct
 {
-    LZMA2_mtInbuf *first;
-    LZMA2_mtInbuf *last;
+    FL2_decInbuf *first;
+    FL2_decInbuf *last;
     size_t startPos;
     size_t endPos;
     size_t unpackSize;
@@ -384,12 +390,13 @@ typedef struct
 typedef struct
 {
     FL2POOL_ctx* factory;
-    LZMA2_mtInbuf *head;
+    FL2_decInbuf *head;
     size_t numThreads;
     size_t maxThreads;
     size_t srcThread;
     size_t srcPos;
-    size_t hashPos;
+    size_t memTotal;
+    size_t memLimit;
     int isFinal;
     int failState;
     BYTE prop;
@@ -423,9 +430,32 @@ struct FL2_DStream_s
 
 #ifndef FL2_SINGLETHREAD
 
+static void LZMA2_freeInbufNodeChain(FL2_decMt *const decmt, FL2_decInbuf *node, FL2_decInbuf *const keep)
+{
+    while (node) {
+        FL2_decInbuf *const next = node->next;
+        if (node != keep) {
+            decmt->memTotal -= sizeof(FL2_decInbuf) + LZMA2_MT_INPUT_SIZE - 1;
+            free(node);
+        }
+        else {
+            node->next = NULL;
+        }
+        node = next;
+    }
+}
+
+static void LZMA2_freeExtraInbufNodes(FL2_decMt *const decmt)
+{
+    LZMA2_freeInbufNodeChain(decmt, decmt->head->next, NULL);
+    decmt->head->next = NULL;
+    decmt->head->length = 0;
+}
+
 static void FL2_FreeOutputBuffers(FL2_decMt *const decmt)
 {
     for (size_t thread = 0; thread < decmt->maxThreads; ++thread) {
+        decmt->memTotal -= decmt->threads[thread].bufSize;
         free(decmt->threads[thread].outBuf);
         decmt->threads[thread].outBuf = NULL;
     }
@@ -436,7 +466,7 @@ static void FL2_Lzma2DecMt_Free(FL2_decMt *const decmt)
 {
     if (decmt) {
         FL2_FreeOutputBuffers(decmt);
-        LZMA2_freeInbufNodeChain(decmt->head, NULL);
+        LZMA2_freeInbufNodeChain(decmt, decmt->head, NULL);
         FL2POOL_free(decmt->factory);
         free(decmt);
     }
@@ -447,17 +477,35 @@ static void FL2_Lzma2DecMt_Init(FL2_decMt *const decmt)
     if (decmt) {
         decmt->failState = 0;
         decmt->isFinal = 0;
-        decmt->hashPos = 0;
+        decmt->memTotal = 0;
         FL2_FreeOutputBuffers(decmt);
-        LZMA2_freeInbufNodeChain(decmt->head->next, NULL);
-        decmt->head->next = NULL;
-        decmt->head->length = 0;
+        LZMA2_freeExtraInbufNodes(decmt);
         decmt->threads[0].inBlock.first = decmt->head;
         decmt->threads[0].inBlock.last = decmt->head;
         decmt->threads[0].inBlock.startPos = 0;
         decmt->threads[0].inBlock.endPos = 0;
         decmt->threads[0].inBlock.unpackSize = 0;
     }
+}
+
+static FL2_decInbuf * LZMA2_createInbufNode(FL2_decMt *const decmt, FL2_decInbuf *const prev)
+{
+    decmt->memTotal += sizeof(FL2_decInbuf) + LZMA2_MT_INPUT_SIZE - 1;
+    if (decmt->memTotal > decmt->memLimit)
+        return NULL;
+
+    FL2_decInbuf *const node = malloc(sizeof(FL2_decInbuf) + LZMA2_MT_INPUT_SIZE - 1);
+    if (!node)
+        return NULL;
+
+    node->next = NULL;
+    node->length = 0;
+    if (prev) {
+        memcpy(node->inBuf, prev->inBuf + prev->length - LZMA_REQUIRED_INPUT_MAX, LZMA_REQUIRED_INPUT_MAX);
+        prev->next = node;
+        node->length = LZMA_REQUIRED_INPUT_MAX;
+    }
+    return node;
 }
 
 static FL2_decMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
@@ -468,7 +516,13 @@ static FL2_decMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
     if (!decmt)
         return NULL;
 
-    decmt->head = LZMA2_createInbufNode(NULL);
+    decmt->memTotal = 0;
+    decmt->memLimit = (size_t)1 << 29;
+
+    decmt->head = LZMA2_createInbufNode(decmt, NULL);
+    if (!decmt->head)
+        return NULL;
+
     decmt->factory = FL2POOL_create(maxThreads - 1);
 
     if (maxThreads > 1 && decmt->factory == NULL) {
@@ -490,7 +544,7 @@ static FL2_decMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
 static LZMA2_parseRes FL2_ParseMt(FL2_decBlock* const inBlock)
 {
     LZMA2_parseRes res = CHUNK_MORE_DATA;
-    LZMA2_mtInbuf* cur = inBlock->last;
+    FL2_decInbuf* cur = inBlock->last;
     if (cur == NULL)
         return res;
 
@@ -521,7 +575,7 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
 
     CHECK_F(LZMA2_initDecoder(dec, decmt->prop, ti->outBuf, ti->bufSize));
 
-    LZMA2_mtInbuf *cur = ti->inBlock.first;
+    FL2_decInbuf *cur = ti->inBlock.first;
     size_t inPos = ti->inBlock.startPos;
     int last = decmt->isFinal && (thread == decmt->numThreads - 1);
 
@@ -597,8 +651,8 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* const fds)
     FL2POOL_waitAll(fds->decmt->factory, 0);
 
     if (decmt->numThreads > 0) {
-        LZMA2_mtInbuf *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
-        LZMA2_freeInbufNodeChain(decmt->head, keep);
+        FL2_decInbuf *keep = decmt->threads[decmt->numThreads - 1].inBlock.last;
+        LZMA2_freeInbufNodeChain(decmt, decmt->head, keep);
         decmt->head = keep;
         decmt->threads[0].inBlock.first = keep;
         decmt->threads[0].inBlock.last = keep;
@@ -635,11 +689,10 @@ static size_t FL2_LoadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
                 FL2_decJob * const done = decmt->threads + decmt->numThreads;
 
                 done->bufSize = done->inBlock.unpackSize;
-#ifdef FL2_TEST_DECMT_FALLBACK
-                if ((rand() & 15) == 0)
-                    done->outBuf = NULL;
-                else
-#endif
+                decmt->memTotal += done->bufSize;
+                if(decmt->memTotal > decmt->memLimit)
+                    return FL2_ERROR(memory_allocation);
+
                 done->outBuf = malloc(done->bufSize);
 
                 if (!done->outBuf)
@@ -665,11 +718,7 @@ static size_t FL2_LoadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
             }
         }
         if (inBlock->last->length >= LZMA2_MT_INPUT_SIZE && inBlock->endPos + LZMA_REQUIRED_INPUT_MAX >= inBlock->last->length) {
-            LZMA2_mtInbuf *next = NULL;
-#ifdef FL2_TEST_DECMT_FALLBACK
-            if ((rand() & ((0x2000000 / LZMA2_MT_INPUT_SIZE) - 1)) != 0)
-#endif
-            next = LZMA2_createInbufNode(inBlock->last);
+            FL2_decInbuf *next = LZMA2_createInbufNode(decmt, inBlock->last);
             if (!next)
                 return FL2_ERROR(memory_allocation);
             inBlock->last = next;
@@ -737,7 +786,7 @@ static size_t FL2_decompressFailedMt(FL2_DStream* const fds, FL2_outBuffer* cons
         decmt->failState = 1;
         CHECK_F(LZMA2_initDecoder(&fds->dec, decmt->prop, NULL, 0));
     }
-    LZMA2_mtInbuf *cur = decmt->threads[0].inBlock.first;
+    FL2_decInbuf *cur = decmt->threads[0].inBlock.first;
     size_t extra = 0;
     if (cur->length <= LZMA2_MT_INPUT_SIZE - LZMA_REQUIRED_INPUT_MAX) {
         /* Read <= 20 bytes from the input if space available, to allow the decoder
@@ -774,11 +823,9 @@ static size_t FL2_decompressFailedMt(FL2_DStream* const fds, FL2_outBuffer* cons
             decmt->threads[0].inBlock.first = cur->next;
         }
     }
-    if (decmt->threads[0].inBlock.first == NULL) {
-        LZMA2_freeInbufNodeChain(decmt->head->next, NULL);
-        decmt->head->next = NULL;
-        decmt->head->length = 0;
-    }
+    if (decmt->threads[0].inBlock.first == NULL)
+        LZMA2_freeExtraInbufNodes(decmt);
+
     return FL2_error_no_error;
 }
 
@@ -857,6 +904,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
         free(fds);
     }
     return 0;
+}
+
+FL2LIB_API void FL2LIB_CALL FL2_setDStreamMemoryLimitMt(FL2_DStream * fds, size_t limit)
+{
+    if (fds->decmt != NULL)
+        fds->decmt->memLimit = limit;
 }
 
 /*===== Streaming decompression functions =====*/

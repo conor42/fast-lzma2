@@ -350,6 +350,8 @@ FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void);
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
+FL2LIB_API void FL2LIB_CALL FL2_setDStreamMemoryLimitMt(FL2_DStream* fds, size_t limit);
+
 FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned timeout);
 FL2LIB_API size_t FL2LIB_CALL FL2_waitDStream(FL2_DStream * fds);
 FL2LIB_API unsigned long long FL2LIB_CALL FL2_getDStreamProgress(const FL2_DStream * fds);

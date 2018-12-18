@@ -1066,7 +1066,7 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
             ptrdiff_t start_match;
 
             match.length = MIN(match.length, (U32)max_length);
-            if (match.length < 3 || match.dist < 256) {
+            if (match.length < 3 || max_length < 4) {
                 enc->matches[0] = match;
                 enc->match_count = 1;
                 main_len = match.length;

@@ -540,8 +540,10 @@ static FL2_decMt *FL2_Lzma2DecMt_Create(unsigned maxThreads)
     decmt->memLimit = (size_t)1 << 29;
 
     decmt->head = LZMA2_createInbufNode(decmt, NULL);
-    if (!decmt->head)
+    if (decmt->head == NULL) {
+        free(decmt);
         return NULL;
+    }
 
     decmt->factory = FL2POOL_create(maxThreads - 1);
 
@@ -919,6 +921,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
         DEBUGLOG(3, "FL2_freeDStream");
         LZMA_destructDCtx(&fds->dec);
         FL2POOL_free(fds->decompressThread);
+#ifndef FL2_SINGLETHREAD
+        FL2_Lzma2DecMt_Free(fds->decmt);
+#endif
 #ifndef NO_XXHASH
         XXH32_freeState(fds->xxh);
 #endif

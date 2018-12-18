@@ -2,7 +2,8 @@
 #include "dict_buffer.h"
 #include "fl2_internal.h"
 
-#define ALIGNMENT_MASK (~(size_t)15)
+#define ALIGNMENT_SIZE 16U
+#define ALIGNMENT_MASK (~(size_t)(ALIGNMENT_SIZE-1))
 
 int DICT_construct(DICT_buffer * const buf, int const async)
 {
@@ -133,7 +134,7 @@ void DICT_getBlock(DICT_buffer * const buf, FL2_dataBlock * const block)
 
 int DICT_needShift(DICT_buffer * const buf, size_t const overlap)
 {
-    return buf->start == buf->end && (overlap == 0 || buf->end > overlap + ALIGNMENT_MASK);
+    return buf->start == buf->end && (overlap == 0 || buf->end >= overlap + ALIGNMENT_SIZE);
 }
 
 int DICT_async(const DICT_buffer * const buf)
@@ -151,7 +152,7 @@ void DICT_shift(DICT_buffer * const buf, size_t overlap)
         buf->end = 0;
         buf->index ^= buf->async;
     }
-    else if (buf->end > overlap + ALIGNMENT_MASK) {
+    else if (buf->end >= overlap + ALIGNMENT_SIZE) {
         size_t const from = (buf->end - overlap) & ALIGNMENT_MASK;
         const BYTE *const src = buf->data[buf->index];
         BYTE *const dst = buf->data[buf->index ^ buf->async];

@@ -947,7 +947,9 @@ static size_t FL2_compressStream_input(FL2_CStream* fcs, FL2_inBuffer* input)
         size_t overlap = blockOverlap;
         if (!DICT_hasUnprocessed(buf)
             && fcs->params.rParams.block_size_multiplier != 0
-            && fcs->blockTotal >= (fcs->params.rParams.dictionary_size * fcs->params.rParams.block_size_multiplier)) {
+            && fcs->blockTotal + (fcs->params.rParams.dictionary_size - overlap)
+            > (fcs->params.rParams.dictionary_size * fcs->params.rParams.block_size_multiplier))
+        {
             /* periodically reset the dictionary for mt decompression */
             overlap = 0;
             fcs->blockTotal = 0;

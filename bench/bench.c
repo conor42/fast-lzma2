@@ -236,12 +236,17 @@ int FL2LIB_CALL main(int argc, char** argv)
         RDG_genBuffer(src, size, 0.6, 0.02, 1);
     }
     unsigned threads = 1;
+    unsigned dthreads = ~0U;
     for (int i = 2; i < argc; ++i) {
         if (argv[i][0] == '-' && argv[i][1] == 'T')
-        threads = atoi(argv[i] + 2);
+            threads = atoi(argv[i] + 2);
+        if (argv[i][0] == '-' && argv[i][1] == 'D')
+            dthreads = atoi(argv[i] + 2);
     }
+    if (dthreads == ~0U)
+        dthreads = threads;
     FL2_CCtx* fcs = FL2_createCCtxMt(threads);
-    FL2_DCtx* dctx = FL2_createDCtxMt(threads);
+    FL2_DCtx* dctx = FL2_createDCtxMt(dthreads);
     if (fcs == NULL)
         return 1;
     int end_level = parse_params(fcs, argc, argv);

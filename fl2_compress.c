@@ -697,7 +697,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
         /* lc, lp, pb can be changed between encoder chunks.
          * Set lc and lp even if lc+lp > 4 to allow sequential setting.
-        /* If lc+lp is still >4 when encoding begins, lc will be reduced. */
+         * If lc+lp is still >4 when encoding begins, lc will be reduced. */
     case FL2_p_literalCtxBits:
         MAXCHECK(value, FL2_LC_MAX);
         cctx->params.cParams.lc = (unsigned)value;

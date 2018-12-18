@@ -264,6 +264,9 @@ int FL2LIB_CALL main(int argc, char** argv)
         printf("%u\r\n", level);
         g_nbSeconds += 5;
     }
+    FL2_freeDCtx(dctx);
+    FL2_freeCCtx(fcs);
+    free(resultBuffer);
     free(compressedBuffer);
     free(src);
     return 0;

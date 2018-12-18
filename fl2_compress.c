@@ -230,7 +230,7 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx)
     free(cctx);
 }
 
-FL2LIB_API unsigned FL2LIB_CALL FL2_CCtx_nbThreads(const FL2_CCtx* cctx)
+FL2LIB_API unsigned FL2LIB_CALL FL2_getCCtxThreadCount(const FL2_CCtx* cctx)
 {
     return cctx->jobCount;
 }

@@ -155,6 +155,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx)
     return 0;
 }
 
+FL2LIB_API unsigned FL2LIB_CALL FL2_getDCtxThreadCount(const FL2_DCtx * dctx)
+{
+    return dctx->nbThreads;
+}
+
 #ifndef FL2_SINGLETHREAD
 
 /* FL2_decompressCtxBlock() : FL2POOL_function type */

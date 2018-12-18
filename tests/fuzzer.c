@@ -963,6 +963,10 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             srcBuffer = cNoiseBuffer[buffNb];
         }
 
+        /* select dictionary size */
+        size_t dictSize = FUZ_randomLength(&lseed, maxSampleLog + 1);
+        dictSize = MAX(dictSize, 1U << 20);
+
         /* select src segment */
         sampleSize = FUZ_randomLength(&lseed, maxSampleLog);
 
@@ -981,6 +985,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             unsigned useStream = FUZ_rand(&lseed) & 3;
             FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cstream, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
+            FL2_CCtx_setParameter(cstream, FL2_p_dictionarySize, dictSize);
             if((FUZ_rand(&lseed) & 7) > 6)
                 FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, 64);
             if ((FUZ_rand(&lseed) & 3) > 2)
@@ -994,7 +999,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             if (useStream) {
                 unsigned flushes = 1 + FUZ_rand(&lseed) % 3;
                 size_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
-                unsigned flushFreq = (unsigned)(((size_t)2 << FL2_CCtx_getParameter(cstream, FL2_p_dictionaryLog)) / bufSize);
+                unsigned flushFreq = (unsigned)((dictSize << 1) / bufSize);
                 flushFreq |= 3;
                 cSize = FL2_initCStream(cstream, 0);
                 CHECK(FL2_isError(cSize), "FL2_initCStream failed : %s", FL2_getErrorName(cSize));
@@ -1099,7 +1104,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             BYTE *send = (BYTE*)cBuffer + cSize;
             BYTE *oend = (BYTE*)dstBuffer + sampleSize;
             ptrdiff_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
-            FL2_setDStreamMemoryLimitMt(dstream, FUZ_rand(&lseed) % (sampleSize * 4U));
+            FL2_setDStreamMemoryLimitMt(dstream, (FUZ_rand(&lseed) << 3) % (dictSize * 8U * nbThreads));
             size_t r;
             size_t total = 0;
             CHECK(FL2_isError(FL2_initDStream(dstream)), "FL2_initDStream failed");

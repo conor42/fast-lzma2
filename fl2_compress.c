@@ -21,7 +21,7 @@
 #include "radix_mf.h"
 #include "lzma2_enc.h"
 
-#define FL2_MAX_LOOPS 5U
+#define FL2_MAX_LOOPS 10U
 
 /*-=====  Pre-defined compression levels  =====-*/
 
@@ -615,7 +615,7 @@ FL2LIB_API BYTE FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx)
 }   } while(0)
 
 
-FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, unsigned value)
+FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, size_t value)
 {
     if (cctx->lockParams
         && param != FL2_p_literalCtxBits && param != FL2_p_literalPosBits && param != FL2_p_posBits)
@@ -632,7 +632,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
             CLAMPCHECK(value, 1, FL2_MAX_CLEVEL);
             FL2_fillParameters(cctx, &FL2_defaultCParameters[value]);
         }
-        cctx->params.compressionLevel = value;
+        cctx->params.compressionLevel = (unsigned)value;
         break;
 
     case FL2_p_highCompression:
@@ -652,23 +652,23 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_overlapFraction:
         MAXCHECK(value, FL2_BLOCK_OVERLAP_MAX);
-        cctx->params.rParams.overlap_fraction = value;
+        cctx->params.rParams.overlap_fraction = (unsigned)value;
         break;
 
     case FL2_p_blockSizeMultiplier:
         if (value != 0)
             CLAMPCHECK(value, FL2_BLOCK_MUL_MIN, FL2_BLOCK_MUL_MAX);
-        cctx->params.rParams.block_size_multiplier = value;
+        cctx->params.rParams.block_size_multiplier = (unsigned)value;
         break;
 
     case FL2_p_bufferLog:
         MAXCHECK(value, RMF_BUFFER_LOG_BASE - FL2_BUFFER_SIZE_LOG_MIN);
-        cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - value;
+        cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - (unsigned)value;
         break;
 
     case FL2_p_chainLog:
         CLAMPCHECK(value, FL2_CHAINLOG_MIN, FL2_CHAINLOG_MAX);
-        cctx->params.cParams.second_dict_bits = value;
+        cctx->params.cParams.second_dict_bits = (unsigned)value;
         break;
 
     case FL2_p_searchLog:
@@ -678,16 +678,16 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_searchDepth:
         CLAMPCHECK(value, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
-        cctx->params.rParams.depth = value;
+        cctx->params.rParams.depth = (unsigned)value;
         break;
 
     case FL2_p_fastLength:
         CLAMPCHECK(value, FL2_FASTLENGTH_MIN, FL2_FASTLENGTH_MAX);
-        cctx->params.cParams.fast_length = value;
+        cctx->params.cParams.fast_length = (unsigned)value;
         break;
 
     case FL2_p_divideAndConquer:
-        cctx->params.rParams.divide_and_conquer = value;
+        cctx->params.rParams.divide_and_conquer = (unsigned)value;
         break;
 
     case FL2_p_strategy:
@@ -700,21 +700,21 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         /* If lc+lp is still >4 when encoding begins, lc will be reduced. */
     case FL2_p_literalCtxBits:
         MAXCHECK(value, FL2_LC_MAX);
-        cctx->params.cParams.lc = value;
+        cctx->params.cParams.lc = (unsigned)value;
         if (value + cctx->params.cParams.lp > FL2_LCLP_MAX)
             return FL2_ERROR(lclpMax_exceeded);
         break;
 
     case FL2_p_literalPosBits:
         MAXCHECK(value, FL2_LP_MAX);
-        cctx->params.cParams.lp = value;
+        cctx->params.cParams.lp = (unsigned)value;
         if (cctx->params.cParams.lc + value > FL2_LCLP_MAX)
             return FL2_ERROR(lclpMax_exceeded);
         break;
 
     case FL2_p_posBits:
         MAXCHECK(value, FL2_PB_MAX);
-        cctx->params.cParams.pb = value;
+        cctx->params.cParams.pb = (unsigned)value;
         break;
 
 #ifndef NO_XXHASH
@@ -807,7 +807,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     }
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, unsigned value)
+FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, size_t value)
 {
     return FL2_CCtx_setParameter(fcs, param, value);
 }

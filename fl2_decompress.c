@@ -454,11 +454,12 @@ static void LZMA2_freeExtraInbufNodes(FL2_decMt *const decmt)
 
 static void FL2_FreeOutputBuffers(FL2_decMt *const decmt)
 {
-    for (size_t thread = 0; thread < decmt->maxThreads; ++thread) {
-        decmt->memTotal -= decmt->threads[thread].bufSize;
-        free(decmt->threads[thread].outBuf);
-        decmt->threads[thread].outBuf = NULL;
-    }
+    for (size_t thread = 0; thread < decmt->maxThreads; ++thread)
+        if(decmt->threads[thread].outBuf != NULL) {
+            decmt->memTotal -= decmt->threads[thread].bufSize;
+            free(decmt->threads[thread].outBuf);
+            decmt->threads[thread].outBuf = NULL;
+        }
     decmt->numThreads = 0;
 }
 
@@ -486,6 +487,20 @@ static void FL2_Lzma2DecMt_Init(FL2_decMt *const decmt)
         decmt->threads[0].inBlock.endPos = 0;
         decmt->threads[0].inBlock.unpackSize = 0;
     }
+}
+
+static int FL2_Lzma2DecMt_InitProp(FL2_decMt *const decmt, BYTE prop)
+{
+    decmt->prop = prop;
+    size_t dictSize = LZMA2_getDictSizeFromProp(prop);
+    /* Minimum memory is two threads, one dict size per thread plus a minimal amount of
+     * compressed data for each. Compression to < 1/6 is uncommon. */
+    if (decmt->memLimit < (dictSize + dictSize / 6U) * 2U) {
+        DEBUGLOG(3, "Using ST decompression due to dict size %u, memory limit %u", (unsigned)dictSize, (unsigned)decmt->memLimit);
+        decmt->failState = 1;
+        return 1;
+    }
+    return 0;
 }
 
 static FL2_decInbuf * LZMA2_createInbufNode(FL2_decMt *const decmt, FL2_decInbuf *const prev)
@@ -773,6 +788,7 @@ static size_t FL2_decompressFailedMt(FL2_DStream* const fds, FL2_outBuffer* cons
         return FL2_decompressInput(fds, output, input);
 
     if (!decmt->failState) {
+        DEBUGLOG(3, "Switching to ST decompression. Memory: %u, limit %u", (unsigned)decmt->memTotal, (unsigned)decmt->memLimit);
 #ifndef NO_XXHASH
         if (fds->doHash && input->pos >= XXHASH_SIZEOF) {
             /* Maybe the hash was read, so rewind the input pos to leave the hash in the input. */
@@ -970,9 +986,7 @@ static size_t FL2_initDStream_prop(FL2_DStream* const fds, BYTE prop)
     prop &= FL2_LZMA_PROP_MASK;
 
 #ifndef FL2_SINGLETHREAD
-    if (fds->decmt)
-        fds->decmt->prop = prop;
-    else
+    if (fds->decmt == NULL || FL2_Lzma2DecMt_InitProp(fds->decmt, prop))
 #endif
         CHECK_F(LZMA2_initDecoder(&fds->dec, prop, NULL, 0));
 

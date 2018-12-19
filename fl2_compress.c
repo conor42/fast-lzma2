@@ -906,10 +906,8 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const endi
         }
 
         CHECK_F(FL2_compressCurBlock(fcs, streamProp));
-
-        return 1;
     }
-    return 0;
+    return FL2_error_no_error;
 }
 
 static void FL2_copyCStreamOutput(FL2_CStream* fcs, FL2_outBuffer *output)
@@ -966,17 +964,17 @@ static size_t FL2_compressStream_input(FL2_CStream* fcs, FL2_inBuffer* input)
         DICT_put(buf, input);
         
         if (!DICT_availSpace(buf)) {
-            size_t const res = FL2_compressStream_internal(fcs, 0);
-            CHECK_F(res);
-
-            if (res == 0)
+            /* break if the compressor is not available */
+            if (fcs->outThread < fcs->threadCount)
                 break;
+
+            CHECK_F(FL2_compressStream_internal(fcs, 0));
         }
 
         CHECK_F(fcs->asyncRes);
     }
 
-    return fcs->outThread == fcs->threadCount;
+    return FL2_error_no_error;
 }
 
 static size_t FL2_loopCheck(FL2_CStream* fcs, int unchanged)
@@ -1003,15 +1001,14 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
     if (output != NULL && fcs->outThread < fcs->threadCount)
         FL2_copyCStreamOutput(fcs, output);
 
-    size_t res = FL2_compressStream_input(fcs, input);
-    CHECK_F(res);
+    CHECK_F(FL2_compressStream_input(fcs, input));
 
-    if(output != NULL && res == 0)
+    if(output != NULL && fcs->outThread < fcs->threadCount)
         FL2_copyCStreamOutput(fcs, output);
 
     CHECK_F(FL2_loopCheck(fcs, prevIn == input->pos && (output == NULL || prevOut == output->pos)));
 
-    return res;
+    return fcs->outThread == fcs->threadCount;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_outBuffer * dict)
@@ -1054,7 +1051,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
     if (FL2POOL_waitAll(fcs->compressThread, fcs->timeout) != 0)
         return FL2_ERROR(timedOut);
     CHECK_F(fcs->asyncRes);
-    return fcs->outThread == fcs->threadCount;
+    return fcs->outThread < fcs->threadCount;
 }
 
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)
@@ -1151,8 +1148,6 @@ static size_t FL2_flushStream_internal(FL2_CStream* fcs, int const ending)
 
     CHECK_F(FL2_compressStream_internal(fcs, ending));
 
-    CHECK_F(FL2_waitStream(fcs));
-
     return fcs->outThread < fcs->threadCount;
 }
 
@@ -1189,8 +1184,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
     if (output != NULL && fcs->outThread < fcs->threadCount)
         FL2_copyCStreamOutput(fcs, output);
 
-    size_t res = FL2_flushStream_internal(fcs, 1);
+    CHECK_F(FL2_flushStream_internal(fcs, 1));
 
+    size_t res = FL2_waitStream(fcs);
     CHECK_F(res);
 
     if (!fcs->endMarked && !DICT_hasUnprocessed(&fcs->buf)) {

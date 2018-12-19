@@ -187,11 +187,12 @@ RMF_structuredInit
         }
     }
     /* Handle the last value */
-    if (i <= block_size && tbl->list_heads[radix_16].head != RADIX_NULL_LINK)
-        SetMatchLinkAndLength(block_size, tbl->list_heads[radix_16].head, 2);
-    else
-        SetNull(block_size);
-
+    if (i == block_size) {
+        if (tbl->list_heads[radix_16].head != RADIX_NULL_LINK)
+            SetMatchLinkAndLength(block_size, tbl->list_heads[radix_16].head, 2);
+        else
+            SetNull(block_size);
+    }
     /* Never a match at the last byte */
     SetNull(end - 1);
 
@@ -325,6 +326,7 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
             size_t const radix_8 = data_src[link];
             /* Seen this char before? */
             U32 const prev = tails_8[radix_8].prev_index;
+            tails_8[radix_8].prev_index = (U32)index;
             if (prev != RADIX_NULL_LINK) {
                 ++tails_8[radix_8].list_count;
                 /* Link the previous occurrence to this one and record the new length */
@@ -338,7 +340,6 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
                 tbl->stack[st_index].count = (U32)radix_8;
                 ++st_index;
             }
-            tails_8[radix_8].prev_index = (U32)index;
         }
         ++index;
     } while (index < list_count);
@@ -374,6 +375,7 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
             if (link < limit) {
                 size_t const radix_8 = data_src[link];
                 U32 const prev = tails_8[radix_8].prev_index;
+                tails_8[radix_8].prev_index = (U32)index;
                 if (prev != RADIX_NULL_LINK) {
                     ++tails_8[radix_8].list_count;
                     tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
@@ -384,7 +386,6 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
                     tbl->stack[st_index].count = (U32)radix_8;
                     ++st_index;
                 }
-                tails_8[radix_8].prev_index = (U32)index;
             }
             index = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
         } while (--list_count != 0);
@@ -487,6 +488,7 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
         next_radix_16 = next_radix_8 + ((size_t)(data_src[next_link + 1]) << 8);
 
         U32 prev = tbl->tails_8[radix_8].prev_index;
+        tbl->tails_8[radix_8].prev_index = (U32)link;
         if (prev != RADIX_NULL_LINK) {
             /* Link the previous occurrence to this one at length 3. */
             /* This will be overwritten if a 4 is found. */
@@ -495,9 +497,9 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
         else {
             reset_list[reset_count++] = radix_8;
         }
-        tbl->tails_8[radix_8].prev_index = (U32)link;
 
         prev = tbl->tails_16[radix_16].prev_index;
+        tbl->tails_16[radix_16].prev_index = (U32)link;
         if (prev != RADIX_NULL_LINK) {
             ++tbl->tails_16[radix_16].list_count;
             /* Link at length 4, overwriting the 3 */
@@ -509,7 +511,6 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
             tbl->stack[st_index].count = (U32)radix_16;
             ++st_index;
         }
-        tbl->tails_16[radix_16].prev_index = (U32)link;
         link = next_link;
     } while (--count > 0);
 

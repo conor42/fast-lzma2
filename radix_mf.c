@@ -449,26 +449,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 tbl->match_buffer[index].src.u32 = MEM_read32(data_src + link);
                 size_t const next_link = tbl->match_buffer[next_index].from;
                 U32 const prev = tbl->tails_8[radix_8].prev_index;
-                if (prev!=RADIX_NULL_LINK) {
-                    ++tbl->tails_8[radix_8].list_count;
-                    tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
-                }
-                else {
-                    tbl->tails_8[radix_8].list_count = 1;
-                    tbl->stack[st_index].head = (U32)index;
-                    tbl->stack[st_index].count = (U32)radix_8;
-                    ++st_index;
-                }
                 tbl->tails_8[radix_8].prev_index = (U32)index;
-                index = next_index;
-                link = next_link;
-            } while (--list_count != 0);
-            else do {
-                size_t const radix_8 = tbl->match_buffer[index].src.chars[slot];
-                size_t const next_index = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
-                /* Pre-load the next link to avoid waiting for RAM access */
-                size_t const next_link = tbl->match_buffer[next_index].from;
-                U32 const prev = tbl->tails_8[radix_8].prev_index;
                 if (prev != RADIX_NULL_LINK) {
                     ++tbl->tails_8[radix_8].list_count;
                     tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
@@ -479,7 +460,26 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     tbl->stack[st_index].count = (U32)radix_8;
                     ++st_index;
                 }
+                index = next_index;
+                link = next_link;
+            } while (--list_count != 0);
+            else do {
+                size_t const radix_8 = tbl->match_buffer[index].src.chars[slot];
+                size_t const next_index = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
+                /* Pre-load the next link to avoid waiting for RAM access */
+                size_t const next_link = tbl->match_buffer[next_index].from;
+                U32 const prev = tbl->tails_8[radix_8].prev_index;
                 tbl->tails_8[radix_8].prev_index = (U32)index;
+                if (prev != RADIX_NULL_LINK) {
+                    ++tbl->tails_8[radix_8].list_count;
+                    tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                }
+                else {
+                    tbl->tails_8[radix_8].list_count = 1;
+                    tbl->stack[st_index].head = (U32)index;
+                    tbl->stack[st_index].count = (U32)radix_8;
+                    ++st_index;
+                }
                 index = next_index;
                 link = next_link;
             } while (--list_count != 0);
@@ -516,6 +516,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     }
                     rpt = -1;
                     U32 const prev = tbl->tails_8[radix_8].prev_index;
+                    tbl->tails_8[radix_8].prev_index = (U32)index;
                     if (prev != RADIX_NULL_LINK) {
                         ++tbl->tails_8[radix_8].list_count;
                         tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
@@ -526,7 +527,6 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                         tbl->stack[st_index].count = (U32)radix_8;
                         ++st_index;
                     }
-                    tbl->tails_8[radix_8].prev_index = (U32)index;
                     index = next_index;
                     link = next_link;
                 }
@@ -540,6 +540,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                         rpt_head_next = next_index;
                         rpt_dist = dist;
                         U32 const prev = tbl->tails_8[radix_8].prev_index;
+                        tbl->tails_8[radix_8].prev_index = (U32)index;
                         if (prev != RADIX_NULL_LINK) {
                             ++tbl->tails_8[radix_8].list_count;
                             tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
@@ -550,7 +551,6 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                             tbl->stack[st_index].count = (U32)radix_8;
                             ++st_index;
                         }
-                        tbl->tails_8[radix_8].prev_index = (U32)index;
                     }
                     else {
                         ++rpt;
@@ -587,6 +587,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 /* The last element in tbl->match_buffer is circular so this is never an access violation. */
                 size_t const next_link = tbl->match_buffer[next_index].from;
                 U32 const prev = tbl->tails_8[radix_8].prev_index;
+                tbl->tails_8[radix_8].prev_index = (U32)index;
                 if (prev != RADIX_NULL_LINK) {
                     tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
                 }
@@ -594,7 +595,6 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     tbl->stack[st_index].count = (U32)radix_8;
                     ++st_index;
                 }
-                tbl->tails_8[radix_8].prev_index = (U32)index;
                 index = next_index;
                 link = next_link;
             } while (--list_count != 0);

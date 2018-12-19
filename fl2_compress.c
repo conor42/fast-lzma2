@@ -236,22 +236,20 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_getCCtxThreadCount(const FL2_CCtx* cctx)
 }
 
 /* FL2_buildRadixTable() : FL2POOL_function type */
-static void FL2_buildRadixTable(void* const jobDescription, size_t const n)
+static void FL2_buildRadixTable(void* const jobDescription, size_t const thread, int n)
 {
-    const FL2_job* const job = (FL2_job*)jobDescription;
-    FL2_CCtx* const cctx = job->cctx;
+    FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    RMF_buildTable(cctx->matchTable, n, 1, cctx->curBlock);
+    RMF_buildTable(cctx->matchTable, thread, 1, cctx->curBlock);
 }
 
 /* FL2_compressRadixChunk() : FL2POOL_function type */
-static void FL2_compressRadixChunk(void* const jobDescription, size_t const n)
+static void FL2_compressRadixChunk(void* const jobDescription, size_t const thread, int n)
 {
-    const FL2_job* const job = (FL2_job*)jobDescription;
-    FL2_CCtx* const cctx = job->cctx;
+    FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    cctx->jobs[n].cSize = LZMA2_encode(cctx->jobs[n].enc, cctx->matchTable,
-        job->block,
+    cctx->jobs[thread].cSize = LZMA2_encode(cctx->jobs[thread].enc, cctx->matchTable,
+        cctx->jobs[thread].block,
         &cctx->params.cParams,
         -1,
         &cctx->encProgress, &cctx->canceled);
@@ -312,8 +310,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
 #ifndef FL2_SINGLETHREAD
 
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
-    for (size_t u = 1; u < mfThreads; ++u)
-		FL2POOL_add(cctx->factory, FL2_buildRadixTable, &cctx->jobs[u], u);
+	FL2POOL_add(cctx->factory, FL2_buildRadixTable, cctx, 1, mfThreads, 0);
 
 #endif
 
@@ -332,8 +329,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
         return FL2_ERROR(internal);
 #endif
 
-    for (size_t u = 1; u < nbThreads; ++u)
-		FL2POOL_add(cctx->factory, FL2_compressRadixChunk, &cctx->jobs[u], u);
+	FL2POOL_add(cctx->factory, FL2_compressRadixChunk, cctx, 1, nbThreads, 0);
 
     cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, streamProp, &cctx->encProgress, &cctx->canceled);
 
@@ -363,11 +359,11 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
 }
 
 /* FL2_compressCurBlock_async() : FL2POOL_function type */
-static void FL2_compressCurBlock_async(void* const jobDescription, size_t const n)
+static void FL2_compressCurBlock_async(void* const jobDescription, size_t const thread, int n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, (int)n);
+    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, n);
 }
 
 static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
@@ -410,7 +406,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     cctx->encWeight = encWeight;
 
     if(cctx->compressThread != NULL)
-        FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, streamProp);
+        FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, 0, 1, streamProp);
     else
         cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, streamProp);
 

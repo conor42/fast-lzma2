@@ -42,14 +42,14 @@ size_t FL2POOL_sizeof(FL2POOL_ctx *ctx);
 /*! FL2POOL_function :
 The function type that can be added to a thread pool.
 */
-typedef void(*FL2POOL_function)(void *, size_t);
+typedef void(*FL2POOL_function)(void *, size_t, int);
 
 /*! FL2POOL_add() :
 Add the job `function(opaque)` to the thread pool.
 Possibly blocks until there is room in the queue.
 Note : The function may be executed asynchronously, so `opaque` must live until the function has been completed.
 */
-void FL2POOL_add(void *ctx, FL2POOL_function function, void *opaque, size_t n);
+void FL2POOL_add(void *ctx, FL2POOL_function function, void *opaque, size_t first, size_t end, int n);
 
 int FL2POOL_waitAll(void *ctx, unsigned timeout);
 

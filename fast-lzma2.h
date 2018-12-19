@@ -271,20 +271,21 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCStream(FL2_CStream * fcs);
 FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionLevel);
 
 /*! FL2_setCStreamTimeout() :
- *  Sets a timeout in milliseconds. Zero disables the timeout. Functions FL2_compressStream(),
- *  FL2_updateDictionary(), FL2_flushStream(), and FL2_endStream() may return a timeout code
- *  before compression of the current dictionary of data completes. FL2_isError returns true
- *  for the timeout code, so check for it using FL2_isTimedOut() before testing for errors.
- *  Functions EXCEPT FL2_updateDictionary() may be called again after the timeout. A typical
- *  application for timeouts is to update the user on compression progress. */
+ *  Sets a timeout in milliseconds. Zero disables the timeout. If a nonzero timout is set, functions
+ *  FL2_compressStream(), FL2_updateDictionary(), FL2_flushStream(), and FL2_endStream() may return a
+ *  timeout code before compression of the current dictionary of data completes. FL2_isError returns
+ *  true for the timeout code, so check for it using FL2_isTimedOut() before testing for errors.
+ *  With the exception of FL2_updateDictionary(), the above functions may be called again to wait for
+ *  completion. A typical application for timeouts is to update the user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
 /*! FL2_compressStream() :
- *  Reads data from input into the dictionary buffer. Compression will begin if the buffer fills up.
- *  Streams created for dual buffering will fill the second buffer from input and return if all
+ *  Reads data from input into the dictionary buffer. Compression will begin if the buffer fills up, and
+ *  streams created for dual buffering will fill the second buffer from input and return if all
  *  input is consumed. A call to FL2_compressStream() will block when all dictionary space is
- *  filled. FL2_compressStream() must not be called again until all compressed data is read.
- *  Returns zero to indicte compressed data must be read, or nonzero otherwise. */
+ *  filled. FL2_compressStream() must not be called with output==NULL until the caller removes all
+ *  compressed data from the CStream object.
+ *  Returns zero to indicte compressed data must be removed, or nonzero otherwise. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer *output, FL2_inBuffer* input);
 
 /*! FL2_getDictionaryBuffer() :

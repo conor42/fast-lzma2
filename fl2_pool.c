@@ -59,10 +59,10 @@ struct FL2POOL_ctx_s {
 static void* FL2POOL_thread(void* opaque) {
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)opaque;
     if (!ctx) { return NULL; }
+    ZSTD_pthread_mutex_lock(&ctx->queueMutex);
     for (;;) {
-        /* Lock the mutex and wait for a non-empty queue or until shutdown */
-        ZSTD_pthread_mutex_lock(&ctx->queueMutex);
 
+        /* While the mutex is locked, wait for a non-empty queue or until shutdown */
         while (ctx->queueEmpty && !ctx->shutdown) {
             ZSTD_pthread_cond_wait(&ctx->queuePopCond, &ctx->queueMutex);
         }
@@ -75,14 +75,13 @@ static void* FL2POOL_thread(void* opaque) {
         {   FL2POOL_job const job = ctx->queue;
             ctx->queueEmpty = 1;
             /* Unlock the mutex, signal a pusher, and run the job */
-            ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
             ZSTD_pthread_cond_signal(&ctx->queuePushCond);
+            ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
 
             job.function(job.opaque, job.n);
 
 			ZSTD_pthread_mutex_lock(&ctx->queueMutex);
 			ctx->numThreadsBusy--;
-			ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
 			ZSTD_pthread_cond_signal(&ctx->queuePushCond);
 		}
     }  /* for (;;) */
@@ -127,10 +126,10 @@ static void FL2POOL_join(FL2POOL_ctx* ctx) {
     /* Shut down the queue */
     ZSTD_pthread_mutex_lock(&ctx->queueMutex);
     ctx->shutdown = 1;
-    ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
     /* Wake up sleeping threads */
     ZSTD_pthread_cond_broadcast(&ctx->queuePushCond);
     ZSTD_pthread_cond_broadcast(&ctx->queuePopCond);
+    ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
     /* Join all of the threads */
     {   size_t i;
         for (i = 0; i < ctx->numThreads; ++i) {

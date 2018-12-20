@@ -163,17 +163,15 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_getDCtxThreadCount(const FL2_DCtx * dctx)
 #ifndef FL2_SINGLETHREAD
 
 /* FL2_decompressCtxBlock() : FL2POOL_function type */
-static void FL2_decompressCtxBlock(void* const jobDescription, size_t const thread, int n)
+static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n)
 {
     BlockDecMt* const blocks = (BlockDecMt*)jobDescription;
-    size_t srcLen = blocks[thread].packSize;
+    size_t srcLen = blocks[n].packSize;
 
-    blocks[thread].res = LZMA2_decodeToDic(blocks[thread].dec, blocks[thread].unpackSize, blocks[thread].src, &srcLen, blocks[thread].finish);
+    blocks[n].res = LZMA2_decodeToDic(blocks[n].dec, blocks[n].unpackSize, blocks[n].src, &srcLen, blocks[n].finish);
 
-    if (!FL2_isError(blocks[thread].res))
-        blocks[thread].res = blocks[thread].dec->dicPos;
-
-    (void)n;
+    if (!FL2_isError(blocks[n].res))
+        blocks[n].res = blocks[n].dec->dicPos;
 }
 
 static size_t FL2_decompressCtxBlocksMt(FL2_DCtx* const dctx, const BYTE *const src, BYTE *const dst, size_t const dstCapacity, size_t const nbThreads)
@@ -198,10 +196,10 @@ static size_t FL2_decompressCtxBlocksMt(FL2_DCtx* const dctx, const BYTE *const 
     if (dstCapacity < blocks[nbThreads - 1].unpackPos + blocks[nbThreads - 1].unpackSize)
         return FL2_ERROR(dstSize_tooSmall);
 
-    FL2POOL_add(dctx->factory, FL2_decompressCtxBlock, blocks, 1, nbThreads, 0);
+    FL2POOL_addRange(dctx->factory, FL2_decompressCtxBlock, blocks, 1, nbThreads);
 
     CHECK_F(LZMA2_initDecoder(blocks[0].dec, prop, dst + blocks[0].unpackPos, blocks[0].unpackSize));
-    FL2_decompressCtxBlock(blocks, 0, 0);
+    FL2_decompressCtxBlock(blocks, 0);
 
     FL2POOL_waitAll(dctx->factory, 0);
 
@@ -658,17 +656,16 @@ static size_t FL2_writeStreamBlocks(FL2_DStream* const fds, FL2_outBuffer* const
 }
 
 /* FL2_decompressBlock() : FL2POOL_function type */
-static void FL2_decompressBlock(void* const jobDescription, size_t const thread, int n)
+static void FL2_decompressBlock(void* const jobDescription, ptrdiff_t const n)
 {
     FL2_DStream* const fds = (FL2_DStream*)jobDescription;
-    fds->decmt->threads[thread].res = FL2_decompressBlockMt(fds, thread);
-    (void)n;
+    fds->decmt->threads[n].res = FL2_decompressBlockMt(fds, n);
 }
 
 static size_t FL2_decompressBlocksMt(FL2_DStream* const fds)
 {
     FL2_decMt * const decmt = fds->decmt;
-    FL2POOL_add(fds->decmt->factory, FL2_decompressBlock, fds, 1, fds->decmt->numThreads, 0);
+    FL2POOL_addRange(fds->decmt->factory, FL2_decompressBlock, fds, 1, fds->decmt->numThreads);
 
     fds->decmt->threads[0].res = FL2_decompressBlockMt(fds, 0);
     FL2POOL_waitAll(fds->decmt->factory, 0);
@@ -1077,15 +1074,14 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
 
-/* FL2_compressCurBlock_async() : FL2POOL_function type */
-static void FL2_decompressStream_async(void* const jobDescription, size_t const thread, int n)
+/* FL2_decompressStream_async() : FL2POOL_function type */
+static void FL2_decompressStream_async(void* const jobDescription, ptrdiff_t const n)
 {
     FL2_DStream* const fds = (FL2_DStream*)jobDescription;
 
     fds->asyncRes = FL2_decompressStream_blocking(fds, fds->asyncOutput, fds->asyncInput);
     fds->wait = 0;
 
-    (void)thread;
     (void)n;
 }
 
@@ -1100,7 +1096,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
         fds->asyncOutput = output;
         fds->asyncInput = input;
         fds->wait = 1;
-        FL2POOL_add(fds->decompressThread, FL2_decompressStream_async, fds, 0, 1, 0);
+        FL2POOL_add(fds->decompressThread, FL2_decompressStream_async, fds, 0);
         CHECK_F(FL2_waitDStream(fds));
         return fds->asyncRes;
     }

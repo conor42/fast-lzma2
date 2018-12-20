@@ -123,13 +123,11 @@ static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParame
     cParams->match_cycles = 1U << params->searchLog;
     cParams->strategy = params->strategy;
     cParams->second_dict_bits = params->chainLog;
-    cParams->random_filter = 0;
 
     RMF_parameters* const rParams = &cctx->params.rParams;
     rParams->dictionary_size = MIN(params->dictionarySize, FL2_DICTSIZE_MAX); /* allows for reduced dict in 32-bit version */
     rParams->match_buffer_log = RMF_BUFFER_LOG_BASE - params->bufferLog;
     rParams->overlap_fraction = params->overlapFraction;
-    rParams->block_size_multiplier = 4;
     rParams->divide_and_conquer = params->divideAndConquer;
     rParams->depth = params->searchDepth;
 }
@@ -194,6 +192,7 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
     cctx->lockParams = 0;
 
     FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, FL2_CLEVEL_DEFAULT);
+    cctx->params.cParams.reset_interval = 4;
 
     return cctx;
 }
@@ -236,20 +235,20 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_getCCtxThreadCount(const FL2_CCtx* cctx)
 }
 
 /* FL2_buildRadixTable() : FL2POOL_function type */
-static void FL2_buildRadixTable(void* const jobDescription, size_t const thread, int n)
+static void FL2_buildRadixTable(void* const jobDescription, ptrdiff_t const n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    RMF_buildTable(cctx->matchTable, thread, 1, cctx->curBlock);
+    RMF_buildTable(cctx->matchTable, n, 1, cctx->curBlock);
 }
 
 /* FL2_compressRadixChunk() : FL2POOL_function type */
-static void FL2_compressRadixChunk(void* const jobDescription, size_t const thread, int n)
+static void FL2_compressRadixChunk(void* const jobDescription, ptrdiff_t const n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    cctx->jobs[thread].cSize = LZMA2_encode(cctx->jobs[thread].enc, cctx->matchTable,
-        cctx->jobs[thread].block,
+    cctx->jobs[n].cSize = LZMA2_encode(cctx->jobs[n].enc, cctx->matchTable,
+        cctx->jobs[n].block,
         &cctx->params.cParams,
         -1,
         &cctx->encProgress, &cctx->canceled);
@@ -310,7 +309,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
 #ifndef FL2_SINGLETHREAD
 
     mfThreads = MIN(RMF_threadCount(cctx->matchTable), mfThreads);
-	FL2POOL_add(cctx->factory, FL2_buildRadixTable, cctx, 1, mfThreads, 0);
+    FL2POOL_addRange(cctx->factory, FL2_buildRadixTable, cctx, 1, mfThreads);
 
 #endif
 
@@ -329,7 +328,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
         return FL2_ERROR(internal);
 #endif
 
-	FL2POOL_add(cctx->factory, FL2_compressRadixChunk, cctx, 1, nbThreads, 0);
+    FL2POOL_addRange(cctx->factory, FL2_compressRadixChunk, cctx, 1, nbThreads);
 
     cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, streamProp, &cctx->encProgress, &cctx->canceled);
 
@@ -359,11 +358,11 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
 }
 
 /* FL2_compressCurBlock_async() : FL2POOL_function type */
-static void FL2_compressCurBlock_async(void* const jobDescription, size_t const thread, int n)
+static void FL2_compressCurBlock_async(void* const jobDescription, ptrdiff_t const n)
 {
     FL2_CCtx* const cctx = (FL2_CCtx*)jobDescription;
 
-    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, n);
+    cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, (int)n);
 }
 
 static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
@@ -406,7 +405,7 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     cctx->encWeight = encWeight;
 
     if(cctx->compressThread != NULL)
-        FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, 0, 1, streamProp);
+        FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, streamProp);
     else
         cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, streamProp);
 
@@ -503,8 +502,8 @@ static size_t FL2_compressBlock(FL2_CCtx* const cctx,
             dstCapacity -= cctx->jobs[u].cSize;
         }
         srcSize -= cctx->curBlock.end - cctx->curBlock.start;
-        if (cctx->params.rParams.block_size_multiplier
-            && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, srcSize) > dictionarySize * cctx->params.rParams.block_size_multiplier) {
+        if (cctx->params.cParams.reset_interval
+            && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, srcSize) > dictionarySize * cctx->params.cParams.reset_interval) {
             /* periodically reset the dictionary for mt decompression */
             cctx->curBlock.start = 0;
             cctx->blockTotal = 0;
@@ -651,10 +650,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         cctx->params.rParams.overlap_fraction = (unsigned)value;
         break;
 
-    case FL2_p_blockSizeMultiplier:
+    case FL2_p_resetInterval:
         if (value != 0)
             CLAMPCHECK(value, FL2_BLOCK_MUL_MIN, FL2_BLOCK_MUL_MAX);
-        cctx->params.rParams.block_size_multiplier = (unsigned)value;
+        cctx->params.cParams.reset_interval = (unsigned)value;
         break;
 
     case FL2_p_bufferLog:
@@ -755,8 +754,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_overlapFraction:
         return cctx->params.rParams.overlap_fraction;
 
-    case FL2_p_blockSizeMultiplier:
-        return cctx->params.rParams.block_size_multiplier;
+    case FL2_p_resetInterval:
+        return cctx->params.cParams.reset_interval;
 
     case FL2_p_bufferLog:
         return RMF_BUFFER_LOG_BASE - cctx->params.rParams.match_buffer_log;
@@ -940,9 +939,9 @@ static size_t FL2_compressStream_input(FL2_CStream* fcs, FL2_inBuffer* input)
         /* read input until the buffer(s) are full */
         size_t overlap = blockOverlap;
         if (!DICT_hasUnprocessed(buf)
-            && fcs->params.rParams.block_size_multiplier != 0
+            && fcs->params.cParams.reset_interval != 0
             && fcs->blockTotal + (fcs->params.rParams.dictionary_size - overlap)
-            > (fcs->params.rParams.dictionary_size * fcs->params.rParams.block_size_multiplier))
+            > (fcs->params.rParams.dictionary_size * fcs->params.cParams.reset_interval))
         {
             /* periodically reset the dictionary for mt decompression */
             overlap = 0;

@@ -186,7 +186,7 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
             FL2_CCtx_setParameter(fcs, FL2_p_divideAndConquer, value);
         }
         else if (strcmp(param, "bm") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_blockSizeMultiplier, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_resetInterval, value);
         }
         else if (strcmp(param, "b") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_bufferLog, value);

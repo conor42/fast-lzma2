@@ -34,7 +34,7 @@ typedef struct
     unsigned match_cycles;
     FL2_strategy strategy;
     unsigned second_dict_bits;
-    unsigned random_filter;
+    unsigned reset_interval;
 } FL2_lzma2Parameters;
 
 

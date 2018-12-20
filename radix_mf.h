@@ -31,7 +31,6 @@ typedef struct
     size_t dictionary_size;
     unsigned match_buffer_log;
     unsigned overlap_fraction;
-    unsigned block_size_multiplier;
     unsigned divide_and_conquer;
     unsigned depth;
 #ifdef RMF_REFERENCE

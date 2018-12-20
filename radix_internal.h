@@ -71,8 +71,8 @@ typedef struct
 
 typedef struct
 {
-    U32 prev_index;
-    U32 list_count;
+    U32 prevIndex;
+    U32 listCount;
 } RMF_listTail;
 
 typedef struct
@@ -85,8 +85,8 @@ typedef struct
 {
     unsigned max_len;
     U32* table;
-    size_t match_buffer_size;
-    size_t match_buffer_limit;
+    size_t matchBufferSize;
+    size_t matchBufferLimit;
     RMF_listTail tails_8[RADIX8_TABLE_SIZE];
     RMF_tableHead stack[STACK_SIZE];
     RMF_listTail tails_16[RADIX16_TABLE_SIZE];
@@ -99,12 +99,12 @@ struct FL2_matchTable_s
     long end_index;
     int isStruct;
     int allocStruct;
-    unsigned thread_count;
+    unsigned threadCount;
     size_t progress;
     RMF_parameters params;
     RMF_builder** builders;
     U32 stack[RADIX16_TABLE_SIZE];
-    RMF_tableHead list_heads[RADIX16_TABLE_SIZE];
+    RMF_tableHead listHeads[RADIX16_TABLE_SIZE];
     U32 table[1];
 };
 
@@ -123,7 +123,7 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     size_t const block_start,
     BYTE const depth,
     BYTE const max_depth,
-    U32 const list_count,
+    U32 const listCount,
     size_t const stack_base);
 int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);
 int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);

@@ -14,57 +14,57 @@
 #define MAX_READ_BEYOND_DEPTH 2
 
 /* If a repeating byte is found, fill that section of the table with matches of distance 1 */
-static size_t RMF_handleRepeat(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
+static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i)
 {
-    ptrdiff_t const rpt_index = i - (MAX_REPEAT / 2 - 2);
-    /* Set the head to the first byte of the repeat and adjust the count */
-    tbl->listHeads[radix_16].head = (U32)(rpt_index - 1);
-    tbl->listHeads[radix_16].count -= MAX_REPEAT / 2 - 2;
-    /* Find the end */
-    i += ZSTD_count(data_block + i + 2, data_block + i + 1, data_block + block_size);
-    ptrdiff_t const rpt_end = i;
+    ptrdiff_t const last_2 = i + MAX_REPEAT / 2 - 1;
+    /* Find the start */
+    BYTE c = data_block[i];
+    while (i != 0 && data_block[i - 1] == c)
+        --i;
+    ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */
-    if (i >= (ptrdiff_t)start) {
+    if (last_2 >= (ptrdiff_t)start) {
         U32 len = 2;
         /* Set matches at distance 1 and available length */
-        for (; i >= rpt_index && len <= RADIX_MAX_LENGTH; --i) {
+        for (i = last_2; i > rpt_index && len <= RADIX_MAX_LENGTH; --i) {
             SetMatchLinkAndLength(i, (U32)(i - 1), len);
             ++len;
         }
         /* Set matches at distance 1 and max length */
-        for (; i >= rpt_index; --i)
+        for (; i > rpt_index; --i)
             SetMatchLinkAndLength(i, (U32)(i - 1), RADIX_MAX_LENGTH);
     }
-    return rpt_end;
+    return rpt_index;
 }
 
 /* If a 2-byte repeat is found, fill that section of the table with matches of distance 2 */
-static size_t RMF_handleRepeat2(FL2_matchTable* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t const block_size, ptrdiff_t i, size_t const radix_16)
+static size_t RMF_handleRepeat2(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i)
 {
-    ptrdiff_t const rpt_index = i - (MAX_REPEAT - 3);
+    ptrdiff_t const last_2 = i + MAX_REPEAT * 2U - 4;
 
-    /* Set the head to the first byte of the repeat and adjust the count */
-    tbl->listHeads[radix_16].head = (U32)(rpt_index - 1);
-    tbl->listHeads[radix_16].count -= MAX_REPEAT / 2 - 2;
-    size_t const radix_16_rev = ((radix_16 >> 8) | (radix_16 << 8)) & 0xFFFF;
-    tbl->listHeads[radix_16_rev].head = (U32)(rpt_index - 2);
-    tbl->listHeads[radix_16_rev].count -= MAX_REPEAT / 2 - 1;
-    /* Find the end */
-    i += ZSTD_count(data_block + i + 2, data_block + i, data_block + block_size);
-    ptrdiff_t const rpt_end = i;
+    /* Find the start */
+    ptrdiff_t realign = i & 1;
+    i += realign;
+    U16 u = *(U16*)(data_block + i);
+    while (i != 0 && *(U16*)(data_block + i - 2) == u)
+        i -= 2;
+    if (realign && i != 0)
+        i += (data_block[i - 1] == data_block[i + 1]) ? -1 : 1;
+
+    ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */
     if (i >= (ptrdiff_t)start) {
-        U32 len = 2;
+        U32 len = 2 + (data_block[last_2 + 2] == data_block[last_2]);
         /* Set matches at distance 2 and available length */
-        for (; i >= rpt_index && len <= RADIX_MAX_LENGTH; --i) {
+        for (i = last_2; i > rpt_index && len <= RADIX_MAX_LENGTH; i -= 2) {
             SetMatchLinkAndLength(i, (U32)(i - 2), len);
-            ++len;
+            len += 2;
         }
         /* Set matches at distance 2 and max length */
-        for (; i >= rpt_index; --i)
+        for (; i > rpt_index; i -= 2)
             SetMatchLinkAndLength(i, (U32)(i - 2), RADIX_MAX_LENGTH);
     }
-    return rpt_end;
+    return rpt_index;
 }
 
 /* Initialization for the reference algortithm */
@@ -130,7 +130,6 @@ RMF_structuredInit
 
     radix_16 = ((size_t)((BYTE)radix_16) << 8) | data_block[2];
 
-    U32 count = 0;
     ptrdiff_t rpt_total = 0;
     ptrdiff_t i = 1;
     ptrdiff_t const block_size = end - 2;
@@ -140,45 +139,14 @@ RMF_structuredInit
 
         U32 const prev = tbl->listHeads[radix_16].head;
         if (prev != RADIX_NULL_LINK) {
-            S32 const dist = (S32)i - prev;
-            /* Check for repeat */
-            if (dist > 2) {
-                count = 0;
-                /* Link this position to the previous occurance */
-                InitMatchLink(i, prev);
-                /* Set the previous to this position */
-                tbl->listHeads[radix_16].head = (U32)i;
-                ++tbl->listHeads[radix_16].count;
-                radix_16 = next_radix;
-            }
-            else {
-                count += 3 - dist;
-                /* Do the usual if the repeat is too short */
-                if (count < MAX_REPEAT - 2) {
-                    InitMatchLink(i, prev);
-                    tbl->listHeads[radix_16].head = (U32)i;
-                    ++tbl->listHeads[radix_16].count;
-                    radix_16 = next_radix;
-                }
-                else {
-                    ptrdiff_t const prev_i = i;
-                    /* Eliminate the repeat from the linked list to save time */
-                    if (dist == 1) {
-                        i = RMF_handleRepeat(tbl, data_block, start, end, i, radix_16);
-                        rpt_total += i - prev_i + MAX_REPEAT / 2U - 1;
-                    }
-                    else {
-                        i = RMF_handleRepeat2(tbl, data_block, start, end, i, radix_16);
-                        rpt_total += i - prev_i + MAX_REPEAT - 2;
-                    }
-					if (i < block_size)
-						radix_16 = ((size_t)data_block[i + 1] << 8) | data_block[i + 2];
-                    count = 0;
-                }
-            }
+            /* Link this position to the previous occurance */
+            InitMatchLink(i, prev);
+            /* Set the previous to this position */
+            tbl->listHeads[radix_16].head = (U32)i;
+            ++tbl->listHeads[radix_16].count;
+            radix_16 = next_radix;
         }
         else {
-            count = 0;
             SetNull(i);
             tbl->listHeads[radix_16].head = (U32)i;
             tbl->listHeads[radix_16].count = 1;
@@ -187,12 +155,11 @@ RMF_structuredInit
         }
     }
     /* Handle the last value */
-    if (i == block_size) {
-        if (tbl->listHeads[radix_16].head != RADIX_NULL_LINK)
-            SetMatchLinkAndLength(block_size, tbl->listHeads[radix_16].head, 2);
-        else
-            SetNull(block_size);
-    }
+    if (tbl->listHeads[radix_16].head != RADIX_NULL_LINK)
+        SetMatchLinkAndLength(block_size, tbl->listHeads[radix_16].head, 2);
+    else
+        SetNull(block_size);
+
     /* Never a match at the last byte */
     SetNull(end - 1);
 
@@ -231,17 +198,59 @@ static void RMF_recurseListsBuffered(RMF_builder* const tbl,
             listCount = (U32)tbl->matchBufferLimit;
 
         size_t count = start;
+        size_t prev_link = (size_t)-1;
+        size_t rpt = 0;
+        size_t rpt_tail = link;
         for (; count < listCount; ++count) {
             /* Pre-load next link */
             size_t const next_link = GetMatchLink(link);
-            /* Get 4 data characters for later. This doesn't block on a cache miss. */
-            tbl->match_buffer[count].src.u32 = MEM_read32(data_src + link);
-            /* Record the actual location of this suffix */
-            tbl->match_buffer[count].from = (U32)link;
-            /* Initialize the next link */
-            tbl->match_buffer[count].next = (U32)(count + 1) | ((U32)depth << 24);
-            link = next_link;
+            size_t dist = prev_link - link;
+            if (dist > 2) {
+                /* Get 4 data characters for later. This doesn't block on a cache miss. */
+                tbl->match_buffer[count].src.u32 = MEM_read32(data_src + link);
+                /* Record the actual location of this suffix */
+                tbl->match_buffer[count].from = (U32)link;
+                /* Initialize the next link */
+                tbl->match_buffer[count].next = (U32)(count + 1) | ((U32)depth << 24);
+                rpt = 0;
+                prev_link = link;
+                rpt_tail = link;
+                link = next_link;
+            }
+            else {
+                rpt += 3 - dist;
+                /* Do the usual if the repeat is too short */
+                if (rpt < MAX_REPEAT - 2) {
+                    /* Get 4 data characters for later. This doesn't block on a cache miss. */
+                    tbl->match_buffer[count].src.u32 = MEM_read32(data_src + link);
+                    /* Record the actual location of this suffix */
+                    tbl->match_buffer[count].from = (U32)link;
+                    /* Initialize the next link */
+                    tbl->match_buffer[count].next = (U32)(count + 1) | ((U32)depth << 24);
+                    prev_link = link;
+                    link = next_link;
+                }
+                else {
+                    /* Eliminate the repeat from the linked list to save time */
+                    if (dist == 1) {
+                        link = RMF_handleRepeat(tbl, data_block, block_start, link);
+                        count -= MAX_REPEAT / 2;
+                        orig_list_count -= (U32)(rpt_tail - link);
+                    }
+                    else {
+                        link = RMF_handleRepeat2(tbl, data_block, block_start, link);
+                        count -= MAX_REPEAT - 1;
+                        orig_list_count -= (U32)(rpt_tail - link) >> 1;
+                    }
+                    rpt = 0;
+                    listCount = (U32)(start + orig_list_count);
+
+                    if (listCount > tbl->matchBufferLimit)
+                        listCount = (U32)tbl->matchBufferLimit;
+                }
+            }
         }
+        count = listCount;
         /* Make the last element circular so pre-loading doesn't read past the end. */
         tbl->match_buffer[count - 1].next = (U32)(count - 1) | ((U32)depth << 24);
         U32 overlap = 0;
@@ -253,7 +262,16 @@ static void RMF_recurseListsBuffered(RMF_builder* const tbl,
         orig_list_count -= (U32)(listCount - start);
         /* Copy everything back, except the last link which never changes, and any extra overlap */
         count -= overlap + (overlap == 0);
-        for (size_t index = 0; index < count; ++index) {
+        if (max_depth > RADIX_MAX_LENGTH) for (size_t index = 0; index < count; ++index) {
+            size_t const from = tbl->match_buffer[index].from;
+            if (from < block_start)
+                return;
+            U32 length = tbl->match_buffer[index].next >> 24;
+            length = (length > RADIX_MAX_LENGTH) ? RADIX_MAX_LENGTH : length;
+            size_t const next = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
+            SetMatchLinkAndLength(from, tbl->match_buffer[next].from, length);
+        }
+        else for (size_t index = 0; index < count; ++index) {
             size_t const from = tbl->match_buffer[index].from;
             if (from < block_start)
                 return;
@@ -281,12 +299,13 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
     const BYTE* const data_block,
     ptrdiff_t const block_size,
     RMF_tableHead* const list_head,
-    U32 const max_depth)
+    U32 max_depth)
 {
     U32 listCount = list_head->count;
     if (listCount < 2)
         return;
 
+    max_depth = MIN(max_depth, RADIX_MAX_LENGTH) & ~1;
     ptrdiff_t link = list_head->head;
     ptrdiff_t const bounded_size = max_depth + MAX_READ_BEYOND_DEPTH;
     ptrdiff_t const bounded_start = block_size - MIN(block_size, bounded_size);
@@ -465,6 +484,7 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
     U32 count,
     U32 const max_depth)
 {
+    U32 const tableMaxDepth = MIN(max_depth, RADIX_MAX_LENGTH) & ~1;
     /* Offset data pointer. This function is only called at depth 2 */
     const BYTE* const data_src = data_block + 2;
     /* Load radix values from the data chars */
@@ -558,7 +578,7 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
                 link,
                 listCount,
                 depth,
-                max_depth);
+                tableMaxDepth);
             continue;
         }
         /* Send to the buffer at depth 4 */
@@ -905,7 +925,7 @@ RMF_structuredBuildTable
         return;
 
     unsigned const best = !tbl->params.divide_and_conquer;
-    unsigned const max_depth = MIN(tbl->params.depth, RADIX_MAX_LENGTH) & ~1;
+    unsigned const max_depth = MIN(tbl->params.depth, STRUCTURED_MAX_LENGTH) & ~1;
     size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
     ptrdiff_t next_progress = (job == 0) ? 0 : RADIX16_TABLE_SIZE;
     ptrdiff_t(*getNextList)(FL2_matchTable* const tbl)

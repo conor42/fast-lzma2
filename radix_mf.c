@@ -94,7 +94,7 @@ static RMF_builder** RMF_createBuilderTable(U32* const matchTable, size_t const 
 
 static int RMF_isStruct(size_t const dictionary_size, unsigned const depth)
 {
-    return dictionary_size > ((size_t)1 << RADIX_LINK_BITS) || depth > BITPACK_MAX_LENGTH;
+    return dictionary_size > ((size_t)1 << RADIX_LINK_BITS);
 }
 
 static int RMF_isStructParam(const RMF_parameters* const params)

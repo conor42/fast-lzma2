@@ -439,30 +439,30 @@ typedef struct {
 typedef enum {
     /* compression parameters */
     FL2_p_compressionLevel, /* Update all compression parameters according to pre-defined cLevel table
-                              * Default level is FL2_CLEVEL_DEFAULT==8.
-                              * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table. */
+                             * Default level is FL2_CLEVEL_DEFAULT==8.
+                             * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table. */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
-                              * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
+                             * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
-                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
+                             * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
     FL2_p_dictionarySize,
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
     FL2_p_resetInterval,    /* Resets for multithreaded decompression. A dictionary reset will occur
-                               after each dictionarySize * resetInterval bytes of input. */
+                             * after each dictionarySize * resetInterval bytes of input. */
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
-                             * 2 ^ (dictionaryLog - bufferLog). Lower number = slower, better compression,
-                             * higher memory usage. */
+                             * 2 ^ (dictionaryLog - 12 + bufferLog) * 12 bytes. Lower number = slower,
+                             * better compression, higher memory usage. */
     FL2_p_chainLog,         /* Size of the full-search table, as a power of 2.
-                              * Resulting table size is (1 << (chainLog+2)).
-                              * Larger tables result in better and slower compression.
-                              * This parameter is useless when using "fast" strategy. */
+                             * Resulting table size is (1 << (chainLog+2)) bytes.
+                             * Larger tables result in better and slower compression.
+                             * This parameter is useless when using "fast" strategy. */
     FL2_p_searchLog,        /* Number of search attempts, as a power of 2, made by the HC3 match finder
-                              * used only in hybrid mode.
-                              * More attempts result in slightly better and slower compression.
-                              * This parameter is not used by the "fast" and "optimize" strategies. */
+                             * used only in hybrid mode.
+                             * More attempts result in slightly better and slower compression.
+                             * This parameter is not used by the "fast" and "optimize" strategies. */
     FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder */
     FL2_p_literalPosBits,   /* lp value for LZMA2 encoder */
     FL2_p_posBits,          /* pb value for LZMA2 encoder */
@@ -484,7 +484,7 @@ typedef enum {
 #endif
     FL2_p_omitProperties,   /* Omit the property byte at the start of the stream. For use within 7-zip */
                             /* or other containers which store the property byte elsewhere. */
-                            /* Cannot be decoded by this library. */
+                            /* A stream compressed under this setting cannot be decoded by this library. */
 #ifdef RMF_REFERENCE
     FL2_p_useReferenceMF    /* Use the reference matchfinder for development purposes. SLOW. */
 #endif

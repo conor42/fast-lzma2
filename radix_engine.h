@@ -44,12 +44,13 @@ static size_t RMF_handleRepeat2(RMF_builder* const tbl, const BYTE* const data_b
 
     /* Find the start */
     ptrdiff_t realign = i & 1;
-    i += realign;
-    U16 u = *(U16*)(data_block + i);
-    while (i != 0 && *(U16*)(data_block + i - 2) == u)
-        i -= 2;
-    if (realign && i != 0)
-        i += (data_block[i - 1] == data_block[i + 1]) ? -1 : 1;
+    i += (4 - (i & 3)) & 3;
+    U32 u = *(U32*)(data_block + i);
+    while (i != 0 && *(U32*)(data_block + i - 4) == u)
+        i -= 4;
+    while (i != 0 && data_block[i - 1] == data_block[i + 1])
+        --i;
+    i += (i & 1) ^ realign;
 
     ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */

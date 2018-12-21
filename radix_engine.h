@@ -17,10 +17,15 @@
 static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i)
 {
     ptrdiff_t const last_2 = i + MAX_REPEAT / 2 - 1;
+
     /* Find the start */
-    BYTE c = data_block[i];
-    while (i != 0 && data_block[i - 1] == c)
-        --i;
+    i += (4 - (i & 3)) & 3;
+    U32 u = *(U32*)(data_block + i);
+    while (i != 0 && *(U32*)(data_block + i - 4) == u)
+      i -= 4;
+    while (i != 0 && data_block[i - 1] == (BYTE)u)
+      --i;
+
     ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */
     if (last_2 >= (ptrdiff_t)start) {

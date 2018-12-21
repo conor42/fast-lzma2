@@ -276,12 +276,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 
 /*! FL2_setCStreamTimeout() :
  *  Sets a timeout in milliseconds. Zero disables the timeout. If a nonzero timout is set, functions
- *  FL2_compressStream(), FL2_updateDictionary(), FL2_flushStream(), and FL2_endStream() may return a
- *  timeout code before compression of the current dictionary of data completes. FL2_isError returns
- *  true for the timeout code, so check the code with FL2_isTimedOut() before testing for errors.
- *  With the exception of FL2_updateDictionary(), the above functions may be called again to wait for
- *  completion.
- *  A typical application for timeouts is to update the user on compression progress. */
+ *  FL2_compressStream(), FL2_updateDictionary(), FL2_getNextCStreamBuffer(), FL2_flushStream(), and
+ *  FL2_endStream() may return a timeout code before compression of the current dictionary of data
+ *  completes. FL2_isError returns true for the timeout code, so check the code with FL2_isTimedOut() before
+ *  testing for errors. With the exception of FL2_updateDictionary(), the above functions may be called again
+ *  to wait for completion. A typical application for timeouts is to update the user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
 /*! FL2_compressStream() :
@@ -325,7 +324,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
 /*! FL2_getNextCStreamBuffer() :
  *  Returns a buffer containing a slice of the compressed data. Call this function and process the
  *  data until the function returns zero. In most cases it will return a buffer for each compression
- *  thread used. It is sometimes less but never more than nbThreads. */
+ *  thread used. It is sometimes less but never more than nbThreads. If asynchronous compression is
+ *  in progress, this function will wait for completion before returning. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
 
 /*! FL2_flushStream() :

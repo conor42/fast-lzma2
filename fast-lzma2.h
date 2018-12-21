@@ -170,9 +170,9 @@ FL2LIB_API unsigned char FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx);
  *  The context may not allocate the number of threads requested if the library is
  *  compiled for single-threaded compression or nbThreads > FL2_MAXTHREADS.
  *  Call FL2_getDCtxThreadCount to obtain the actual number allocated.
- *  One dictionary reset must be present in the stream for each thread allocated, or not all
- *  of the threads will be used. Dictionary resets are inserted into the stream according to
- *  the blockSizeMultiplier parameter setting in the compression context. */
+ *  At least nbThreads dictionary resets must exist in the stream to use all of the
+ *  threads. Dictionary resets are inserted into the stream according to the resetInterval
+ *  parameter used in the compression context. */
 typedef struct FL2_DCtx_s FL2_DCtx;
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void);
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtxMt(unsigned nbThreads);
@@ -216,11 +216,12 @@ typedef struct FL2_outBuffer_s {
  *  A FL2_CStream object is required to track streaming operation.
  *  Use FL2_createCStream() and FL2_freeCStream() to create/release resources.
  *  FL2_CStream objects can be reused multiple times on consecutive compression operations.
- *  It is recommended to re-use FL2_CStream in situations where many streaming operations will be achieved consecutively,
- *  since it will play nicer with system's memory, by re-using already allocated memory.
+ *  It is recommended to re-use FL2_CStream in situations where many streaming operations will be done
+ *  consecutively, since it will reduce allocation and initialization time.
  *
  *  Call FL2_createCStreamMt() with a nonzero dualBuffer parameter to use two input dictionary buffers.
- *  This allows data to be added to the stream while compression is underway, and is useful when I/O is slow.
+ *  The stream will not block on FL2_compressStream(), and continue to accept data while compression is
+ *  underway, until both buffers are full. Useful when I/O is slow.
  *  To compress with a single thread and use dual buffering, call FL2_createCStreamMt with nbThreads=1.
  *
  *  Use FL2_initCStream() on the FL2_CStream object to start a new compression operation.
@@ -230,13 +231,13 @@ typedef struct FL2_outBuffer_s {
  *  It will always consume the entire input unless an error occurs or the dictionary buffer is filled,
  *  unlike the decompression function.
  *  @return : Nonzero if the CStream can accept more input,
- *            zero if compressed output must be removed,
+ *            zero if compressed output must be copied (output is full or NULL),
  *            or an error code, which can be tested using FL2_isError().
  *
  *  The radix match finder allows compressed data to be stored in its match table during encoding.
- *  Applications may pass NULL instead of an FL2_outBuffer object pointer.
- *  When FL2_compressStream returns zero, the compressed data must be read from
- *  the internal buffers. Call FL2_getNextCStreamBuffer() repeatedly until it returns zero.
+ *  Applications may pass NULL instead of an FL2_outBuffer object pointer. In this case,
+ *  when FL2_compressStream returns zero, the compressed data must be read from the internal buffers.
+ *  Call FL2_getNextCStreamBuffer() repeatedly until it returns zero.
  *  Each call returns buffer information in the FL2_inBuffer parameter. Applications typically will 
  *  passed this to an I/O write function or downstream filter.
  *  Alternately, applications may pass an FL2_outBuffer object pointer to receive the output. In this case
@@ -246,14 +247,17 @@ typedef struct FL2_outBuffer_s {
  *  within internal buffers using FL2_flushStream(). It may be necessary to call it twice if the
  *  CStream was created with dual dictionary buffers.
  *  Note 1 : this will reduce compression ratio because the algorithm is block-based.
- *  Note 2 : compressed content must be read from the CStream object after each call.
- *  @return : nb of bytes still present within internal buffers (0 if they're empty)
+ *  Note 2 : all compressed content must be read from the CStream object after each call before
+             further flushing can occur.
+ *  @return : 1 if data still present within internal buffers
+              0 if they're empty
  *            or an error code, which can be tested using FL2_isError().
  *
  *  FL2_endStream() instructs to finish a stream.
  *  It will perform a flush and write the LZMA2 termination byte (required).
  *  FL2_endStream() may not be able to flush full data if the CStream was created with dual dictionary
- *  buffers. In which case, read all compressed data from the CStream and call again FL2_endStream().
+ *  buffers or the output fills up. In which case, empty the output, or read all compressed data from
+ *  the CStream if output == NULL, and call again FL2_endStream().
  *  @return : 0 if stream fully completed and flushed,
  *            or >0 to indicate bytes are still present within the internal buffers,
  *            or an error code, which can be tested using FL2_isError().
@@ -274,9 +278,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
  *  Sets a timeout in milliseconds. Zero disables the timeout. If a nonzero timout is set, functions
  *  FL2_compressStream(), FL2_updateDictionary(), FL2_flushStream(), and FL2_endStream() may return a
  *  timeout code before compression of the current dictionary of data completes. FL2_isError returns
- *  true for the timeout code, so check for it using FL2_isTimedOut() before testing for errors.
+ *  true for the timeout code, so check the code with FL2_isTimedOut() before testing for errors.
  *  With the exception of FL2_updateDictionary(), the above functions may be called again to wait for
- *  completion. A typical application for timeouts is to update the user on compression progress. */
+ *  completion.
+ *  A typical application for timeouts is to update the user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
 /*! FL2_compressStream() :
@@ -310,7 +315,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs);
 
 /*! FL2_cancelOperation() :
  *  Cancels any compression operation underway. Useful only when dual buffering and/or timeouts
- *  are enabled. */
+ *  are enabled. The stream will be returned to an uninitialized state. */
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs);
 
 /*! FL2_remainingOutputSize() :
@@ -320,7 +325,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs);
 /*! FL2_getNextCStreamBuffer() :
  *  Returns a buffer containing a slice of the compressed data. Call this function and process the
  *  data until the function returns zero. In most cases it will return a buffer for each compression
- *  thread used. It is sometimes less but never more than that. */
+ *  thread used. It is sometimes less but never more than nbThreads. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf);
 
 /*! FL2_flushStream() :
@@ -334,7 +339,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_flushStream(FL2_CStream* fcs, FL2_outBuffer *o
  *  Compress all data remaining in the dictionary buffer(s) and write the stream end marker. With
  *  dual buffers it may be necessary to call FL2_endStream() twice and read the compressed data
  *  each time.
- *  Returns zero when compression is complete and the final output can be read. */
+ *  Returns zero when compression is complete (and the final output can be read if output==NULL). */
 FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *output);
 
 /*-***************************************************************************
@@ -345,7 +350,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
  *  FL2_DStream objects can be re-used multiple times.
  *
  *  Use FL2_initDStream() to start a new decompression operation.
- *   @return : recommended first input size
+ *   @return : zero or an error code
  *
  *  Use FL2_decompressStream() repetitively to consume your input.
  *  The function will update both `pos` fields.
@@ -354,8 +359,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
  *  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`
  *  If `output.pos < output.size`, decoder has flushed everything it could.
  *  @return : 0 when a frame is completely decoded and fully flushed,
- *            an error code, which can be tested using FL2_isError(),
- *            1, which means there is still some decoding to do to complete current frame.
+ *            1, which means there is still some decoding to do to complete current frame,
+ *            or an error code, which can be tested using FL2_isError().
  * *******************************************************************************/
 
 #define LZMA_REQUIRED_INPUT_MAX 20
@@ -445,24 +450,24 @@ typedef enum {
                              * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
-    FL2_p_dictionarySize,
+    FL2_p_dictionarySize,   /* Same as above but expressed as an absolute value. 
+                             * Must be clamped between FL2_DICTSIZE_MIN and FL2_DICTSIZE_MAX. */
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
                              * Values above 2 mostly yield only a small improvement in compression. */
-    FL2_p_resetInterval,    /* Resets for multithreaded decompression. A dictionary reset will occur
+    FL2_p_resetInterval,    /* For multithreaded decompression. A dictionary reset will occur
                              * after each dictionarySize * resetInterval bytes of input. */
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
                              * 2 ^ (dictionaryLog - 12 + bufferLog) * 12 bytes. Lower number = slower,
                              * better compression, higher memory usage. */
-    FL2_p_chainLog,         /* Size of the full-search table, as a power of 2.
+    FL2_p_chainLog,         /* Size of the hybrid mode HC3 hash chain, as a power of 2.
                              * Resulting table size is (1 << (chainLog+2)) bytes.
                              * Larger tables result in better and slower compression.
-                             * This parameter is useless when using "fast" strategy. */
-    FL2_p_searchLog,        /* Number of search attempts, as a power of 2, made by the HC3 match finder
-                             * used only in hybrid mode.
-                             * More attempts result in slightly better and slower compression.
-                             * This parameter is not used by the "fast" and "optimize" strategies. */
+                             * This parameter is only in the hybrid "ultra" strategy. */
+    FL2_p_searchLog,        /* Number of search attempts, as a power of 2, made by the HC3 match finder.
+                             * Used only in the hybrid "ultra" strategy.
+                             * More attempts result in slightly better and slower compression. */
     FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder */
     FL2_p_literalPosBits,   /* lp value for LZMA2 encoder */
     FL2_p_posBits,          /* pb value for LZMA2 encoder */
@@ -474,7 +479,7 @@ typedef enum {
     FL2_p_divideAndConquer, /* Split long chains of 2-byte matches into shorter chains with a small overlap
                              * during further processing. Allows buffering of all chains at length 2.
                              * Faster, less compression. Generally a good tradeoff. Enabled by default. */
-    FL2_p_strategy,         /* 1 = fast; 2 = optimize, 3 = ultra (hybrid mode).
+    FL2_p_strategy,         /* 1 = fast; 2 = optimized, 3 = ultra (hybrid mode).
                              * The higher the value of the selected strategy, the more complex it is,
                              * resulting in stronger and slower compression. */
 #ifndef NO_XXHASH
@@ -514,7 +519,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int h
 *  FL2_estimateCCtxSize() will provide a budget large enough for any compression level up to selected one.
 *  To use FL2_estimateCCtxSize_usingCCtx, set the compression level and any other settings for the context,
 *  then call the function. Some allocation occurs when the context is created, but the large memory buffers
-*  used for string matching are allocated only when compression begins. */
+*  used for string matching are allocated only when compression is initialized. */
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigned nbThreads); /*!< memory usage determined by level */
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters *params, unsigned nbThreads); /*!< memory usage determined by params */

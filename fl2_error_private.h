@@ -63,7 +63,7 @@ ERR_STATIC ERR_enum ERR_getErrorCode(size_t code) { if (!ERR_isError(code)) retu
 *  Error Strings
 ******************************************/
 
-const char* ERR_getErrorString(ERR_enum code);   /* error_private.c */
+const char* ERR_getErrorString(ERR_enum code);   /* fl2_error_private.c */
 
 ERR_STATIC const char* ERR_getErrorName(size_t code)
 {

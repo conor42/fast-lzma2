@@ -43,7 +43,7 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 16 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
     { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
-    { 64 MB, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 8 */
+    { 64 MB, 2, 11, 1, 60, 96, 1, 3, FL2_ultra }, /* 8 */
     { 64 MB, 3, 12, 2, 126, 160, 1, 3, FL2_ultra }, /* 9 */
 };
 
@@ -90,15 +90,15 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 1 MB, 3, 9, 1, 94, 128, 0, 4, FL2_ultra }, /* 1 */
-    { 2 MB, 3, 10, 1, 94, 128, 0, 4, FL2_ultra }, /* 2 */
-    { 4 MB, 3, 11, 2, 94, 128, 0, 4, FL2_ultra }, /* 3 */
-    { 8 MB, 3, 12, 2, 94, 128, 0, 4, FL2_ultra }, /* 4 */
-    { 16 MB, 3, 13, 3, 126, 160, 0, 4, FL2_ultra }, /* 5 */
-    { 32 MB, 3, 14, 3, 126, 160, 0, 4, FL2_ultra }, /* 6 */
-    { 64 MB, 3, 14, 4, 126, 160, 0, 4, FL2_ultra }, /* 7 */
-    { 128 MB, 3, 14, 4, 126, 160, 0, 4, FL2_ultra }, /* 8 */
-    { 256 MB, 3, 14, 5, 126, 160, 0, 3, FL2_ultra } /* 9 */
+    { 1 MB, 3, 9, 2, 254, 273, 0, 4, FL2_ultra }, /* 1 */
+    { 2 MB, 3, 10, 2, 254, 273, 0, 4, FL2_ultra }, /* 2 */
+    { 4 MB, 3, 11, 2, 254, 273, 0, 4, FL2_ultra }, /* 3 */
+    { 8 MB, 3, 12, 2, 254, 273, 0, 4, FL2_ultra }, /* 4 */
+    { 16 MB, 3, 13, 3, 254, 273, 0, 4, FL2_ultra }, /* 5 */
+    { 32 MB, 3, 14, 3, 254, 273, 0, 4, FL2_ultra }, /* 6 */
+    { 64 MB, 3, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 7 */
+    { 128 MB, 3, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 8 */
+    { 256 MB, 3, 14, 5, 254, 273, 0, 3, FL2_ultra } /* 9 */
 };
 
 #undef MB
@@ -847,9 +847,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
     FL2_preBeginFrame(fcs, 0);
 
 #ifdef NO_XXHASH
-    int doHash = 0;
+    int const doHash = 0;
 #else
-    int doHash = (fcs->params.doXXH && !fcs->params.omitProp);
+    int const doHash = (fcs->params.doXXH && !fcs->params.omitProp);
 #endif
     if (DICT_init(buf, dictSize, doHash) != 0)
         return FL2_ERROR(memory_allocation);
@@ -977,7 +977,7 @@ static size_t FL2_loopCheck(FL2_CStream* fcs, int unchanged)
     if (unchanged) {
         ++fcs->loopCount;
         if (fcs->loopCount > FL2_MAX_LOOPS)
-            return FL2_ERROR(infinite_loop);
+            return FL2_ERROR(buffer);
     }
     else {
         fcs->loopCount = 0;

@@ -18,7 +18,7 @@
 ***************************************/
 #include "mem.h"
 #include "compiler.h"
-#include "error_private.h"
+#include "fl2_error_private.h"
 
 #if defined (__cplusplus)
 extern "C" {

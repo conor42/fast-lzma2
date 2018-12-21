@@ -145,6 +145,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
@@ -158,7 +159,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\dict_buffer.c" />
-    <ClCompile Include="..\error_private.c" />
+    <ClCompile Include="..\fl2_error_private.c" />
     <ClCompile Include="..\fl2_common.c" />
     <ClCompile Include="..\fl2_compress.c" />
     <ClCompile Include="..\fl2_decompress.c" />
@@ -179,7 +180,7 @@
     <ClInclude Include="..\count.h" />
     <ClInclude Include="..\data_block.h" />
     <ClInclude Include="..\dict_buffer.h" />
-    <ClInclude Include="..\error_private.h" />
+    <ClInclude Include="..\fl2_error_private.h" />
     <ClInclude Include="..\fast-lzma2.h" />
     <ClInclude Include="..\fastpos_table.h" />
     <ClInclude Include="..\fl2_compress_internal.h" />

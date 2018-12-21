@@ -153,11 +153,13 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_
 
 static void RMF_reduceDict(RMF_parameters* const params, size_t const dict_reduce)
 {
-    if (dict_reduce)
+    if (dict_reduce) {
         for (size_t dict_size = params->dictionary_size; dict_size > DICTIONARY_SIZE_MIN && (dict_size >> 1) >= dict_reduce; dict_size >>= 1) {
             /* Use unchanged match buffer size for reduced dict */
             params->match_buffer_log = MAX(params->match_buffer_log - 1, FL2_BUFFER_SIZE_LOG_MIN);
         }
+        params->dictionary_size = MIN(params->dictionary_size, MAX(dict_reduce, DICTIONARY_SIZE_MIN));
+    }
 }
 
 static void RMF_initListHeads(FL2_matchTable* const tbl)
@@ -345,6 +347,8 @@ static void RMF_bruteForceBuffered(RMF_builder* const tbl,
     } while (i < listCount - 1 && buffer[i].data_src >= start);
 }
 
+/* Lengthen and divide buffered chains into smaller chains, save them on a stack and process in turn. 
+ * The match finder spends most of its time here. */
 FORCE_INLINE_TEMPLATE
 void RMF_recurseListChunk_generic(RMF_builder* const tbl,
     const BYTE* const data_block,

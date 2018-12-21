@@ -11,7 +11,7 @@
 
 /* The purpose of this file is to have a single list of error strings embedded in binary */
 
-#include "error_private.h"
+#include "fl2_error_private.h"
 
 const char* ERR_getErrorString(ERR_enum code)
 {
@@ -31,7 +31,7 @@ const char* ERR_getErrorString(ERR_enum code)
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
     case PREFIX(srcSize_wrong): return "Src size is incorrect";
     case PREFIX(canceled): return "Processing was canceled by a call to FL2_cancelOperation()";
-    case PREFIX(infinite_loop): return "Streaming progress halted due to buffer(s) full/empty";
+    case PREFIX(buffer): return "Streaming progress halted due to buffer(s) full/empty";
     case PREFIX(timedOut): return "Wait timed out. Timeouts should be handled before errors using FL2_isTimedOut()";
         /* following error codes are not stable and may be removed or changed in a future version */
     case PREFIX(maxCode):

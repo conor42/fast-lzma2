@@ -994,8 +994,6 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_literalPosBits, FUZ_rand(&lseed) % (5 - lc));
             FL2_CCtx_setParameter(cstream, FL2_p_posBits, FUZ_rand(&lseed) % 5);
             FL2_CCtx_setParameter(cstream, FL2_p_doXXHash, FUZ_rand(&lseed) & 1);
-//            if (testNb == 14)
-//                __debugbreak();
             if (useStream) {
                 unsigned flushes = 1 + FUZ_rand(&lseed) % 3;
                 size_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);

@@ -482,14 +482,14 @@ typedef enum {
     FL2_p_strategy,         /* 1 = fast; 2 = optimized, 3 = ultra (hybrid mode).
                              * The higher the value of the selected strategy, the more complex it is,
                              * resulting in stronger and slower compression. */
+    FL2_p_omitProperties,   /* Omit the property byte at the start of the stream. For use within 7-zip */
+                            /* or other containers which store the property byte elsewhere. */
+                            /* A stream compressed under this setting cannot be decoded by this library. */
 #ifndef NO_XXHASH
     FL2_p_doXXHash,         /* Calculate a 32-bit xxhash value from the input data and store it 
                              * after the stream terminator. The value will be checked on decompression.
                              * 0 = do not calculate; 1 = calculate (default) */
 #endif
-    FL2_p_omitProperties,   /* Omit the property byte at the start of the stream. For use within 7-zip */
-                            /* or other containers which store the property byte elsewhere. */
-                            /* A stream compressed under this setting cannot be decoded by this library. */
 #ifdef RMF_REFERENCE
     FL2_p_useReferenceMF    /* Use the reference matchfinder for development purposes. SLOW. */
 #endif

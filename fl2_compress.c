@@ -166,6 +166,11 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
         FL2_freeCCtx(cctx);
         return NULL;
     }
+    if (dualBuffer) {
+      cctx->compressThread = FL2POOL_create(1);
+      if (cctx->compressThread == NULL)
+        return NULL;
+    }
 #endif
 
     for (unsigned u = 0; u < nbThreads; ++u) {
@@ -449,6 +454,8 @@ static size_t FL2_beginFrame(FL2_CCtx* const cctx, size_t const dictReduce)
     cctx->dictMax = 0;
     cctx->blockTotal = 0;
     cctx->streamTotal = 0;
+    cctx->encProgress = 0;
+    RMF_initProgress(cctx->matchTable);
     cctx->asyncRes = 0;
     cctx->outThread = 0;
     cctx->threadCount = 0;
@@ -1035,7 +1042,7 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStre
 {
     U64 const encodeSize = fcs->curBlock.end - fcs->curBlock.start;
 
-    if (fcs->encProgress == 0)
+    if (fcs->encProgress == 0 && fcs->curBlock.end != 0)
         return fcs->streamTotal + ((fcs->matchTable->progress * encodeSize / fcs->curBlock.end * fcs->rmfWeight) >> 4);
 
     return fcs->streamTotal + ((fcs->rmfWeight * encodeSize) >> 4) + ((fcs->encProgress * fcs->encWeight) >> 4);

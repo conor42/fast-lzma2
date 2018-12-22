@@ -480,8 +480,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         FL2_getDictionaryBuffer(cstream, &dict);
         memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer, dict.size / 2);
         CHECK(FL2_updateDictionary(cstream, dict.size / 2));
-        r = FL2_flushStream(cstream, NULL);
-        if (r == 0) goto _output_error;
+        CHECK(FL2_flushStream(cstream, NULL));
         while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
             out.pos += cbuf.size;

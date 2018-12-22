@@ -14,7 +14,7 @@ typedef struct {
     size_t async;
     size_t start;   /* start = 0 (first block) or overlap */
     size_t end;     /* never < overlap */
-    size_t bufSize; /* allocation size */
+    size_t size; /* allocation size */
 #ifndef NO_XXHASH
     XXH32_state_t *xxh;
 #endif
@@ -22,7 +22,7 @@ typedef struct {
 
 int DICT_construct(DICT_buffer *const buf, int const async);
 
-int DICT_init(DICT_buffer *const buf, size_t const dictSize, int const doHash);
+int DICT_init(DICT_buffer *const buf, size_t const dict_size, int const do_hash);
 
 void DICT_destruct(DICT_buffer *const buf);
 
@@ -30,7 +30,7 @@ size_t DICT_size(const DICT_buffer *const buf);
 
 size_t DICT_get(DICT_buffer *const buf, size_t const overlap, FL2_outBuffer* const dict);
 
-int DICT_update(DICT_buffer *const buf, size_t const addedSize);
+int DICT_update(DICT_buffer *const buf, size_t const added_size);
 
 void DICT_put(DICT_buffer *const buf, FL2_inBuffer* const input);
 

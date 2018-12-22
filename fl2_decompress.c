@@ -171,7 +171,7 @@ static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n
     blocks[n].res = LZMA2_decodeToDic(blocks[n].dec, blocks[n].unpackSize, blocks[n].src, &srcLen, blocks[n].finish);
 
     if (!FL2_isError(blocks[n].res))
-        blocks[n].res = blocks[n].dec->dicPos;
+        blocks[n].res = blocks[n].dec->dic_pos;
 }
 
 static size_t FL2_decompressCtxBlocksMt(FL2_DCtx* const dctx, const BYTE *const src, BYTE *const dst, size_t const dstCapacity, size_t const nbThreads)
@@ -254,7 +254,7 @@ static size_t FL2_decompressDCtxMt(FL2_DCtx* const dctx,
                 return res;
 
             unpackSize += res;
-            dctx->dec.dicPos = unpackSize;
+            dctx->dec.dic_pos = unpackSize;
             *srcLen += blocks[thread - 1].packPos + blocks[thread - 1].packSize;
 
             if (type == CHUNK_FINAL)
@@ -270,9 +270,9 @@ static size_t FL2_decompressDCtxMt(FL2_DCtx* const dctx,
             FL2_resetMtBlocks(dctx);
         }
         else {
-            blocks[thread].packSize += inf.packSize;
-            blocks[thread].unpackSize += inf.unpackSize;
-            pos += inf.packSize;
+            blocks[thread].packSize += inf.pack_size;
+            blocks[thread].unpackSize += inf.unpack_size;
+            pos += inf.pack_size;
         }
     }
     return FL2_ERROR(srcSize_wrong);
@@ -322,7 +322,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     {
         CHECK_F(LZMA2_initDecoder(&dctx->dec, prop, dst, dstCapacity));
 
-        dicPos = dctx->dec.dicPos;
+        dicPos = dctx->dec.dic_pos;
 
         res = LZMA2_decodeToDic(&dctx->dec, dstCapacity, srcBuf, &srcPos, LZMA_FINISH_END);
     }
@@ -334,7 +334,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     if (res == LZMA_STATUS_NEEDS_MORE_INPUT)
         return FL2_ERROR(srcSize_wrong);
 
-    dicPos = dctx->dec.dicPos - dicPos;
+    dicPos = dctx->dec.dic_pos - dicPos;
 
 #ifndef NO_XXHASH
     if (doHash) {
@@ -582,8 +582,8 @@ static LZMA2_parseRes FL2_ParseMt(FL2_decBlock* const inBlock)
         if (res != CHUNK_CONTINUE)
             break;
 
-        inBlock->endPos += inf.packSize;
-        inBlock->unpackSize += inf.unpackSize;
+        inBlock->endPos += inf.pack_size;
+        inBlock->unpackSize += inf.unpack_size;
 
         first = 0;
     }
@@ -605,13 +605,13 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
 
     while (1) {
         size_t srcSize = cur->length - inPos;
-        size_t const dicPos = dec->dicPos;
+        size_t const dicPos = dec->dic_pos;
 
         size_t const res = LZMA2_decodeToDic(dec, ti->bufSize, cur->inBuf + inPos, &srcSize, last && cur == ti->inBlock.last ? LZMA_FINISH_END : LZMA_FINISH_ANY);
 
         CHECK_F(res);
 
-        FL2_atomic_add(fds->progress, (long)(dec->dicPos - dicPos));
+        FL2_atomic_add(fds->progress, (long)(dec->dic_pos - dicPos));
 
         if (res == LZMA_STATUS_FINISHED_WITH_MARK) {
             DEBUGLOG(4, "Found end mark");

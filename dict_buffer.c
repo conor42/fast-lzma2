@@ -9,7 +9,7 @@ int DICT_construct(DICT_buffer * const buf, int const async)
 {
     buf->data[0] = NULL;
     buf->data[1] = NULL;
-    buf->bufSize = 0;
+    buf->size = 0;
 
     buf->async = (async != 0);
 
@@ -20,15 +20,15 @@ int DICT_construct(DICT_buffer * const buf, int const async)
     return 0;
 }
 
-int DICT_init(DICT_buffer * const buf, size_t const dictSize, int const doHash)
+int DICT_init(DICT_buffer * const buf, size_t const dict_size, int const do_hash)
 {
-    if (buf->data[0] == NULL || dictSize > buf->bufSize) {
+    if (buf->data[0] == NULL || dict_size > buf->size) {
         DICT_destruct(buf);
-        buf->data[0] = malloc(dictSize);
+        buf->data[0] = malloc(dict_size);
 
         buf->data[1] = NULL;
         if (buf->async)
-            buf->data[1] = malloc(dictSize);
+            buf->data[1] = malloc(dict_size);
 
         if (buf->data[0] == NULL || (buf->async && buf->data[1] == NULL)) {
             DICT_destruct(buf);
@@ -38,10 +38,10 @@ int DICT_init(DICT_buffer * const buf, size_t const dictSize, int const doHash)
     buf->index = 0;
     buf->start = 0;
     buf->end = 0;
-    buf->bufSize = dictSize;
+    buf->size = dict_size;
 
 #ifndef NO_XXHASH
-    if (doHash) {
+    if (do_hash) {
         if (buf->xxh == NULL) {
             buf->xxh = XXH32_createState();
             if (buf->xxh == NULL) {
@@ -66,7 +66,7 @@ void DICT_destruct(DICT_buffer * const buf)
     free(buf->data[1]);
     buf->data[0] = NULL;
     buf->data[1] = NULL;
-    buf->bufSize = 0;
+    buf->size = 0;
 #ifndef NO_XXHASH
     XXH32_freeState(buf->xxh);
     buf->xxh = NULL;
@@ -75,7 +75,7 @@ void DICT_destruct(DICT_buffer * const buf)
 
 size_t DICT_size(const DICT_buffer * const buf)
 {
-    return buf->bufSize;
+    return buf->size;
 }
 
 size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * const dict)
@@ -84,33 +84,33 @@ size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * c
 
     dict->dst = buf->data[buf->index] + buf->end;
     dict->pos = 0;
-    dict->size = buf->bufSize - buf->end;
+    dict->size = buf->size - buf->end;
 
     return dict->size - dict->pos;
 }
 
-int DICT_update(DICT_buffer * const buf, size_t const addedSize)
+int DICT_update(DICT_buffer * const buf, size_t const added_size)
 {
-    buf->end += addedSize;
-    assert(buf->end <= buf->bufSize);
+    buf->end += added_size;
+    assert(buf->end <= buf->size);
     return !DICT_availSpace(buf);
 }
 
 void DICT_put(DICT_buffer * const buf, FL2_inBuffer * const input)
 {
-    size_t const toRead = MIN(buf->bufSize - buf->end, input->size - input->pos);
+    size_t const to_read = MIN(buf->size - buf->end, input->size - input->pos);
 
-    DEBUGLOG(5, "CStream : reading %u bytes", (U32)toRead);
+    DEBUGLOG(5, "CStream : reading %u bytes", (U32)to_read);
 
-    memcpy(buf->data[buf->index] + buf->end, (BYTE*)input->src + input->pos, toRead);
+    memcpy(buf->data[buf->index] + buf->end, (BYTE*)input->src + input->pos, to_read);
 
-    input->pos += toRead;
-    buf->end += toRead;
+    input->pos += to_read;
+    buf->end += to_read;
 }
 
 size_t DICT_availSpace(const DICT_buffer * const buf)
 {
-    return buf->bufSize - buf->end;
+    return buf->size - buf->end;
 }
 
 int DICT_hasUnprocessed(const DICT_buffer * const buf)
@@ -185,5 +185,5 @@ XXH32_hash_t DICT_getDigest(const DICT_buffer * const buf)
 
 size_t DICT_memUsage(const DICT_buffer * const buf)
 {
-    return (1 + buf->async) * buf->bufSize;
+    return (1 + buf->async) * buf->size;
 }

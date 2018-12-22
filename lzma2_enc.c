@@ -1411,7 +1411,7 @@ size_t LZMA_encodeOptimumSequence(LZMA2_ECtx *const enc, FL2_dataBlock const blo
                 U32 dist = enc->opt_buf[i].prev_dist;
                 /* The last match will be truncated to fit in the optimal buffer so get the full length */
                 if (i + len >= kOptimizerBufferSize - 1 && dist >= kNumReps) {
-                    RMF_match lastmatch = RMF_getMatch(block, tbl, search_depth, tbl->isStruct, match_index);
+                    RMF_match lastmatch = RMF_getMatch(block, tbl, search_depth, tbl->is_struct, match_index);
                     if (lastmatch.length > len) {
                         len = lastmatch.length;
                         dist = lastmatch.dist + kNumReps;
@@ -1649,7 +1649,7 @@ static BYTE LZMA2_isChunkCompressible(const FL2_matchTable* const tbl,
 		size_t const margin = chunk_size / margin_divisor[strategy];
 		size_t const terminator = start + margin;
 
-		if (tbl->isStruct) {
+		if (tbl->is_struct) {
 			size_t prev_dist = 0;
 			for (size_t index = start; index < end; ) {
 				U32 const link = GetMatchLink(tbl->table, index);
@@ -1727,7 +1727,7 @@ static size_t LZMA2_encodeChunk(LZMA2_ECtx *const enc,
     size_t const index, size_t const end)
 {
     if (enc->strategy == FL2_fast) {
-        if (tbl->isStruct) {
+        if (tbl->is_struct) {
             return LZMA_encodeChunkFast(enc, block, tbl, 1,
                 index, end);
         }
@@ -1737,7 +1737,7 @@ static size_t LZMA2_encodeChunk(LZMA2_ECtx *const enc,
         }
     }
     else {
-        if (tbl->isStruct) {
+        if (tbl->is_struct) {
             return LZMA_encodeChunkBest(enc, block, tbl, 1,
                 index, end);
         }

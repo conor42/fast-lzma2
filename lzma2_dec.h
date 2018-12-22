@@ -30,7 +30,7 @@ typedef struct
 	BYTE lp;
 	BYTE pb;
 	BYTE pad_;
-	U32 dicSize;
+	U32 dic_size;
 } LZMA2_props;
 
 /* LzmaProps_Decode - decodes properties
@@ -123,9 +123,9 @@ Returns:
 #define LzmaProps_GetNumProbs(p) (NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << ((p)->lc + (p)->lp)))
 
 
-#define CALC_POS_STATE(processedPos, pbMask) (((processedPos) & (pbMask)) << 4)
-#define COMBINED_PS_STATE (posState + state)
-#define GET_LEN_STATE (posState)
+#define CALC_POS_STATE(processed_pos, pb_mask) (((processed_pos) & (pb_mask)) << 4)
+#define COMBINED_PS_STATE (pos_state + state)
+#define GET_LEN_STATE (pos_state)
 
 #define LZMA2_LCLP_MAX 4U
 
@@ -134,27 +134,27 @@ typedef struct
 {
     LZMA2_props prop;
     BYTE *dic;
-	size_t dicPos;
-	size_t dicBufSize;
+	size_t dic_pos;
+	size_t dic_buf_size;
 	const BYTE *buf;
 	Probability *probs_1664;
 	U32 range;
 	U32 code;
-    U32 processedPos;
-    U32 checkDicSize;
+    U32 processed_pos;
+    U32 check_dic_size;
     U32 reps[4];
 	unsigned state;
 	unsigned state2;
-	unsigned remainLen;
-    U32 packSize;
-    U32 unpackSize;
+	unsigned remain_len;
+    U32 pack_size;
+    U32 unpack_size;
     BYTE control;
-    BYTE needInitDic;
-	BYTE needInitState;
-	BYTE needInitState2;
-    BYTE needInitProp;
-	BYTE needFlush;
-	BYTE extDic;
+    BYTE need_init_dic;
+	BYTE need_init_state;
+	BYTE need_init_state2;
+    BYTE need_init_prop;
+	BYTE need_flush;
+	BYTE ext_dic;
 	BYTE pad_;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
 } LZMA2_DCtx;
@@ -173,13 +173,13 @@ typedef enum
    covers last bytes of block. In other cases you must use LZMA_FINISH_ANY.
 
    If LZMA decoder sees end marker before reaching output limit, it returns SZ_OK,
-   and output value of destLen will be less than output buffer size limit.
+   and output value of dest_len will be less than output buffer size limit.
    You can check status result also.
 
    You can use multiple checks to test data integrity after full decompression:
      1) Check Result and "status" variable.
-     2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
-     3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
+     2) Check that output(dest_len) = uncompressed_size, if you know real uncompressed_size.
+     3) Check that output(src_len) = compressed_size, if you know real compressed_size.
         You must use correct finish mode in that case. */
 
 typedef enum
@@ -196,21 +196,21 @@ typedef enum
 
 void LZMA_destructDCtx(LZMA2_DCtx *const p);
 
-size_t LZMA2_getDictSizeFromProp(BYTE const dictProp);
+size_t LZMA2_getDictSizeFromProp(BYTE const dict_prop);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const srcLen);
+size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len);
 
-size_t LZMA2_decMemoryUsage(size_t const dictSize);
+size_t LZMA2_decMemoryUsage(size_t const dict_size);
 
-size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dictProp, BYTE *const dic, size_t dicBufSize);
+size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const dic, size_t dic_buf_size);
 
-size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dicLimit,
-    const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode);
+size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
+    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);
 
-size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const destLen,
-    const BYTE *src, size_t *const srcLen, ELzmaFinishMode const finishMode);
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len,
+    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);
 
 typedef enum
 {
@@ -223,8 +223,8 @@ typedef enum
 
 typedef struct
 {
-    size_t packSize;
-    size_t unpackSize;
+    size_t pack_size;
+    size_t unpack_size;
 } LZMA2_chunk;
 
 #if defined(FL2_DEBUG) && (FL2_DEBUG>=1)
@@ -233,7 +233,7 @@ typedef struct
 #  define LZMA2_MT_INPUT_SIZE 0x40000
 #endif
 
-LZMA2_parseRes LZMA2_parseInput(const BYTE* const inBuf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf);
+LZMA2_parseRes LZMA2_parseInput(const BYTE* const in_buf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf);
 
 #if defined (__cplusplus)
 }

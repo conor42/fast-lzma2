@@ -1754,7 +1754,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     FL2_dataBlock const block,
     const FL2_lzma2Parameters* const options,
     int stream_prop,
-    FL2_atomic *const progress,
+    FL2_atomic *const progress_in,
+    FL2_atomic *const progress_out,
     int *const canceled)
 {
     size_t const start = block.start;
@@ -1879,7 +1880,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
             next_is_random = LZMA2_isChunkCompressible(tbl, block, next_index, enc->strategy);
         }
         out_dest += compressed_size + header_size;
-        FL2_atomic_add(*progress, (long)(next_index - index));
+        FL2_atomic_add(*progress_in, (long)(next_index - index));
+        FL2_atomic_add(*progress_out, (long)(compressed_size + header_size));
         index = next_index;
         if (*canceled)
             return FL2_ERROR(canceled);

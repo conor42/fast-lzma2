@@ -304,8 +304,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t adde
 
 /*! FL2_getCStreamProgress() :
  *  Returns the number of bytes processed since the stream was initialized. This is a synthetic
- *  estimate because the match finder does not proceed sequentially through the data. */
-FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs);
+ *  estimate because the match finder does not proceed sequentially through the data. If
+ *  outputSize is not NULL, returns the number of bytes of compressed data generated. */
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs, unsigned long long *outputSize);
 
 /*! FL2_waitStream() :
  *  Waits for compression to end. This function returns after the timeout set using

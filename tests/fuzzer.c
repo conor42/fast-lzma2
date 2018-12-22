@@ -570,14 +570,17 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
         FL2_inBuffer in = { CNBuffer, CNBuffSize, 0 };
         size_t r;
-        DISPLAYLEVEL(4, "  0%c", '%');
+        DISPLAYLEVEL(4, "  0%c     0Kb:   0Kb", '%');
         CHECK(FL2_initCStream(cstream, 9));
         FL2_setCStreamTimeout(cstream, 300);
         CHECK(FL2_compressStream(cstream, &out, &in));
         do {
             r = FL2_endStream(cstream, &out);
             if (FL2_isTimedOut(r)) {
-                DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)(FL2_getCStreamProgress(cstream) * 100 / CNBuffSize), '%');
+                unsigned long long cProgress;
+                unsigned long long dProgress = FL2_getCStreamProgress(cstream, &cProgress);
+                DISPLAYLEVEL(4, "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%3u%c %5uKb:%4uKb",
+                    (unsigned)(dProgress * 100 / CNBuffSize), '%', (unsigned)(dProgress >> 10), (unsigned)(cProgress >> 10));
                 fflush(stdout);
             }
             else {
@@ -600,7 +603,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         do {
             r = FL2_endStream(cstream, NULL);
             if (FL2_isTimedOut(r)) {
-                if (FL2_getCStreamProgress(cstream) >= CNBuffSize / 4U)
+                if (FL2_getCStreamProgress(cstream, NULL) >= CNBuffSize / 4U)
                     break;
             }
             else {
@@ -608,7 +611,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             }
         } while (r);
         FL2_cancelOperation(cstream);
-        r = FL2_getCStreamProgress(cstream) * 100 / CNBuffSize;
+        r = FL2_getCStreamProgress(cstream, NULL) * 100 / CNBuffSize;
         DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)r, '%');
         if (r >= 99) goto _output_error;
         FL2_setCStreamTimeout(cstream, 0);
@@ -1036,6 +1039,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                                 r = FL2_flushStream(cstream, &out);
                             } while (FL2_isTimedOut(r));
                             CHECK(FL2_isError(r), "FL2_flushStream failed : %s", FL2_getErrorName(r));
+                            r = !r;
                         }
                     }
                     if (!r) {

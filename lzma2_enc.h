@@ -49,7 +49,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     FL2_dataBlock const block,
     const FL2_lzma2Parameters* const options,
     int stream_prop,
-    FL2_atomic *const progress,
+    FL2_atomic *const progress_in,
+    FL2_atomic *const progress_out,
     int *const canceled);
 
 BYTE LZMA2_getDictSizeProp(size_t const dictionary_size);

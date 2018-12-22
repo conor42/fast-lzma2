@@ -68,11 +68,13 @@ struct FL2_CCtx_s {
     size_t dictMax;
     U64 blockTotal;
     U64 streamTotal;
+    U64 streamCsize;
     FL2_matchTable* matchTable;
     U32 timeout;
     U32 rmfWeight;
     U32 encWeight;
-    FL2_atomic encProgress;
+    FL2_atomic progressIn;
+    FL2_atomic progressOut;
     int canceled;
     BYTE wroteProp;
     BYTE endMarked;

@@ -184,6 +184,7 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
     cctx->dictMax = 0;
     cctx->blockTotal = 0;
     cctx->streamTotal = 0;
+    cctx->streamCsize = 0;
     cctx->outThread = 0;
     cctx->outPos = 0;
     cctx->asyncRes = 0;
@@ -256,7 +257,7 @@ static void FL2_compressRadixChunk(void* const jobDescription, ptrdiff_t const n
         cctx->jobs[n].block,
         &cctx->params.cParams,
         -1,
-        &cctx->encProgress, &cctx->canceled);
+        &cctx->progressIn, &cctx->progressOut, &cctx->canceled);
 }
 
 static int FL2_initEncoders(FL2_CCtx* const cctx)
@@ -271,7 +272,9 @@ static int FL2_initEncoders(FL2_CCtx* const cctx)
 static void FL2_initProgress(FL2_CCtx* const cctx)
 {
     RMF_initProgress(cctx->matchTable);
-    cctx->encProgress = 0;
+    cctx->progressIn = 0;
+    cctx->streamCsize += cctx->progressOut;
+    cctx->progressOut = 0;
     cctx->canceled = 0;
 }
 
@@ -335,7 +338,10 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
 
     FL2POOL_addRange(cctx->factory, FL2_compressRadixChunk, cctx, 1, nbThreads);
 
-    cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, streamProp, &cctx->encProgress, &cctx->canceled);
+    cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable,
+        cctx->jobs[0].block,
+        &cctx->params.cParams, streamProp,
+        &cctx->progressIn, &cctx->progressOut, &cctx->canceled);
 
     FL2POOL_waitAll(cctx->factory, 0);
 
@@ -349,7 +355,10 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
     if (err)
         return FL2_ERROR(internal);
 #endif
-    cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable, cctx->jobs[0].block, &cctx->params.cParams, streamProp, &cctx->encProgress, &cctx->canceled);
+    cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable,
+        cctx->jobs[0].block,
+        &cctx->params.cParams, streamProp,
+        &cctx->progressIn, &cctx->progressOut, &cctx->canceled);
 
 #endif
 
@@ -454,7 +463,9 @@ static size_t FL2_beginFrame(FL2_CCtx* const cctx, size_t const dictReduce)
     cctx->dictMax = 0;
     cctx->blockTotal = 0;
     cctx->streamTotal = 0;
-    cctx->encProgress = 0;
+    cctx->streamCsize = 0;
+    cctx->progressIn = 0;
+    cctx->progressOut = 0;
     RMF_initProgress(cctx->matchTable);
     cctx->asyncRes = 0;
     cctx->outThread = 0;
@@ -1038,14 +1049,17 @@ FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream * fcs, size_t add
     return fcs->outThread == fcs->threadCount;
 }
 
-FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs)
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs, unsigned long long *outputSize)
 {
+    if (outputSize != NULL)
+        *outputSize = fcs->streamCsize + fcs->progressOut;
+
     U64 const encodeSize = fcs->curBlock.end - fcs->curBlock.start;
 
-    if (fcs->encProgress == 0 && fcs->curBlock.end != 0)
+    if (fcs->progressIn == 0 && fcs->curBlock.end != 0)
         return fcs->streamTotal + ((fcs->matchTable->progress * encodeSize / fcs->curBlock.end * fcs->rmfWeight) >> 4);
 
-    return fcs->streamTotal + ((fcs->rmfWeight * encodeSize) >> 4) + ((fcs->encProgress * fcs->encWeight) >> 4);
+    return fcs->streamTotal + ((fcs->rmfWeight * encodeSize) >> 4) + ((fcs->progressIn * fcs->encWeight) >> 4);
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)

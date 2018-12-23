@@ -55,6 +55,8 @@ int DICT_init(DICT_buffer * const buf, size_t const dict_size, int const do_hash
         XXH32_freeState(buf->xxh);
         buf->xxh = NULL;
     }
+#else
+    (void)do_hash;
 #endif
 
     return 0;

@@ -92,14 +92,9 @@ static RMF_builder** RMF_createBuilderTable(U32* const match_table, size_t const
     return builders;
 }
 
-static int RMF_isStruct(size_t const dictionary_size, unsigned const depth)
+static int RMF_isStruct(size_t const dictionary_size)
 {
     return dictionary_size > ((size_t)1 << RADIX_LINK_BITS);
-}
-
-static int RMF_isStructParam(const RMF_parameters* const params)
-{
-    return RMF_isStruct(params->dictionary_size, params->depth);
 }
 
 /** RMF_clampParams() :
@@ -122,7 +117,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
 
 static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_parameters* const params)
 {
-    int const is_struct = RMF_isStructParam(params);
+    int const is_struct = RMF_isStruct(params->dictionary_size);
     size_t const dictionary_size = tbl->params.dictionary_size;
     /* dictionary is allocated with the struct and is immutable */
     if (params->dictionary_size > tbl->params.dictionary_size
@@ -177,7 +172,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     RMF_parameters params = RMF_clampParams(*p);
     RMF_reduceDict(&params, dict_reduce);
 
-    int const is_struct = RMF_isStructParam(&params);
+    int const is_struct = RMF_isStruct(params.dictionary_size);
     size_t dictionary_size = params.dictionary_size;
 
     DEBUGLOG(3, "RMF_createMatchTable : is_struct %d, dict %u", is_struct, (U32)dictionary_size);
@@ -219,7 +214,7 @@ BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_paramet
     RMF_parameters params = RMF_clampParams(*p);
     RMF_reduceDict(&params, dict_reduce);
     return tbl->params.dictionary_size > params.dictionary_size
-        || (tbl->params.dictionary_size == params.dictionary_size && tbl->alloc_struct >= RMF_isStructParam(&params));
+        || (tbl->params.dictionary_size == params.dictionary_size && tbl->alloc_struct >= RMF_isStruct(params.dictionary_size));
 }
 
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const p, size_t const dict_reduce)
@@ -681,7 +676,7 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
 
 size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_log, unsigned const depth, unsigned const thread_count)
 {
-    size_t size = (size_t)(4U + RMF_isStruct(dict_size, depth)) * dict_size;
+    size_t size = (size_t)(4U + RMF_isStruct(dict_size)) * dict_size;
     size_t const buf_size = dict_size >> buffer_log;
     size += ((buf_size - 1) * sizeof(RMF_buildMatch) + sizeof(RMF_builder)) * thread_count;
     return size;

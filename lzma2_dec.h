@@ -146,8 +146,8 @@ typedef struct
 	unsigned state;
 	unsigned state2;
 	unsigned remain_len;
-    U32 pack_size;
-    U32 unpack_size;
+    size_t pack_size;
+    size_t unpack_size;
     BYTE control;
     BYTE need_init_dic;
 	BYTE need_init_state;
@@ -207,7 +207,7 @@ size_t LZMA2_decMemoryUsage(size_t const dict_size);
 size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const dic, size_t dic_buf_size);
 
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
-    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);
+    const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode);
 
 size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len,
     const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);

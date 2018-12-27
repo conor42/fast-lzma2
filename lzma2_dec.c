@@ -174,7 +174,6 @@ typedef enum
 {
     LZMA2_STATE_CONTROL,
     LZMA2_STATE_DATA,
-    LZMA2_STATE_DATA_CONT,
     LZMA2_STATE_FINISHED,
     LZMA2_STATE_ERROR
 } ELzma2State;
@@ -858,7 +857,7 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit, cons
             if (p->remain_len == 0 && p->code == 0) {
                 return LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK;
             }
-                return LZMA_STATUS_NOT_FINISHED;
+            return LZMA_STATUS_NOT_FINISHED;
         }
 
         if (p->need_init_state)
@@ -981,7 +980,7 @@ static void LZMA_updateWithUncompressed(LZMA2_DCtx *const p, const BYTE *const s
 }
 
 static unsigned LZMA2_nextChunkInfo(BYTE *const control,
-    U32 *const unpack_size, U32 *const pack_size,
+    size_t *const unpack_size, size_t *const pack_size,
     LZMA2_props *const prop,
     const BYTE *const src, ptrdiff_t *const src_len)
 {
@@ -1000,15 +999,15 @@ static unsigned LZMA2_nextChunkInfo(BYTE *const control,
         if (*control > 2)
             return LZMA2_STATE_ERROR;
         *src_len = 3;
-        *unpack_size = (((U32)src[1] << 8) | src[2]) + 1;
+        *unpack_size = (((size_t)src[1] << 8) | src[2]) + 1;
     }
     else {
         S32 const has_prop = LZMA2_IS_THERE_PROP(LZMA2_GET_LZMA_MODE(*control));
         if (len < 5 + has_prop)
             return LZMA2_STATE_CONTROL;
         *src_len = 5 + has_prop;
-        *unpack_size = ((U32)(*control & 0x1F) << 16) + ((U32)src[1] << 8) + src[2] + 1;
-        *pack_size = ((U32)src[3] << 8) + src[4] + 1;
+        *unpack_size = ((size_t)(*control & 0x1F) << 16) + ((size_t)src[1] << 8) + src[2] + 1;
+        *pack_size = ((size_t)src[3] << 8) + src[4] + 1;
         if (has_prop) {
             BYTE b = src[5];
             if (b >= (9 * 5 * 5))
@@ -1026,6 +1025,132 @@ static unsigned LZMA2_nextChunkInfo(BYTE *const control,
     return LZMA2_STATE_DATA;
 }
 
+size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
+    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+{
+    size_t const in_size = *src_len;
+    *src_len = 0;
+
+    if (p->state2 == LZMA2_STATE_CONTROL) {
+        ptrdiff_t len = in_size - *src_len;
+        p->state2 = LZMA2_nextChunkInfo(&p->control, &p->unpack_size, &p->pack_size, &p->prop, src, &len);
+
+        *src_len += len;
+        src += len;
+
+        if (p->state2 == LZMA2_STATE_ERROR)
+            return FL2_ERROR(corruption_detected);
+        else if (p->state2 == LZMA2_STATE_CONTROL)
+            return LZMA_STATUS_NEEDS_MORE_INPUT;
+        else if (p->state2 == LZMA2_STATE_FINISHED)
+            return LZMA_STATUS_FINISHED_WITH_MARK;
+
+        if (LZMA2_IS_UNCOMPRESSED_STATE(p->control))
+        {
+            BYTE const init_dic = (p->control == LZMA2_CONTROL_COPY_RESET_DIC);
+            if (init_dic)
+                p->need_init_prop = p->need_init_state2 = 1;
+            else if (p->need_init_dic)
+                return FL2_ERROR(corruption_detected);
+            p->need_init_dic = 0;
+            LZMA_initDicAndState(p, init_dic, 0);
+        }
+        else {
+            unsigned const mode = LZMA2_GET_LZMA_MODE(p->control);
+            BYTE const init_dic = (mode == 3);
+            BYTE const init_state = (mode != 0);
+            if ((!init_dic && p->need_init_dic) || (!init_state && p->need_init_state2))
+                return FL2_ERROR(corruption_detected);
+
+            LZMA_initDicAndState(p, init_dic, init_state);
+            p->need_init_dic = 0;
+            p->need_init_state2 = 0;
+        }
+    }
+    if (p->state2 == LZMA2_STATE_DATA) {
+        size_t in_cur = in_size - *src_len;
+        size_t const dic_pos = p->dic_pos;
+        size_t out_cur = dic_limit - dic_pos;
+        ELzmaFinishMode cur_finish_mode = LZMA_FINISH_END;
+
+        if (out_cur == 0)
+            return LZMA_STATUS_NOT_FINISHED;
+
+        if (out_cur > p->unpack_size)
+            out_cur = p->unpack_size;
+
+        if (LZMA2_IS_UNCOMPRESSED_STATE(p->control)) {
+            if (in_cur == 0)
+                return LZMA_STATUS_NEEDS_MORE_INPUT;
+
+            if (in_cur > out_cur)
+                in_cur = out_cur;
+
+            LZMA_updateWithUncompressed(p, src, in_cur);
+
+            src += in_cur;
+            *src_len += in_cur;
+            p->unpack_size -= in_cur;
+        }
+        else
+        {
+            if (in_cur < p->pack_size) {
+                if (in_cur < LZMA_REQUIRED_INPUT_MAX)
+                    return LZMA_STATUS_NEEDS_MORE_INPUT;
+                cur_finish_mode = LZMA_FINISH_ANY;
+            }
+            else {
+                in_cur = p->pack_size;
+            }
+
+            size_t res = LZMA_decodeToDic(p, dic_pos + out_cur, src, &in_cur, cur_finish_mode);
+
+            src += in_cur;
+            *src_len += in_cur;
+            p->pack_size -= in_cur;
+            p->unpack_size -= p->dic_pos - dic_pos;
+
+            if (ERR_isError(res))
+                return res;
+
+            if (res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK && p->pack_size == 0)
+                return FL2_ERROR(corruption_detected);
+
+            if ((p->pack_size == 0) != (p->unpack_size == 0))
+                return FL2_ERROR(corruption_detected);
+
+            if (in_cur == 0 && p->dic_pos == dic_pos)
+                return FL2_ERROR(corruption_detected);
+        }
+
+        if (p->unpack_size == 0)
+            p->state2 = LZMA2_STATE_CONTROL;
+    }
+    return LZMA_STATUS_NOT_FINISHED;
+}
+
+size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
+    const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+{
+    size_t const in_size = *src_len;
+    size_t in_pos = 0;
+    size_t res = FL2_ERROR(corruption_detected);
+
+    while (p->state2 != LZMA2_STATE_ERROR)
+    {
+        size_t len = in_size - in_pos;
+        res = LZMA2_decodeChunkToDic(p, dic_limit, src + in_pos, &len, finish_mode);
+        in_pos += len;
+        if (ERR_isError(res))
+            break;
+        if (res == LZMA_STATUS_FINISHED_WITH_MARK || res == LZMA_STATUS_NEEDS_MORE_INPUT)
+            break;
+    }
+    *src_len = in_pos;
+    return res;
+}
+
+#if 0
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
     const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
 {
@@ -1156,7 +1281,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         return res;
     return FL2_ERROR(corruption_detected);
 }
-
+#endif
 
 size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len, const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
 {

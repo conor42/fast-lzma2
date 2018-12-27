@@ -364,6 +364,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
         size_t const radix_8 = tbl->match_buffer[index].src.chars[0];
         /* Seen this char before? */
         U32 const prev = tbl->tails_8[radix_8].prev_index;
+        tbl->tails_8[radix_8].prev_index = (U32)index;
         if (prev != RADIX_NULL_LINK) {
             ++tbl->tails_8[radix_8].list_count;
             /* Link the previous occurrence to this one and record the new length */
@@ -377,7 +378,6 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
             tbl->stack[st_index].count = (U32)radix_8;
             ++st_index;
         }
-        tbl->tails_8[radix_8].prev_index = (U32)index;
         ++index;
     } while (index < list_count);
 
@@ -613,7 +613,9 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     U32 const list_count,
     size_t const stack_base)
 {
-    if (max_depth > 6)
+    if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE)
+        RMF_bruteForceBuffered(tbl, data_block, block_start, 0, list_count, 0, depth, max_depth);
+    else if (max_depth > 6)
         RMF_recurseListChunk_generic(tbl, data_block, block_start, depth, max_depth, list_count, stack_base);
     else
         RMF_recurseListChunk_generic(tbl, data_block, block_start, depth, 6, list_count, stack_base);

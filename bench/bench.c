@@ -8,8 +8,6 @@
 #include "../mem.h"
 #include "../util.h"
 
-extern size_t g_total;
-
 #define TIMELOOP_MICROSEC     1*1000000ULL /* 1 second */
 #define ACTIVEPERIOD_MICROSEC 70*1000000ULL /* 70 seconds */
 #define COOLPERIOD_SEC        5

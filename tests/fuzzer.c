@@ -1107,7 +1107,6 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             ptrdiff_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
             FL2_setDStreamMemoryLimitMt(dstream, (FUZ_rand(&lseed) << 3) % (dictSize * 8U * nbThreads));
             size_t r;
-            size_t total = 0;
             CHECK(FL2_isError(FL2_initDStream(dstream)), "FL2_initDStream failed");
             do {
                 if (in.pos + LZMA_REQUIRED_INPUT_MAX >= in.size) {
@@ -1119,7 +1118,6 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                 out.size = MIN(bufSize, oend - (BYTE*)out.dst);
                 out.pos = 0;
                 r = FL2_decompressStream(dstream, &out, &in);
-                total += out.pos;
                 CHECK(FL2_isError(r), "FL2_decompressStream failed (%s) (srcSize : %u ; cSize : %u)", FL2_getErrorName(r), (U32)sampleSize, (U32)cSize);
             } while (r);
             {   size_t diff = findDiff(sampleBuffer, dstBuffer, sampleSize);

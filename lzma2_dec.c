@@ -1113,10 +1113,7 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
             if (ERR_isError(res))
                 return res;
 
-            if (res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK && p->pack_size == 0)
-                return FL2_ERROR(corruption_detected);
-
-            if ((p->pack_size == 0) != (p->unpack_size == 0))
+            if (res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK && p->unpack_size == 0 && p->pack_size == 0)
                 return FL2_ERROR(corruption_detected);
 
             if (res == LZMA_STATUS_NEEDS_MORE_INPUT)

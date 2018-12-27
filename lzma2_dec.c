@@ -1074,7 +1074,7 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         ELzmaFinishMode cur_finish_mode = LZMA_FINISH_END;
 
         if (out_cur == 0)
-            return LZMA_STATUS_NOT_FINISHED;
+            return (finish_mode == LZMA_FINISH_ANY) ? LZMA_STATUS_OUTPUT_FULL : FL2_ERROR(dstSize_tooSmall);
 
         if (out_cur > p->unpack_size)
             out_cur = p->unpack_size;
@@ -1119,7 +1119,9 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
             if ((p->pack_size == 0) != (p->unpack_size == 0))
                 return FL2_ERROR(corruption_detected);
 
-            if (in_cur == 0 && p->dic_pos == dic_pos)
+            if (res == LZMA_STATUS_NEEDS_MORE_INPUT)
+                return res;
+            else if (in_cur == 0 && p->dic_pos == dic_pos)
                 return FL2_ERROR(corruption_detected);
         }
 
@@ -1143,7 +1145,9 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         in_pos += len;
         if (ERR_isError(res))
             break;
-        if (res == LZMA_STATUS_FINISHED_WITH_MARK || res == LZMA_STATUS_NEEDS_MORE_INPUT)
+        if (res == LZMA_STATUS_FINISHED_WITH_MARK
+            || res == LZMA_STATUS_NEEDS_MORE_INPUT
+            || res == LZMA_STATUS_OUTPUT_FULL)
             break;
     }
     *src_len = in_pos;

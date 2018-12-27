@@ -188,6 +188,7 @@ typedef enum
   LZMA_STATUS_FINISHED_WITH_MARK,          /* stream was finished with end mark. */
   LZMA_STATUS_NOT_FINISHED,                /* stream was not finished */
   LZMA_STATUS_NEEDS_MORE_INPUT,            /* you must provide more input bytes */
+  LZMA_STATUS_OUTPUT_FULL,                 /* not finished; output buffer is full */
   LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK  /* there is probability that stream was finished without end mark */
 } ELzmaStatus;
 

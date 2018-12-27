@@ -613,6 +613,9 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     U32 const list_count,
     size_t const stack_base)
 {
+    if (list_count < 2)
+        return;
+    
     if (list_count <= MAX_BRUTE_FORCE_LIST_SIZE)
         RMF_bruteForceBuffered(tbl, data_block, block_start, 0, list_count, 0, depth, max_depth);
     else if (max_depth > 6)

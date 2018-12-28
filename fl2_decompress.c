@@ -258,7 +258,7 @@ static size_t FL2_decompressDCtxMt(FL2_DCtx* const dctx,
             *srcLen += blocks[thread - 1].packPos + blocks[thread - 1].packSize;
 
             if (type == CHUNK_FINAL)
-                return LZMA_STATUS_FINISHED_WITH_MARK;
+                return LZMA_STATUS_FINISHED;
 
             src = (BYTE*)src + pos;
             srcSize -= pos;
@@ -613,7 +613,7 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
 
         FL2_atomic_add(fds->progress, (long)(dec->dic_pos - dicPos));
 
-        if (res == LZMA_STATUS_FINISHED_WITH_MARK) {
+        if (res == LZMA_STATUS_FINISHED) {
             DEBUGLOG(4, "Found end mark");
         }
         if (cur == ti->inBlock.last)
@@ -787,7 +787,7 @@ static size_t FL2_decompressInput(FL2_DStream* fds, FL2_outBuffer* output, FL2_i
 
         if (FL2_isError(res))
             return res;
-        if (res == LZMA_STATUS_FINISHED_WITH_MARK) {
+        if (res == LZMA_STATUS_FINISHED) {
             DEBUGLOG(4, "Found end mark");
             fds->stage = fds->doHash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED;
         }

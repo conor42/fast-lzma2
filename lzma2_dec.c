@@ -855,7 +855,7 @@ static size_t LZMA_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit, cons
         if (p->dic_pos >= dic_limit)
         {
             if (p->remain_len == 0 && p->code == 0) {
-                return LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK;
+                return LZMA_STATUS_FINISHED;
             }
             return LZMA_STATUS_NOT_FINISHED;
         }
@@ -1028,6 +1028,9 @@ static unsigned LZMA2_nextChunkInfo(BYTE *const control,
 size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
     const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
 {
+    if (p->state2 == LZMA2_STATE_FINISHED)
+        return LZMA_STATUS_FINISHED;
+
     size_t const in_size = *src_len;
     *src_len = 0;
 
@@ -1043,7 +1046,7 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         else if (p->state2 == LZMA2_STATE_CONTROL)
             return LZMA_STATUS_NEEDS_MORE_INPUT;
         else if (p->state2 == LZMA2_STATE_FINISHED)
-            return LZMA_STATUS_FINISHED_WITH_MARK;
+            return LZMA_STATUS_FINISHED;
 
         if (LZMA2_IS_UNCOMPRESSED_STATE(p->control))
         {
@@ -1071,7 +1074,6 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         size_t in_cur = in_size - *src_len;
         size_t const dic_pos = p->dic_pos;
         size_t out_cur = dic_limit - dic_pos;
-        ELzmaFinishMode cur_finish_mode = LZMA_FINISH_END;
 
         if (out_cur == 0)
             return (finish_mode == LZMA_FINISH_ANY) ? LZMA_STATUS_OUTPUT_FULL : FL2_ERROR(dstSize_tooSmall);
@@ -1094,6 +1096,7 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         }
         else
         {
+            ELzmaFinishMode cur_finish_mode = LZMA_FINISH_END;
             if (in_cur < p->pack_size) {
                 if (in_cur < LZMA_REQUIRED_INPUT_MAX)
                     return LZMA_STATUS_NEEDS_MORE_INPUT;
@@ -1113,11 +1116,15 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
             if (ERR_isError(res))
                 return res;
 
-            if (res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK && p->unpack_size == 0 && p->pack_size == 0)
+            /* error if decoder not finished but chunk output is complete */
+            if (res != LZMA_STATUS_FINISHED && p->unpack_size == 0)
                 return FL2_ERROR(corruption_detected);
 
+            /* Error conditions:
+               1. need input but chunk is finished
+               2. have output space, input not needed, but nothing was written*/
             if (res == LZMA_STATUS_NEEDS_MORE_INPUT)
-                return res;
+                return (p->pack_size == 0) ? FL2_ERROR(corruption_detected) : res;
             else if (in_cur == 0 && p->dic_pos == dic_pos)
                 return FL2_ERROR(corruption_detected);
         }
@@ -1131,22 +1138,25 @@ size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
     const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode)
 {
+    if (p->state2 == LZMA2_STATE_ERROR)
+        return FL2_ERROR(corruption_detected);
+    
     size_t const in_size = *src_len;
     size_t in_pos = 0;
-    size_t res = FL2_ERROR(corruption_detected);
+    size_t res;
 
-    while (p->state2 != LZMA2_STATE_ERROR)
-    {
+    do {
         size_t len = in_size - in_pos;
         res = LZMA2_decodeChunkToDic(p, dic_limit, src + in_pos, &len, finish_mode);
         in_pos += len;
-        if (ERR_isError(res))
+        if (ERR_isError(res)) {
+            p->state2 = LZMA2_STATE_ERROR;
             break;
-        if (res == LZMA_STATUS_FINISHED_WITH_MARK
-            || res == LZMA_STATUS_NEEDS_MORE_INPUT
-            || res == LZMA_STATUS_OUTPUT_FULL)
-            break;
-    }
+        }
+    } while (res != LZMA_STATUS_FINISHED
+        && res != LZMA_STATUS_NEEDS_MORE_INPUT
+        && res != LZMA_STATUS_OUTPUT_FULL);
+
     *src_len = in_pos;
     return res;
 }
@@ -1169,7 +1179,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         }
 
         if (p->state2 == LZMA2_STATE_FINISHED)
-            return LZMA_STATUS_FINISHED_WITH_MARK;
+            return LZMA_STATUS_FINISHED;
 
         size_t const dic_pos = p->dic_pos;
 
@@ -1265,7 +1275,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
 
             if (p->pack_size == 0 && p->unpack_size == 0)
             {
-                if (res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK)
+                if (res != LZMA_STATUS_FINISHED)
                     break;
                 p->state2 = LZMA2_STATE_CONTROL;
             }
@@ -1315,7 +1325,7 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len
         dest += out_cur;
         out_size -= out_cur;
         *dest_len += out_cur;
-        if (ERR_isError(res) || res == LZMA_STATUS_FINISHED_WITH_MARK)
+        if (ERR_isError(res) || res == LZMA_STATUS_FINISHED)
             return res;
         if (out_cur == 0 || out_size == 0)
             return FL2_error_no_error;

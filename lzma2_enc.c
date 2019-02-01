@@ -69,7 +69,7 @@ Public domain
 #define kMatchLenMin 2U
 #define kMatchLenMax (kMatchLenMin + kLenNumSymbolsTotal - 1U)
 
-#define kOptimizerBufferSize (1U << 12U)
+#define kOptimizerBufferSize (1U << 11U)
 #define kInfinityPrice (1UL << 30U)
 #define kNullDist (U32)-1
 
@@ -911,20 +911,28 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
         unsigned cur_byte = *data;
         unsigned match_byte = *(data - reps[0] - 1);
         U32 cur_price = cur_opt->price;
-        U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob) +
-            LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
         OptimalNode* next_opt = &enc->opt_buf[cur + 1];
         BYTE next_is_char = 0;
-        /* Try literal */
-        if (cur_and_lit_price < next_opt->price) {
-            next_opt->price = cur_and_lit_price;
-            next_opt->prev_index = (unsigned)cur;
-            MakeAsLiteral(*next_opt);
-            next_is_char = 1;
+        U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob);
+        if (cur_and_lit_price > next_opt->price || (next_opt->price < kInfinityPrice && match_byte == cur_byte))
+        {
+            cur_and_lit_price = 0;
+        }
+        else {
+            cur_and_lit_price += LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
+            /* Try literal */
+            if (cur_and_lit_price < next_opt->price) {
+                next_opt->price = cur_and_lit_price;
+                next_opt->prev_index = (unsigned)cur;
+                MakeAsLiteral(*next_opt);
+                next_is_char = 1;
+            }
         }
         match_price = cur_price + GET_PRICE_1(is_match_prob);
         rep_match_price = match_price + GET_PRICE_1(is_rep_prob);
-        if (match_byte == cur_byte) {
+        if (IsCharState(state)
+            && match_byte == cur_byte
+            && rep_match_price < next_opt->price) {
             /* Try 1-byte rep0 */
             U32 short_rep_price = rep_match_price + LZMA_getRepLen1Price(enc, state, pos_state);
             if (short_rep_price <= next_opt->price) {
@@ -937,7 +945,7 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
         bytes_avail = MIN(block.end - index, kOptimizerBufferSize - 1 - cur);
         if (bytes_avail < 2)
             return len_end;
-        if (!next_is_char && match_byte != cur_byte) {
+        if (!next_is_char && cur_and_lit_price != 0 && match_byte != cur_byte) {
             /* Try literal + rep0 */
             const BYTE *data_2 = data - reps[0];
             size_t limit = MIN(bytes_avail - 1, fast_length);
@@ -1195,7 +1203,7 @@ static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx *const enc, FL2_dataBlock cons
 {
     if (len <= match.length) {
         size_t main_len;
-        if (match.length < 3 || match.dist < 256) {
+        if (match.length < 3 || block.end - index < 4) {
             enc->matches[0] = match;
             enc->match_count = 1;
             main_len = match.length;
@@ -1299,7 +1307,7 @@ size_t LZMA_initOptimizerPos0(LZMA2_ECtx *const enc, FL2_dataBlock const block,
 
     unsigned match_price = GET_PRICE_1(is_match_prob);
     unsigned rep_match_price = match_price + GET_PRICE_1(is_rep_prob);
-    if (match_byte == cur_byte) {
+    if (match_byte == cur_byte && rep_lens[0] == 0) {
         /* Try 1-byte rep0 */
         unsigned short_rep_price = rep_match_price + LZMA_getRepLen1Price(enc, state, pos_state);
         if (short_rep_price < enc->opt_buf[1].price) {
@@ -1379,7 +1387,23 @@ size_t LZMA_encodeOptimumSequence(LZMA2_ECtx *const enc, FL2_dataBlock const blo
             ++index;
             /* Lazy termination of the optimal parser. In the second half of the buffer */
             /* a resolution within one byte is enough */
-            for (; cur < (len_end - cur / (kOptimizerBufferSize / 2U)); ++cur, ++index) {
+            for (; cur < len_end; ++cur, ++index) {
+
+                if (cur >= kOptimizerBufferSize - 64) {
+                    size_t j, best;
+                    U32 price = enc->opt_buf[cur].price;
+                    best = cur;
+                    for (j = cur + 1; j <= len_end; j++) {
+                        U32 price2 = enc->opt_buf[j].price;
+                        if (price >= price2) {
+                            price = price2;
+                            best = j;
+                        }
+                    }
+                    cur = best;
+                    break;
+                }
+
                 if (enc->opt_buf[cur + 1].price < enc->opt_buf[cur].price)
                     continue;
 
@@ -1389,10 +1413,12 @@ size_t LZMA_encodeOptimumSequence(LZMA2_ECtx *const enc, FL2_dataBlock const blo
 
                 len_end = LZMA_optimalParse(enc, block, match, index, cur, len_end, is_hybrid, reps);
             }
+#if 0
             if (cur < len_end && match.length < enc->fast_length) {
                 /* Adjust the end point based on scaling up the price. */
                 cur += (enc->opt_buf[cur].price + enc->opt_buf[cur].price / cur) >= enc->opt_buf[cur + 1].price;
             }
+#endif
             DEBUGLOG(6, "End optimal parse at %u", (U32)cur);
             LZMA_reverseOptimalChain(enc->opt_buf, cur);
         }

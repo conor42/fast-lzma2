@@ -47,7 +47,7 @@ void RC_reset(RangeEncoder* const rc);
 
 void RC_setOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer, size_t chunk_size);
 
-void RC_shiftLow(RangeEncoder* const rc);
+void FORCE_NOINLINE RC_shiftLow(RangeEncoder* const rc);
 
 void RC_encodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol);
 

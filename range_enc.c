@@ -7,6 +7,7 @@
 
 #include "fl2_internal.h"
 #include "mem.h"
+#include "platform.h"
 #include "range_enc.h"
 
 const unsigned price_table[kBitModelTotal >> kNumMoveReducingBits] = {
@@ -39,25 +40,55 @@ void RC_reset(RangeEncoder* const rc)
 {
     rc->low = 0;
     rc->range = (U32)-1;
-    rc->cache_size = 1;
+    rc->cache_size = 0;
     rc->cache = 0;
 }
 
-void RC_shiftLow(RangeEncoder* const rc)
+#ifdef __64BIT__
+
+void FORCE_NOINLINE RC_shiftLow(RangeEncoder* const rc)
 {
-	if (rc->low < 0xFF000000 || rc->low > 0xFFFFFFFF)
-	{
-		BYTE temp = rc->cache;
-		do {
-			assert (rc->out_index < 0x10000);
-            rc->out_buffer[rc->out_index++] = temp + (BYTE)(rc->low >> 32);
-            temp = 0xFF;
-		} while (--rc->cache_size != 0);
-        rc->cache = (BYTE)(rc->low >> 24);
-	}
-	++rc->cache_size;
-    rc->low = (rc->low << 8) & 0xFFFFFFFF;
+    U64 low = rc->low;
+    rc->low = (U32)(low << 8);
+    if (low < 0xFF000000 || low > 0xFFFFFFFF) {
+        BYTE high = (BYTE)(low >> 32);
+        rc->out_buffer[rc->out_index++] = rc->cache + high;
+        rc->cache = (BYTE)(low >> 24);
+        if (rc->cache_size != 0) {
+            high += 0xFF;
+            do {
+                rc->out_buffer[rc->out_index++] = high;
+            } while (--rc->cache_size != 0);
+        }
+    }
+    else {
+        rc->cache_size++;
+    }
 }
+
+#else
+
+void FORCE_NOINLINE RC_shiftLow(RangeEncoder* const rc)
+{
+    U32 low = (U32)rc->low;
+    unsigned high = (unsigned)(rc->low >> 32);
+    rc->low = low << 8;
+    if (low < (U32)0xFF000000 || high != 0) {
+        rc->out_buffer[rc->out_index++] = rc->cache + (BYTE)high;
+        rc->cache = (BYTE)(low >> 24);
+        if (rc->cache_size != 0) {
+            high += 0xFF;
+            do {
+                rc->out_buffer[rc->out_index++] = (BYTE)high;
+            } while (--rc->cache_size != 0);
+        }
+    }
+    else {
+        rc->cache_size++;
+    }
+}
+
+#endif
 
 void RC_encodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol)
 {

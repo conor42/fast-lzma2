@@ -54,12 +54,12 @@
 
 /* force no inlining */
 #ifdef _MSC_VER
-#  define FORCE_NOINLINE static __declspec(noinline)
+#  define FORCE_NOINLINE __declspec(noinline)
 #else
 #  ifdef __GNUC__
-#    define FORCE_NOINLINE static __attribute__((__noinline__))
+#    define FORCE_NOINLINE __attribute__((__noinline__))
 #  else
-#    define FORCE_NOINLINE static
+#    define FORCE_NOINLINE 
 #  endif
 #endif
 

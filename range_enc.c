@@ -98,11 +98,11 @@ void RC_encodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned
     RC_encodeBit(rc, &probs[1], bit);
     size_t tree_index = 1;
     do {
-		--bit_count;
+        --bit_count;
         tree_index = (tree_index << 1) | bit;
         bit = (symbol >> bit_count) & 1;
         RC_encodeBit(rc, &probs[tree_index], bit);
-	} while (bit_count != 0);
+    } while (bit_count != 0);
 }
 
 void RC_encodeBitTreeReverse(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol)
@@ -119,7 +119,7 @@ void RC_encodeBitTreeReverse(RangeEncoder* const rc, Probability *const probs, u
 	}
 }
 
-void RC_encodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count)
+void FORCE_NOINLINE RC_encodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count)
 {
 	assert(bit_count > 0);
 	do {

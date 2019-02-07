@@ -59,12 +59,10 @@ Public domain
 
 #define kLenNumLowBits 3U
 #define kLenNumLowSymbols (1U << kLenNumLowBits)
-#define kLenNumMidBits 3U
-#define kLenNumMidSymbols (1U << kLenNumMidBits)
 #define kLenNumHighBits 8U
 #define kLenNumHighSymbols (1U << kLenNumHighBits)
 
-#define kLenNumSymbolsTotal (kLenNumLowSymbols + kLenNumMidSymbols + kLenNumHighSymbols)
+#define kLenNumSymbolsTotal (kLenNumLowSymbols * 2 + kLenNumHighSymbols)
 
 #define kMatchLenMin 2U
 #define kMatchLenMax (kMatchLenMin + kLenNumSymbolsTotal - 1U)
@@ -118,15 +116,14 @@ typedef struct
 {
     size_t table_size;
     unsigned prices[kNumPositionStatesMax][kLenNumSymbolsTotal];
-    Probability choice;
-    Probability choice_2;
-    Probability low[kNumPositionStatesMax << kLenNumLowBits];
-    Probability mid[kNumPositionStatesMax << kLenNumMidBits];
+    Probability choice; /* low[0] is choice_2. Must be consecutive for speed */
+    Probability low[kNumPositionStatesMax << (kLenNumLowBits + 1)];
     Probability high[kLenNumHighSymbols];
 } LengthStates;
 
 typedef struct
 {
+    /* Fields are ordered for speed */
     LengthStates rep_len_states;
     Probability is_rep0_long[kNumStates][kNumPositionStatesMax];
 
@@ -345,39 +342,61 @@ void LZMA_encodeLiteralBuf(LZMA2_ECtx *const enc, const BYTE* const data_block, 
     }
 }
 
-static void LZMA_lengthStates_SetPrices_LowMid(LengthStates* const ls, size_t const pos_state)
+static void LZMA_lengthStates_SetPrices(const Probability *probs, U32 start_price, U32 *prices)
 {
-    unsigned prob = ls->choice;
-    unsigned const a0 = GET_PRICE_0(prob);
-    unsigned const a1 = GET_PRICE_1(prob);
-    prob = ls->choice_2;
-    unsigned const b0 = a1 + GET_PRICE_0(prob);
-    size_t i = 0;
-    for (; i < kLenNumLowSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = a0 + RC_getTreePrice(ls->low + (pos_state << kLenNumLowBits), kLenNumLowBits, i);
-    }
-    for (; i < kLenNumLowSymbols + kLenNumMidSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = b0 + RC_getTreePrice(ls->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, i - kLenNumLowSymbols);
+    for (size_t i = 0; i < 8; i += 2) {
+        U32 prob = probs[4 + (i >> 1)];
+        U32 price = start_price + GET_PRICE(probs[1], (i >> 2))
+            + GET_PRICE(probs[2 + (i >> 2)], (i >> 1) & 1);
+        prices[i] = price + GET_PRICE_0(prob);
+        prices[i + 1] = price + GET_PRICE_1(prob);
     }
 }
 
-static void LZMA_lengthStates_SetPrices(LengthStates* const ls, size_t const pos_state)
+static void FORCE_NOINLINE LZMA_lengthStates_updatePrices(LZMA2_ECtx *const enc, LengthStates* const ls)
 {
-    unsigned prob = ls->choice;
-    unsigned const a0 = GET_PRICE_0(prob);
-    unsigned const a1 = GET_PRICE_1(prob);
-    prob = ls->choice_2;
-    unsigned const b0 = a1 + GET_PRICE_0(prob);
-    unsigned const b1 = a1 + GET_PRICE_1(prob);
-    size_t i = 0;
-    for (; i < kLenNumLowSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = a0 + RC_getTreePrice(ls->low + (pos_state << kLenNumLowBits), kLenNumLowBits, i);
+    U32 b;
+
+    {
+        unsigned prob = ls->choice;
+        U32 a, c;
+        b = GET_PRICE_1(prob);
+        a = GET_PRICE_0(prob);
+        c = b + GET_PRICE_0(ls->low[0]);
+        for (size_t pos_state = 0; pos_state <= enc->pos_mask; pos_state++)
+        {
+            U32 *prices = ls->prices[pos_state];
+            const Probability *probs = ls->low + (pos_state << (1 + kLenNumLowBits));
+            LZMA_lengthStates_SetPrices(probs, a, prices);
+            LZMA_lengthStates_SetPrices(probs + kLenNumLowSymbols, c, prices + kLenNumLowSymbols);
+        }
     }
-    for (; i < kLenNumLowSymbols + kLenNumMidSymbols && i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = b0 + RC_getTreePrice(ls->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, i - kLenNumLowSymbols);
-    }
-    for (; i < ls->table_size; ++i) {
-        ls->prices[pos_state][i] = b1 + RC_getTreePrice(ls->high, kLenNumHighBits, i - kLenNumLowSymbols - kLenNumMidSymbols);
+
+    size_t i = ls->table_size;
+
+    if (i > kLenNumLowSymbols * 2) {
+        const Probability *probs = ls->high;
+        U32 *prices = ls->prices[0] + kLenNumLowSymbols * 2;
+        i = (i - (kLenNumLowSymbols * 2 - 1)) >> 1;
+        b += GET_PRICE_1(ls->low[0]);
+        do {
+            --i;
+            size_t sym = i + (1 << (kLenNumHighBits - 1));
+            U32 price = b;
+            do {
+                unsigned bit = (unsigned)sym & 1;
+                sym >>= 1;
+                price += GET_PRICE(probs[sym], bit);
+            } while (sym >= 2);
+
+            unsigned prob = probs[i + (1 << (kLenNumHighBits - 1))];
+            prices[i * 2] = price + GET_PRICE_0(prob);
+            prices[i * 2 + 1] = price + GET_PRICE_1(prob);
+        } while (i);
+
+        size_t size = (ls->table_size - kLenNumLowSymbols * 2) * sizeof(ls->prices[0][0]);
+        for (size_t pos_state = 1; pos_state <= enc->pos_mask; pos_state++)
+            memcpy(ls->prices[pos_state] + kLenNumLowSymbols * 2, ls->prices[0] + kLenNumLowSymbols * 2, size);
     }
 }
 
@@ -386,17 +405,17 @@ static void LZMA_encodeLength(LZMA2_ECtx *const enc, LengthStates* const len_pro
     len -= kMatchLenMin;
     if (len < kLenNumLowSymbols) {
         RC_encodeBit0(&enc->rc, &len_prob_table->choice);
-        RC_encodeBitTree(&enc->rc, len_prob_table->low + (pos_state << kLenNumLowBits), kLenNumLowBits, len);
+        RC_encodeBitTree(&enc->rc, len_prob_table->low + (pos_state << (1 + kLenNumLowBits)), kLenNumLowBits, len);
     }
     else {
         RC_encodeBit1(&enc->rc, &len_prob_table->choice);
-        if (len < kLenNumLowSymbols + kLenNumMidSymbols) {
-            RC_encodeBit0(&enc->rc, &len_prob_table->choice_2);
-            RC_encodeBitTree(&enc->rc, len_prob_table->mid + (pos_state << kLenNumMidBits), kLenNumMidBits, len - kLenNumLowSymbols);
+        if (len < kLenNumLowSymbols * 2) {
+            RC_encodeBit0(&enc->rc, &len_prob_table->low[0]);
+            RC_encodeBitTree(&enc->rc, len_prob_table->low + kLenNumLowSymbols + (pos_state << (1 + kLenNumLowBits)), kLenNumLowBits, len - kLenNumLowSymbols);
         }
         else {
-            RC_encodeBit1(&enc->rc, &len_prob_table->choice_2);
-            RC_encodeBitTree(&enc->rc, len_prob_table->high, kLenNumHighBits, len - kLenNumLowSymbols - kLenNumMidSymbols);
+            RC_encodeBit1(&enc->rc, &len_prob_table->low[0]);
+            RC_encodeBitTree(&enc->rc, len_prob_table->high, kLenNumHighBits, len - kLenNumLowSymbols * 2);
         }
     }
 }
@@ -1437,18 +1456,6 @@ size_t LZMA_encodeOptimumSequence(LZMA2_ECtx *const enc, FL2_dataBlock const blo
     return start_index;
 }
 
-static void FORCE_NOINLINE LZMA_updateLengthPrices(LZMA2_ECtx *const enc, LengthStates* const len_states)
-{
-    LZMA_lengthStates_SetPrices(len_states, 0);
-    for (size_t pos_state = 1; pos_state <= enc->pos_mask; ++pos_state)
-        LZMA_lengthStates_SetPrices_LowMid(len_states, pos_state);
-    if (len_states->table_size > kLenNumLowSymbols * 2) {
-        size_t size = (len_states->table_size - kLenNumLowSymbols * 2) * sizeof(len_states->prices[0][0]);
-        for (size_t pos_state = 1; pos_state <= enc->pos_mask; ++pos_state)
-            memcpy(len_states->prices[pos_state] + kLenNumLowSymbols * 2, len_states->prices[0] + kLenNumLowSymbols * 2, size);
-    }
-}
-
 static void FORCE_NOINLINE LZMA_fillAlignPrices(LZMA2_ECtx *const enc)
 {
     unsigned i;
@@ -1558,8 +1565,8 @@ size_t LZMA_encodeChunkBest(LZMA2_ECtx *const enc,
     unsigned const search_depth = tbl->params.depth;
     LZMA_fillDistancesPrices(enc);
     LZMA_fillAlignPrices(enc);
-    LZMA_updateLengthPrices(enc, &enc->states.len_states);
-    LZMA_updateLengthPrices(enc, &enc->states.rep_len_states);
+    LZMA_lengthStates_updatePrices(enc, &enc->states.len_states);
+    LZMA_lengthStates_updatePrices(enc, &enc->states.rep_len_states);
     while (index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size)
     {
         RMF_match const match = RMF_getMatch(block, tbl, search_depth, struct_tbl, index);
@@ -1583,11 +1590,11 @@ size_t LZMA_encodeChunkBest(LZMA2_ECtx *const enc,
         if (enc->match_price_count >= kMatchRepriceFrequency) {
             LZMA_fillAlignPrices(enc);
             LZMA_fillDistancesPrices(enc);
-            LZMA_updateLengthPrices(enc, &enc->states.len_states);
+            LZMA_lengthStates_updatePrices(enc, &enc->states.len_states);
         }
         if (enc->rep_len_price_count >= kRepLenRepriceFrequency) {
             enc->rep_len_price_count = 0;
-            LZMA_updateLengthPrices(enc, &enc->states.rep_len_states);
+            LZMA_lengthStates_updatePrices(enc, &enc->states.rep_len_states);
         }
     }
     return index;
@@ -1596,12 +1603,8 @@ size_t LZMA_encodeChunkBest(LZMA2_ECtx *const enc,
 static void LZMA_lengthStates_Reset(LengthStates* const ls, unsigned const fast_length)
 {
     ls->choice = kProbInitValue;
-    ls->choice_2 = kProbInitValue;
-    for (size_t i = 0; i < (kNumPositionStatesMax << kLenNumLowBits); ++i) {
+    for (size_t i = 0; i < (kNumPositionStatesMax << (kLenNumLowBits + 1)); ++i) {
         ls->low[i] = kProbInitValue;
-    }
-    for (size_t i = 0; i < (kNumPositionStatesMax << kLenNumMidBits); ++i) {
-        ls->mid[i] = kProbInitValue;
     }
     for (size_t i = 0; i < kLenNumHighSymbols; ++i) {
         ls->high[i] = kProbInitValue;

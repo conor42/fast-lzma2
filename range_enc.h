@@ -53,7 +53,7 @@ void RC_encodeBitTree(RangeEncoder* const rc, Probability *const probs, unsigned
 
 void RC_encodeBitTreeReverse(RangeEncoder* const rc, Probability *const probs, unsigned bit_count, unsigned symbol);
 
-void RC_encodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count);
+void FORCE_NOINLINE RC_encodeDirect(RangeEncoder* const rc, unsigned value, unsigned bit_count);
 
 HINT_INLINE
 void RC_encodeBit0(RangeEncoder* const rc, Probability *const rprob)

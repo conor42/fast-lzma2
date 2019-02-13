@@ -67,9 +67,9 @@ Public domain
 #define kMatchLenMin 2U
 #define kMatchLenMax (kMatchLenMin + kLenNumSymbolsTotal - 1U)
 
-#define kOptimizerBufferSize 512U
-#define kOptimizerSkipSize 4U
 #define kOptimizerEndSize 16U
+#define kOptimizerBufferSize (kMatchLenMax * 2U + kOptimizerEndSize)
+#define kOptimizerSkipSize 8U
 #define kInfinityPrice (1UL << 30U)
 #define kNullDist (U32)-1
 
@@ -956,19 +956,17 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
         unsigned match_byte = *(data - reps[0] - 1);
         U32 cur_price = cur_opt->price;
         OptimalNode* next_opt = &enc->opt_buf[cur + 1];
-        BYTE next_is_lit = 0;
+
         U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob);
-        if (cur_and_lit_price + kMinLitPrice / 2U > next_opt->price) {
-            cur_and_lit_price = 0;
-        }
-        else {
+        BYTE try_lit = cur_and_lit_price + kMinLitPrice / 2U <= next_opt->price;
+        if (try_lit) {
             cur_and_lit_price += LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
             /* Try literal */
             if (cur_and_lit_price < next_opt->price) {
                 next_opt->price = cur_and_lit_price;
                 next_opt->len = 1;
                 MakeAsLiteral(*next_opt);
-                next_is_lit = 1;
+                try_lit = 0;
             }
         }
         match_price = cur_price + GET_PRICE_1(is_match_prob);
@@ -980,13 +978,13 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                 next_opt->price = short_rep_price;
                 next_opt->len = 1;
                 MakeAsShortRep(*next_opt);
-                next_is_lit = 1;
             }
         }
         bytes_avail = MIN(block.end - index, kOptimizerBufferSize - 1 - cur);
         if (bytes_avail < 2)
             return len_end;
-        if (!next_is_lit && match_byte != cur_byte && cur_and_lit_price != 0) {
+
+        if (try_lit && match_byte != cur_byte) {
             /* Try literal + rep0 */
             const BYTE *data_2 = data - reps[0];
             size_t limit = MIN(bytes_avail - 1, fast_length);
@@ -1470,13 +1468,13 @@ reverse:
                     LZMA_encodeNormalMatch(enc, len, dist - kNumReps, pos_state);
                     i += len;
                 }
-                else if(len > 1) {
-                    LZMA_encodeRepMatchLong(enc, len, dist, pos_state);
-                    i += len;
-                }
-                else {
+                else if(len == 1) {
                     LZMA_encodeRepMatchShort(enc, pos_state);
                     ++i;
+                }
+                else {
+                    LZMA_encodeRepMatchLong(enc, len, dist, pos_state);
+                    i += len;
                 }
             }
         } while (i < cur);

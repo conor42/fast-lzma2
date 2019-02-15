@@ -403,7 +403,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_DICTSIZE_MIN     (1U << FL2_DICTLOG_MIN)
 #define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
-#define FL2_SEARCHLOG_MAX     (FL2_CHAINLOG_MAX-1)
+#define FL2_SEARCHLOG_MAX     6
 #define FL2_SEARCHLOG_MIN       0
 #define FL2_FASTLENGTH_MIN    6   /* only used by optimizer */
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */

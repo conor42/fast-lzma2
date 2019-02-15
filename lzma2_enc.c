@@ -67,6 +67,8 @@ Public domain
 #define kMatchLenMin 2U
 #define kMatchLenMax (kMatchLenMin + kLenNumSymbolsTotal - 1U)
 
+#define kMatchesMax 65U /* Doesn't need to be larger than 2^FL2_SEARCHLOG_MAX + 1 */
+
 #define kOptimizerEndSize 16U
 #define kOptimizerBufferSize (kMatchLenMax * 2U + kOptimizerEndSize)
 #define kOptimizerSkipSize 8U
@@ -189,7 +191,8 @@ struct LZMA2_ECtx_s
     unsigned dist_slot_prices[kNumLenToPosStates][kDistTableSizeMax];
     unsigned distance_prices[kNumLenToPosStates][kNumFullDistances];
 
-    RMF_match matches[kMatchLenMax-kMatchLenMin];
+    RMF_match base_match; /* Allows access to matches[-1] in LZMA_optimalParse */
+    RMF_match matches[kMatchesMax];
     size_t match_count;
 
     OptimalNode opt_buf[kOptimizerBufferSize];
@@ -951,18 +954,19 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
     memcpy(cur_opt->reps, reps, sizeof(cur_opt->reps));
     Probability is_rep_prob = enc->states.is_rep[state];
 
-    {   Probability is_match_prob = enc->states.is_match[state][pos_state];
+    {   OptimalNode* next_opt = &enc->opt_buf[cur + 1];
+        U32 cur_price = cur_opt->price;
+        U32 next_price = next_opt->price;
+        Probability is_match_prob = enc->states.is_match[state][pos_state];
         unsigned cur_byte = *data;
         unsigned match_byte = *(data - reps[0] - 1);
-        U32 cur_price = cur_opt->price;
-        OptimalNode* next_opt = &enc->opt_buf[cur + 1];
-
+        
         U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob);
-        BYTE try_lit = cur_and_lit_price + kMinLitPrice / 2U <= next_opt->price;
+        BYTE try_lit = cur_and_lit_price + kMinLitPrice / 2U <= next_price;
         if (try_lit) {
             cur_and_lit_price += LZMA_getLiteralPrice(enc, index, state, data[-1], cur_byte, match_byte);
             /* Try literal */
-            if (cur_and_lit_price < next_opt->price) {
+            if (cur_and_lit_price < next_price) {
                 next_opt->price = cur_and_lit_price;
                 next_opt->len = 1;
                 MakeAsLiteral(*next_opt);
@@ -1118,18 +1122,22 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
             }
             match_index = enc->match_count - 1;
             len_end = MAX(len_end, cur + main_len);
+
             start_match = 0;
-            while (start_len > enc->matches[start_match].length) {
+            while (start_len > enc->matches[start_match].length)
                 ++start_match;
-            }
+            enc->matches[start_match - 1].length = (U32)start_len - 1; /* Saves an if..else branch in the loop. [-1] is ok */
+
             for (; match_index >= start_match; --match_index) {
                 size_t len_test = enc->matches[match_index].length;
                 size_t cur_dist = enc->matches[match_index].dist;
+                const BYTE *data_2 = data - cur_dist - 1;
+                size_t rep_0_pos = len_test + 1;
                 size_t dist_slot = LZMA_getDistSlot((U32)cur_dist);
                 U32 cur_and_len_price;
-                size_t base_len = (match_index > start_match) ? enc->matches[match_index - 1].length + 1 : start_len;
+                size_t base_len = enc->matches[match_index - 1].length + 1;
                 /* Pre-load rep0 data bytes */
-                unsigned rep_0_bytes = MEM_read16(data - cur_dist + len_test);
+                unsigned rep_0_bytes = MEM_read16(data_2 + rep_0_pos);
                 for (; len_test >= base_len; --len_test) {
                     size_t len_to_dist_state;
                     OptimalNode *opt;
@@ -1152,10 +1160,8 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                     else if(len_test < main_len)
                         break;
                     if (len_test == enc->matches[match_index].length) {
-                        size_t rep_0_pos = len_test + 1;
                         if (rep_0_pos + 2 <= bytes_avail && rep_0_bytes == MEM_read16(data + rep_0_pos)) {
                             /* Try match + literal + rep0 */
-                            const BYTE *data_2 = data - cur_dist - 1;
                             size_t limit = MIN(rep_0_pos + fast_length, bytes_avail);
                             size_t len_test_2 = ZSTD_count(data + rep_0_pos + 2, data_2 + rep_0_pos + 2, data + limit) + 2;
                             size_t state_2 = MatchNextState(state);
@@ -1887,7 +1893,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     enc->pb = options->pb;
     enc->strategy = options->strategy;
     enc->fast_length = options->fast_length;
-    enc->match_cycles = options->match_cycles;
+    enc->match_cycles = MIN(options->match_cycles, kMatchesMax - 1);
 
     LZMA2_reset(enc, block.end);
 

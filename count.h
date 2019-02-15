@@ -86,7 +86,7 @@ static unsigned ZSTD_NbCommonBytes(register size_t val)
 }
 
 
-MEM_STATIC size_t ZSTD_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* const pInLimit)
+static size_t ZSTD_count(const BYTE* pIn, const BYTE* pMatch, const BYTE* const pInLimit)
 {
     const BYTE* const pStart = pIn;
     const BYTE* const pInLoopLimit = pInLimit - (sizeof(size_t) - 1);

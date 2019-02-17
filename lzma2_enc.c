@@ -1197,6 +1197,8 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                     else
                         cur_and_len_price += enc->dist_slot_prices[len_to_dist_state][dist_slot] + enc->align_prices[cur_dist & kAlignMask];
 
+                    BYTE sub_len = len_test < enc->matches[match_index].length;
+
                     OptimalNode *opt = &enc->opt_buf[cur + len_test];
                     if (cur_and_len_price < opt->price) {
                         opt->price = cur_and_len_price;
@@ -1204,10 +1206,10 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                         opt->dist = (U32)(cur_dist + kNumReps);
                         opt->extra = 0;
                     }
-                    else if(len_test < main_len)
+                    else if(sub_len)
                         break; /* End the tests if prices for shorter lengths are not lower than those already recorded */
 
-                    if (len_test == enc->matches[match_index].length) {
+                    if (!sub_len) {
                         if (rep_0_pos + 2 <= bytes_avail && rep_0_bytes == MEM_read16(data + rep_0_pos)) {
                             /* Try match + literal + rep0 */
                             size_t limit = MIN(rep_0_pos + fast_length, bytes_avail);
@@ -1277,10 +1279,10 @@ FORCE_NOINLINE
 static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx *const enc, FL2_dataBlock const block,
     RMF_match const match,
     size_t const index,
-    size_t len,
+    size_t start_len,
     unsigned const normal_match_price)
 {
-    if (len <= match.length) {
+    if (start_len <= match.length) {
         size_t main_len;
         if (match.length < 3 || block.end - index < 4) {
             enc->matches[0] = match;
@@ -1291,38 +1293,38 @@ static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx *const enc, FL2_dataBlock cons
             main_len = LZMA_hashGetMatches(enc, block, index, MIN(block.end - index, enc->fast_length), match);
         }
 
-        size_t match_index = 0;
-        while (len > enc->matches[match_index].length)
-            ++match_index;
+        size_t start_match = 0;
+        while (start_len > enc->matches[start_match].length)
+            ++start_match;
+
+        enc->matches[start_match - 1].length = (U32)start_len - 1; /* Avoids an if..else branch in the loop. [-1] is ok */
 
         size_t pos_state = index & enc->pos_mask;
-        size_t distance = enc->matches[match_index].dist;
-        size_t slot = LZMA_getDistSlot(enc->matches[match_index].dist);
-        /* Test every available match length at the shortest distance. The buffer is sorted */
-        /* in order of increasing length, and therefore increasing distance too. */
-        for (;; ++len) {
-            unsigned cur_and_len_price = normal_match_price
-                + enc->states.len_states.prices[pos_state][len - kMatchLenMin];
-            size_t len_to_dist_state = LEN_TO_DIST_STATE(len);
 
-            if (distance < kNumFullDistances)
-                cur_and_len_price += enc->distance_prices[len_to_dist_state][distance];
-            else
-                cur_and_len_price += enc->align_prices[distance & kAlignMask] + enc->dist_slot_prices[len_to_dist_state][slot];
+        for (size_t match_index = enc->match_count - 1; match_index >= start_match; --match_index) {
+            size_t len_test = enc->matches[match_index].length;
+            size_t distance = enc->matches[match_index].dist;
+            size_t slot = LZMA_getDistSlot((U32)distance);
+            size_t base_len = enc->matches[match_index - 1].length + 1;
+            /* Test every available match length at the shortest distance. The buffer is sorted */
+            /* in order of increasing length, and therefore increasing distance too. */
+            for (; len_test >= base_len; --len_test) {
+                unsigned cur_and_len_price = normal_match_price
+                    + enc->states.len_states.prices[pos_state][len_test - kMatchLenMin];
+                size_t len_to_dist_state = LEN_TO_DIST_STATE(len_test);
 
-            if (cur_and_len_price < enc->opt_buf[len].price) {
-                enc->opt_buf[len].price = cur_and_len_price;
-                enc->opt_buf[len].len = (unsigned)len;
-                enc->opt_buf[len].dist = (U32)(distance + kNumReps);
-                enc->opt_buf[len].extra = 0;
-            }
-            if (len == enc->matches[match_index].length) {
-                /* Run out of length for this match. Get the next if any. */
-                if (len == main_len)
-                    break;
-                ++match_index;
-                distance = enc->matches[match_index].dist;
-                slot = LZMA_getDistSlot(enc->matches[match_index].dist);
+                if (distance < kNumFullDistances)
+                    cur_and_len_price += enc->distance_prices[len_to_dist_state][distance];
+                else
+                    cur_and_len_price += enc->align_prices[distance & kAlignMask] + enc->dist_slot_prices[len_to_dist_state][slot];
+
+                if (cur_and_len_price < enc->opt_buf[len_test].price) {
+                    enc->opt_buf[len_test].price = cur_and_len_price;
+                    enc->opt_buf[len_test].len = (unsigned)len_test;
+                    enc->opt_buf[len_test].dist = (U32)(distance + kNumReps);
+                    enc->opt_buf[len_test].extra = 0;
+                }
+                else break;
             }
         }
         return main_len;

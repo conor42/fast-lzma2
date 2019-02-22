@@ -120,7 +120,7 @@ static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParame
     cParams->lp = 0;
     cParams->pb = 2;
     cParams->fast_length = params->fastLength;
-    cParams->match_cycles = 1U << params->searchLog;
+    cParams->match_cycles = 1U << params->cyclesLog;
     cParams->strategy = params->strategy;
     cParams->second_dict_bits = params->chainLog;
 
@@ -138,7 +138,7 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
 
     DEBUGLOG(3, "FL2_createCCtxMt : %u threads", nbThreads);
 
-    FL2_CCtx* const cctx = malloc(sizeof(FL2_CCtx) + (nbThreads - 1) * sizeof(FL2_job));
+    FL2_CCtx* const cctx = calloc(1, sizeof(FL2_CCtx) + (nbThreads - 1) * sizeof(FL2_job));
     if (cctx == NULL)
         return NULL;
 
@@ -146,14 +146,8 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
     for (unsigned u = 0; u < nbThreads; ++u)
         cctx->jobs[u].enc = NULL;
 
-    cctx->params.highCompression = 0;
 #ifndef NO_XXHASH
     cctx->params.doXXH = 1;
-#endif
-    cctx->params.omitProp = 0;
-
-#ifdef RMF_REFERENCE
-    cctx->params.rParams.use_ref_mf = 0;
 #endif
 
     cctx->matchTable = NULL;
@@ -181,21 +175,8 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
         }
         cctx->jobs[u].cctx = cctx;
     }
-    cctx->dictMax = 0;
-    cctx->blockTotal = 0;
-    cctx->streamTotal = 0;
-    cctx->streamCsize = 0;
-    cctx->outThread = 0;
-    cctx->outPos = 0;
-    cctx->asyncRes = 0;
-    cctx->threadCount = 0;
-    cctx->timeout = 0;
 
     DICT_construct(&cctx->buf, dualBuffer);
-
-    cctx->endMarked = 0;
-    cctx->wroteProp = 0;
-    cctx->lockParams = 0;
 
     FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, FL2_CLEVEL_DEFAULT);
     cctx->params.cParams.reset_interval = 4;
@@ -278,6 +259,10 @@ static void FL2_initProgress(FL2_CCtx* const cctx)
     cctx->canceled = 0;
 }
 
+/* FL2_compressCurBlock_blocking() :
+ * Compress cctx->curBlock and wait until complete.
+ * Write streamProp as the first byte if >= 0
+ */
 static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const streamProp)
 {
     size_t const encodeSize = (cctx->curBlock.end - cctx->curBlock.start);
@@ -379,6 +364,12 @@ static void FL2_compressCurBlock_async(void* const jobDescription, ptrdiff_t con
     cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, (int)n);
 }
 
+/* FL2_compressCurBlock() :
+ * Update total input size.
+ * Clear the compressed data buffers.
+ * Init progress info.
+ * Start compression of cctx->curBlock, and wait for completion if no async compression thread exists.
+ */
 static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
 {
     FL2_initProgress(cctx);
@@ -426,6 +417,9 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     return cctx->asyncRes;
 }
 
+/* FL2_getProp() :
+ * Get the LZMA2 dictionary size property byte. If xxhash is enabled, includes the xxhash flag bit.
+ */
 static BYTE FL2_getProp(FL2_CCtx* const cctx, size_t const dictionarySize)
 {
 #ifndef NO_XXHASH
@@ -485,7 +479,11 @@ static void FL2_endFrame(FL2_CCtx* const cctx)
     cctx->lockParams = 0;
 }
 
-static size_t FL2_compressBlock(FL2_CCtx* const cctx,
+/* Compress a memory buffer which may be larger than the dictionary.
+ * The property byte is written first unless the omit flag is set.
+ * Return: compressed size.
+ */
+static size_t FL2_compressBuffer(FL2_CCtx* const cctx,
     const void* const src, size_t srcSize,
     void* const dst, size_t dstCapacity)
 {
@@ -555,7 +553,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
     FL2_preBeginFrame(cctx, srcSize);
     CHECK_F(FL2_beginFrame(cctx, srcSize));
 
-    size_t const cSize = FL2_compressBlock(cctx, src, srcSize, dst, dstCapacity);
+    size_t const cSize = FL2_compressBuffer(cctx, src, srcSize, dst, dstCapacity);
 
     if (FL2_isError(cSize))
         return cSize;
@@ -684,9 +682,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         cctx->params.cParams.second_dict_bits = (unsigned)value;
         break;
 
-    case FL2_p_searchLog:
-        MAXCHECK(value, FL2_SEARCHLOG_MAX);
-        cctx->params.cParams.match_cycles = 1U << value;
+    case FL2_p_hybridCycles:
+        CLAMPCHECK(value, FL2_HYBRIDCYCLES_MIN, FL2_HYBRIDCYCLES_MAX);
+        cctx->params.cParams.match_cycles = (unsigned)value;
         break;
 
     case FL2_p_searchDepth:
@@ -700,7 +698,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         break;
 
     case FL2_p_divideAndConquer:
-        cctx->params.rParams.divide_and_conquer = (unsigned)value;
+        cctx->params.rParams.divide_and_conquer = value != 0;
         break;
 
     case FL2_p_strategy:
@@ -709,7 +707,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         break;
 
         /* lc, lp, pb can be changed between encoder chunks.
-         * Set lc and lp even if lc+lp > 4 to allow sequential setting.
+         * A condition where lc+lp > 4 is permitted to allow sequential setting,
+         * but will return an error code to alert the calling function.
          * If lc+lp is still >4 when encoding begins, lc will be reduced. */
     case FL2_p_literalCtxBits:
         MAXCHECK(value, FL2_LC_MAX);
@@ -781,8 +780,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_chainLog:
         return cctx->params.cParams.second_dict_bits;
 
-    case FL2_p_searchLog:
-        return ZSTD_highbit32(cctx->params.cParams.match_cycles);
+    case FL2_p_hybridCycles:
+        return cctx->params.cParams.match_cycles;
 
     case FL2_p_literalCtxBits:
         return cctx->params.cParams.lc;
@@ -911,6 +910,9 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const endi
         int streamProp = -1;
 
         if (!fcs->wroteProp && !fcs->params.omitProp) {
+            /* If the LZMA2 property byte is required and not already written,
+             * pass it to the compression function 
+             */
             size_t dictionarySize = ending ? MAX(fcs->dictMax, fcs->curBlock.end)
                 : fcs->params.rParams.dictionary_size;
             streamProp = FL2_getProp(fcs, dictionarySize);
@@ -923,6 +925,9 @@ static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const endi
     return FL2_error_no_error;
 }
 
+/* Copy the compressed output stored in the match table buffer.
+ * One slice exists per thread.
+ */
 static void FL2_copyCStreamOutput(FL2_CStream* fcs, FL2_outBuffer *output)
 {
     for (; fcs->outThread < fcs->threadCount; ++fcs->outThread) {
@@ -939,6 +944,7 @@ static void FL2_copyCStreamOutput(FL2_CStream* fcs, FL2_outBuffer *output)
         fcs->outPos += toWrite;
         output->pos += toWrite;
 
+        /* If the slice is not flushed, the output is full */
         if (fcs->outPos < fcs->jobs[fcs->outThread].cSize)
             break;
 
@@ -1112,6 +1118,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inB
     return cbuf->size;
 }
 
+/* Write the properties byte (if required), the hash and the end marker
+ * into the output buffer.
+ */
 static void FL2_writeEnd(FL2_CStream* const fcs)
 {
     size_t thread = fcs->threadCount - 1;

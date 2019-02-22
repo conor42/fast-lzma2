@@ -140,12 +140,12 @@ RMF_structuredInit
     ptrdiff_t i = 1;
     ptrdiff_t const block_size = end - 2;
     for (; i < block_size; ++i) {
-        /* Pre-load the next value for speed increase */
+        /* Pre-load the next value for speed increase on some hardware. Execution can continue while memory read is pending */
         size_t const next_radix = ((size_t)((BYTE)radix_16) << 8) | data_block[i + 2];
 
         U32 const prev = tbl->list_heads[radix_16].head;
         if (prev != RADIX_NULL_LINK) {
-            /* Link this position to the previous occurance */
+            /* Link this position to the previous occurrence */
             InitMatchLink(i, prev);
             /* Set the previous to this position */
             tbl->list_heads[radix_16].head = (U32)i;
@@ -173,11 +173,6 @@ RMF_structuredInit
 
     return rpt_total;
 }
-
-#if defined(_MSC_VER)
-#  pragma warning(disable : 4701)  /* disable: C4701: potentially uninitialized local variable */
-#endif
-
 
 /* Copy the list into a buffer and recurse it there. This decreases cache misses and allows */
 /* data characters to be loaded every fourth pass and stored for use in the next 4 passes */
@@ -299,7 +294,7 @@ static void RMF_recurseListsBuffered(RMF_builder* const tbl,
     } while (orig_list_count != 0);
 }
 
-/* Parse the list with bounds checks on data reads. Stop at the point where bound checks are not required. */
+/* Parse the list with an upper bound check on data reads. Stop at the point where bound checks are not required. */
 /* Buffering is used so that parsing can continue below the bound to find a few matches without altering the main table. */
 static void RMF_recurseListsBound(RMF_builder* const tbl,
     const BYTE* const data_block,
@@ -324,9 +319,8 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
         ptrdiff_t next_link = GetMatchLink(link);
         if (link >= bounded_start) {
             --list_head->count;
-            if (next_link < bounded_start) {
+            if (next_link < bounded_start)
                 list_head->head = (U32)next_link;
-            }
         }
         else {
             --extra_count;
@@ -454,6 +448,7 @@ static void RMF_bruteForce(RMF_builder* const tbl,
         link = GetMatchLink(link);
         buffer[i] = link;
     } while (++i < list_count);
+
     i = 0;
     do {
         size_t longest = 0;
@@ -463,26 +458,28 @@ static void RMF_bruteForce(RMF_builder* const tbl,
         do {
             const BYTE* data_2 = data_src + buffer[j];
             size_t len_test = 0;
-            while (data[len_test] == data_2[len_test] && len_test < limit) {
+            while (data[len_test] == data_2[len_test] && len_test < limit)
                 ++len_test;
-            }
+
             if (len_test > longest) {
                 longest_index = j;
                 longest = len_test;
-                if (len_test >= limit) {
+                if (len_test >= limit)
                     break;
-                }
             }
         } while (++j < list_count);
-        if (longest > 0) {
-            SetMatchLinkAndLength(buffer[i],
-                (U32)buffer[longest_index],
-                depth + (U32)longest);
-        }
+
+        if (longest > 0)
+            SetMatchLinkAndLength(buffer[i], (U32)buffer[longest_index], depth + (U32)longest);
+
         ++i;
+    /* Test with block_start to avoid wasting time matching strings in the overlap region with each other */
     } while (i < list_count - 1 && buffer[i] >= block_start);
 }
 
+/* RMF_recurseLists16() : 
+ * Match strings at depth 2 using a 16-bit radix to lengthen to depth 4
+ */
 static void RMF_recurseLists16(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
@@ -534,6 +531,7 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
         else {
             tbl->tails_16[radix_16].list_count = 1;
             tbl->stack[st_index].head = (U32)link;
+            /* Store a reference to this table location to retrieve the count at the end */
             tbl->stack[st_index].count = (U32)radix_16;
             ++st_index;
         }
@@ -600,6 +598,9 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
 }
 
 #if 0
+/* Unbuffered complete processing to max_depth.
+ * This may be faster on CPUs without a large memory cache.
+ */
 static void RMF_recurseListsUnbuf16(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,

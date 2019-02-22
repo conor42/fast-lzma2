@@ -73,7 +73,7 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             }
         }
 
-#if 0       /* disable decompression test */
+#if 1       /* disable decompression test */
         dCompleted = 1;
         (void)totalDTime; (void)fastestD;   /* unused when decompression disabled */
 #else
@@ -172,7 +172,7 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
             FL2_CCtx_setParameter(fcs, FL2_p_chainLog, value);
         }
         else if (strcmp(param, "mc") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_searchLog, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_hybridCycles, value);
         }
         else if (strcmp(param, "sd") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_searchDepth, value);

@@ -403,8 +403,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_DICTSIZE_MIN     (1U << FL2_DICTLOG_MIN)
 #define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
-#define FL2_SEARCHLOG_MAX     6
-#define FL2_SEARCHLOG_MIN       0
+#define FL2_HYBRIDCYCLES_MAX   64
+#define FL2_HYBRIDCYCLES_MIN    1
 #define FL2_FASTLENGTH_MIN    6   /* only used by optimizer */
 #define FL2_FASTLENGTH_MAX  273   /* only used by optimizer */
 #define FL2_BLOCK_OVERLAP_MIN 0
@@ -433,7 +433,7 @@ typedef struct {
     size_t   dictionarySize;   /* largest match distance : larger == more compression, more memory needed during decompression; >= 27 == more memory, slower */
     unsigned overlapFraction;  /* overlap between consecutive blocks in 1/16 units: larger == more compression, slower */
     unsigned chainLog;         /* fully searched segment : larger == more compression, slower, more memory; hybrid mode only (ultra) */
-    unsigned searchLog;        /* nb of searches : larger == more compression, slower; hybrid mode only (ultra) */
+    unsigned cyclesLog;        /* nb of searches : larger == more compression, slower; hybrid mode only (ultra) */
     unsigned searchDepth;      /* maximum depth for resolving string matches : larger == more compression, slower; >= 64 == more memory, slower */
     unsigned fastLength;       /* acceptable match size for parser, not less than searchDepth : larger == more compression, slower; fast bytes parameter from 7-zip */
     unsigned divideAndConquer; /* split long chains of 2-byte matches into shorter chains with a small overlap : faster, somewhat less compression; enabled by default */
@@ -466,7 +466,7 @@ typedef enum {
                              * Resulting table size is (1 << (chainLog+2)) bytes.
                              * Larger tables result in better and slower compression.
                              * This parameter is only in the hybrid "ultra" strategy. */
-    FL2_p_searchLog,        /* Number of search attempts, as a power of 2, made by the HC3 match finder.
+    FL2_p_hybridCycles,     /* Number of search attempts made by the HC3 match finder.
                              * Used only in the hybrid "ultra" strategy.
                              * More attempts result in slightly better and slower compression. */
     FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder */

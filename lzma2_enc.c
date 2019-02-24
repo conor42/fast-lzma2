@@ -1289,7 +1289,7 @@ static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx *const enc, FL2_dataBlock cons
             main_len = LZMA_hashGetMatches(enc, block, index, MIN(block.end - index, enc->fast_length), match);
         }
 
-        size_t start_match = 0;
+        ptrdiff_t start_match = 0;
         while (start_len > enc->matches[start_match].length)
             ++start_match;
 
@@ -1297,7 +1297,7 @@ static size_t LZMA_initMatchesPos0Best(LZMA2_ECtx *const enc, FL2_dataBlock cons
 
         size_t pos_state = index & enc->pos_mask;
 
-        for (size_t match_index = enc->match_count - 1; match_index >= start_match; --match_index) {
+        for (ptrdiff_t match_index = enc->match_count - 1; match_index >= start_match; --match_index) {
             size_t len_test = enc->matches[match_index].length;
             size_t const distance = enc->matches[match_index].dist;
             size_t const slot = LZMA_getDistSlot((U32)distance);

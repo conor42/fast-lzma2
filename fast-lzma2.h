@@ -55,7 +55,7 @@ Introduction
 /*------   Version   ------*/
 #define FL2_VERSION_MAJOR    0
 #define FL2_VERSION_MINOR    9
-#define FL2_VERSION_RELEASE  9
+#define FL2_VERSION_RELEASE  10
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */

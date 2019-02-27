@@ -9,7 +9,6 @@
 */
 
 #include <stdio.h>  
-#include "count.h"
 
 #define MAX_READ_BEYOND_DEPTH 2
 
@@ -306,7 +305,6 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
     if (list_count < 2)
         return;
 
-    max_depth = MIN(max_depth, RADIX_MAX_LENGTH) & ~1;
     ptrdiff_t link = list_head->head;
     ptrdiff_t const bounded_size = max_depth + MAX_READ_BEYOND_DEPTH;
     ptrdiff_t const bounded_start = block_size - MIN(block_size, bounded_size);
@@ -422,6 +420,7 @@ static void RMF_recurseListsBound(RMF_builder* const tbl,
 
         U32 length = tbl->match_buffer[index].next >> 24;
         length = MIN(length, (U32)(block_size - from));
+        length = MIN(length, RADIX_MAX_LENGTH);
 
         size_t const next = tbl->match_buffer[index].next & BUFFER_LINK_MASK;
         SetMatchLinkAndLength(from, tbl->match_buffer[next].from, length);
@@ -933,7 +932,8 @@ RMF_structuredBuildTable
 
     unsigned const best = !tbl->params.divide_and_conquer;
     unsigned const max_depth = MIN(tbl->params.depth, STRUCTURED_MAX_LENGTH) & ~1;
-    size_t const bounded_start = block.end - max_depth - MAX_READ_BEYOND_DEPTH;
+    size_t bounded_start = max_depth + MAX_READ_BEYOND_DEPTH;
+    bounded_start = block.end - MIN(block.end, bounded_start);
     ptrdiff_t next_progress = (job == 0) ? 0 : RADIX16_TABLE_SIZE;
     ptrdiff_t(*getNextList)(FL2_matchTable* const tbl)
         = multi_thread ? RMF_getNextList_mt : RMF_getNextList_st;
@@ -964,7 +964,7 @@ RMF_structuredBuildTable
         }
 #endif
         if (list_head.head >= bounded_start) {
-            RMF_recurseListsBound(tbl->builders[job], block.data, block.end, &list_head, (BYTE)max_depth);
+            RMF_recurseListsBound(tbl->builders[job], block.data, block.end, &list_head, max_depth);
             if (list_head.count < 2 || list_head.head < block.start)
                 continue;
         }

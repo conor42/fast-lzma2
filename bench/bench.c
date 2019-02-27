@@ -73,7 +73,7 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             }
         }
 
-#if 1       /* disable decompression test */
+#if 0       /* disable decompression test */
         dCompleted = 1;
         (void)totalDTime; (void)fastestD;   /* unused when decompression disabled */
 #else

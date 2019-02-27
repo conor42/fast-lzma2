@@ -1185,8 +1185,6 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                 U32 cur_and_len_price;
                 /* Test from the full length down to 1 more than the next shorter match */
                 size_t base_len = enc->matches[match_index - 1].length + 1;
-                /* Pre-load rep0 data bytes */
-                unsigned rep_0_bytes = MEM_read16(data_2 + rep_0_pos);
                 for (; len_test >= base_len; --len_test) {
                     cur_and_len_price = normal_match_price + enc->states.len_states.prices[pos_state][len_test - kMatchLenMin];
                     size_t const len_to_dist_state = LEN_TO_DIST_STATE(len_test);
@@ -1207,7 +1205,7 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                     else if(sub_len)
                         break; /* End the tests if prices for shorter lengths are not lower than those already recorded */
 
-                    if (!sub_len && rep_0_pos + 2 <= bytes_avail && rep_0_bytes == MEM_read16(data + rep_0_pos)) {
+                    if (!sub_len && rep_0_pos + 2 <= bytes_avail && MEM_read16(data + rep_0_pos) == MEM_read16(data_2 + rep_0_pos)) {
                         /* Try match + literal + rep0 */
                         size_t const limit = MIN(rep_0_pos + fast_length, bytes_avail);
                         size_t const len_test_2 = ZSTD_count(data + rep_0_pos + 2, data_2 + rep_0_pos + 2, data + limit) + 2;

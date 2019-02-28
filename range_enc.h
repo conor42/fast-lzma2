@@ -28,9 +28,13 @@ typedef U16 Probability;
 #define kNumMoveBits 5U
 #define kProbInitValue (kBitModelTotal >> 1U)
 #define kNumMoveReducingBits 4U
-#define kNumBitPriceShiftBits 4U
+#define kNumBitPriceShiftBits 5U
+#define kPriceTableSize (kBitModelTotal >> kNumMoveReducingBits)
 
-extern const unsigned price_table[kBitModelTotal >> kNumMoveReducingBits];
+extern BYTE price_table[2][kPriceTableSize];
+#if 0
+void RC_printPriceTable();
+#endif
 
 typedef struct
 {
@@ -105,11 +109,11 @@ void RC_encodeBit(RangeEncoder* const rc, Probability *const rprob, unsigned con
 }
 
 #define GET_PRICE(prob, symbol) \
-  price_table[((prob) ^ ((-(int)(symbol)) & (kBitModelTotal - 1))) >> kNumMoveReducingBits]
+  price_table[symbol][(prob) >> kNumMoveReducingBits]
 
-#define GET_PRICE_0(prob) price_table[(prob) >> kNumMoveReducingBits]
+#define GET_PRICE_0(prob) price_table[0][(prob) >> kNumMoveReducingBits]
 
-#define GET_PRICE_1(prob) price_table[((prob) ^ (kBitModelTotal - 1)) >> kNumMoveReducingBits]
+#define GET_PRICE_1(prob) price_table[1][(prob) >> kNumMoveReducingBits]
 
 #define kMinLitPrice 8U
 
@@ -121,7 +125,7 @@ unsigned RC_getTreePrice(const Probability* const prob_table, unsigned bit_count
     do {
 		size_t const next_symbol = symbol >> 1;
 		unsigned prob = prob_table[next_symbol];
-		unsigned bit = (unsigned)symbol & 1;
+        size_t bit = symbol & 1;
 		price += GET_PRICE(prob, bit);
 		symbol = next_symbol;
     } while (symbol != 1);
@@ -132,7 +136,7 @@ HINT_INLINE
 unsigned RC_getReverseTreePrice(const Probability* const prob_table, unsigned bit_count, size_t symbol)
 {
     unsigned prob = prob_table[1];
-    unsigned bit = symbol & 1;
+    size_t bit = symbol & 1;
     unsigned price = GET_PRICE(prob, bit);
     size_t m = 1;
     while (--bit_count != 0) {

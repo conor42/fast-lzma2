@@ -289,7 +289,7 @@ static unsigned LZMA_getRepPrice(LZMA2_ECtx* const enc, size_t const rep_index, 
         else {
             unsigned const rep_G2_prob = enc->states.is_rep_G2[state];
             price += GET_PRICE_1(rep_G1_prob);
-            price += GET_PRICE(rep_G2_prob, (U32)rep_index - 2);
+            price += GET_PRICE(rep_G2_prob, rep_index - 2);
         }
     }
     return price;
@@ -406,7 +406,7 @@ static void LZMA_lengthStates_updatePrices(LZMA2_ECtx *const enc, LengthStates* 
             size_t sym = i + (1 << (kLenNumHighBits - 1));
             U32 price = b;
             do {
-                unsigned bit = (unsigned)sym & 1;
+                size_t bit = sym & 1;
                 sym >>= 1;
                 price += GET_PRICE(probs[sym], bit);
             } while (sym >= 2);

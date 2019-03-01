@@ -157,12 +157,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDCtx(FL2_DCtx* dctx)
     return FL2_error_no_error;
 }
 
+#ifndef FL2_SINGLETHREAD
+
 FL2LIB_API unsigned FL2LIB_CALL FL2_getDCtxThreadCount(const FL2_DCtx * dctx)
 {
     return (unsigned)dctx->nbThreads;
 }
-
-#ifndef FL2_SINGLETHREAD
 
 /* FL2_decompressCtxBlock() : FL2POOL_function type */
 static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n)
@@ -377,16 +377,20 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressDCtx(FL2_DCtx* dctx,
     return dicPos;
 }
 
+/*===== Streaming decompression functions =====*/
+
 typedef enum
 {
     FL2DEC_STAGE_INIT,
-    FL2DEC_STAGE_MT_PARSE,
     FL2DEC_STAGE_DECOMP,
+#ifndef FL2_SINGLETHREAD
     FL2DEC_STAGE_MT_WRITE,
+#endif
     FL2DEC_STAGE_HASH,
     FL2DEC_STAGE_FINISHED
 } FL2_decStage;
 
+#ifndef FL2_SINGLETHREAD
 typedef struct FL2_decInbuf_s FL2_decInbuf;
 
 struct FL2_decInbuf_s
@@ -426,22 +430,24 @@ typedef struct
     size_t srcPos;
     size_t memTotal;
     size_t memLimit;
-    int isFinal;
-    int failState;
+    BYTE isFinal;
+    BYTE failState;
+    BYTE canceled;
     BYTE prop;
 #ifndef NO_XXHASH
     XXH32_canonical_t hash;
 #endif
     FL2_decJob threads[1];
 } FL2_decMt;
+#endif
 
 struct FL2_DStream_s
 {
 #ifndef FL2_SINGLETHREAD
     FL2_decMt *decmt;
+    FL2POOL_ctx* decompressThread;
 #endif
     LZMA2_DCtx dec;
-    FL2POOL_ctx* decompressThread;
     FL2_outBuffer* asyncOutput;
     FL2_inBuffer* asyncInput;
     size_t asyncRes;
@@ -456,6 +462,34 @@ struct FL2_DStream_s
     BYTE loopCount;
     BYTE wait;
 };
+
+static size_t FL2_decompressInput(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
+{
+    if (fds->stage == FL2DEC_STAGE_DECOMP) {
+        size_t destSize = output->size - output->pos;
+        size_t srcSize = input->size - input->pos;
+        size_t const res = LZMA2_decodeToBuf(&fds->dec, (BYTE*)output->dst + output->pos, &destSize, (const BYTE*)input->src + input->pos, &srcSize, LZMA_FINISH_ANY);
+
+        DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
+
+#ifndef NO_XXHASH
+        if (fds->doHash)
+            XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, destSize);
+#endif
+        FL2_atomic_add(fds->progress, (long)destSize);
+
+        output->pos += destSize;
+        input->pos += srcSize;
+
+        if (FL2_isError(res))
+            return res;
+        if (res == LZMA_STATUS_FINISHED) {
+            DEBUGLOG(4, "Found end mark");
+            fds->stage = fds->doHash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED;
+        }
+    }
+    return FL2_error_no_error;
+}
 
 #ifndef FL2_SINGLETHREAD
 
@@ -494,6 +528,14 @@ static void FL2_FreeOutputBuffers(FL2_decMt *const decmt)
     decmt->numThreads = 0;
 }
 
+static void FL2_Lzma2DecMt_Cleanup(FL2_decMt *const decmt)
+{
+    if (decmt) {
+        FL2_FreeOutputBuffers(decmt);
+        LZMA2_freeExtraInbufNodes(decmt);
+    }
+}
+
 static void FL2_Lzma2DecMt_Free(FL2_decMt *const decmt)
 {
     if (decmt) {
@@ -510,6 +552,7 @@ static void FL2_Lzma2DecMt_Init(FL2_decMt *const decmt)
         decmt->cur = NULL;
         decmt->failState = 0;
         decmt->isFinal = 0;
+        decmt->canceled = 0;
         decmt->memTotal = 0;
         FL2_FreeOutputBuffers(decmt);
         LZMA2_freeExtraInbufNodes(decmt);
@@ -643,7 +686,7 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
     /* Flag to indicate this block ends with the terminator */
     BYTE const last = decmt->isFinal && (thread == decmt->numThreads - 1);
 
-    while (1) {
+    while (!decmt->canceled) {
         size_t srcSize = cur->length - inPos;
         size_t const dicPos = dec->dic_pos;
 
@@ -669,7 +712,11 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
             cur = cur->next;
         }
     }
-    return 0;
+
+    if (decmt->canceled)
+        return FL2_ERROR(canceled);
+
+    return FL2_error_no_error;
 }
 
 /*
@@ -741,7 +788,7 @@ static size_t FL2_decompressBlocksMt(FL2_DStream* const fds)
     decmt->srcThread = 0;
     decmt->srcPos = 0;
 
-    return 0;
+    return FL2_error_no_error;
 }
 
 /* Read input into the buffer chain, adding new nodes when necessary. 
@@ -819,34 +866,6 @@ static size_t FL2_LoadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
         /* Do not continue if we have an incomplete chunk header */
         if (res == CHUNK_MORE_DATA && toread == 0)
             break;
-    }
-    return 0;
-}
-
-static size_t FL2_decompressInput(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
-{
-    if (fds->stage == FL2DEC_STAGE_DECOMP) {
-        size_t destSize = output->size - output->pos;
-        size_t srcSize = input->size - input->pos;
-        size_t const res = LZMA2_decodeToBuf(&fds->dec, (BYTE*)output->dst + output->pos, &destSize, (const BYTE*)input->src + input->pos, &srcSize, LZMA_FINISH_ANY);
-
-        DEBUGLOG(5, "Decoded %u bytes", (U32)destSize);
-
-#ifndef NO_XXHASH
-        if (fds->doHash)
-            XXH32_update(fds->xxh, (BYTE*)output->dst + output->pos, destSize);
-#endif
-        FL2_atomic_add(fds->progress, (long)destSize);
-
-        output->pos += destSize;
-        input->pos += srcSize;
-
-        if (FL2_isError(res))
-            return res;
-        if (res == LZMA_STATUS_FINISHED) {
-            DEBUGLOG(4, "Found end mark");
-            fds->stage = fds->doHash ? FL2DEC_STAGE_HASH : FL2DEC_STAGE_FINISHED;
-        }
     }
     return FL2_error_no_error;
 }
@@ -947,7 +966,8 @@ static size_t FL2_decompressStreamMt(FL2_DStream* const fds, FL2_outBuffer* cons
     }
     return fds->stage != FL2DEC_STAGE_FINISHED;
 }
-#endif
+
+#endif /* FL2_SINGLETHREAD */
 
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void)
 {
@@ -964,13 +984,13 @@ FL2LIB_API FL2_DStream *FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads)
 
         nbThreads = FL2_checkNbThreads(nbThreads);
 
-        fds->decompressThread = NULL;
         fds->asyncRes = 0;
         fds->streamTotal = 0;
         fds->progress = 0;
         fds->timeout = 0;
 
 #ifndef FL2_SINGLETHREAD
+        fds->decompressThread = NULL;
         fds->decmt = (nbThreads > 1) ? FL2_Lzma2DecMt_Create(nbThreads) : NULL;
 #endif
 
@@ -991,8 +1011,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
     if (fds != NULL) {
         DEBUGLOG(3, "FL2_freeDStream");
         LZMA_destructDCtx(&fds->dec);
-        FL2POOL_free(fds->decompressThread);
 #ifndef FL2_SINGLETHREAD
+        FL2POOL_free(fds->decompressThread);
         FL2_Lzma2DecMt_Free(fds->decmt);
 #endif
 #ifndef NO_XXHASH
@@ -1005,11 +1025,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds)
 
 FL2LIB_API void FL2LIB_CALL FL2_setDStreamMemoryLimitMt(FL2_DStream * fds, size_t limit)
 {
+#ifndef FL2_SINGLETHREAD
     if (fds->decmt != NULL)
         fds->decmt->memLimit = limit;
+#endif
 }
 
-/*===== Streaming decompression functions =====*/
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 {
     DEBUGLOG(4, "FL2_initDStream");
@@ -1031,6 +1052,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds)
 
 FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned timeout)
 {
+#ifndef FL2_SINGLETHREAD
+    /* decompressThread is only used if a timeout is specified */
     if (timeout != 0) {
         if (fds->decompressThread == NULL) {
             fds->decompressThread = FL2POOL_create(1);
@@ -1044,16 +1067,32 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned 
         fds->decompressThread = NULL;
     }
     fds->timeout = timeout;
-
+#endif
     return FL2_error_no_error;
 }
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitDStream(FL2_DStream * fds)
 {
+#ifndef FL2_SINGLETHREAD
     if (FL2POOL_waitAll(fds->decompressThread, fds->timeout) != 0)
         return FL2_ERROR(timedOut);
-
+#endif
+    /* decompressThread writes the result into asyncRes before sleeping */
     return fds->asyncRes;
+}
+
+FL2LIB_API void FL2LIB_CALL FL2_cancelDStream(FL2_DStream *fds)
+{
+#ifndef FL2_SINGLETHREAD
+    if (fds->decompressThread != NULL) {
+        fds->decmt->canceled = 1;
+
+        FL2POOL_waitAll(fds->decompressThread, 0);
+
+        fds->decmt->canceled = 0;
+    }
+    FL2_Lzma2DecMt_Cleanup(fds->decmt);
+#endif
 }
 
 FL2LIB_API unsigned long long FL2LIB_CALL FL2_getDStreamProgress(const FL2_DStream * fds)
@@ -1066,6 +1105,7 @@ static size_t FL2_initDStream_prop(FL2_DStream* const fds, BYTE prop)
     fds->doHash = prop >> FL2_PROP_HASH_BIT;
     prop &= FL2_LZMA_PROP_MASK;
 
+    /* If MT decoding is enabled and the dict is not too large, decoder init will occur elsewhere */
 #ifndef FL2_SINGLETHREAD
     if (fds->decmt == NULL || FL2_Lzma2DecMt_InitProp(fds->decmt, prop))
 #endif
@@ -1095,7 +1135,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigne
 
 static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input)
 {
+#ifndef FL2_SINGLETHREAD
     FL2_decMt *const decmt = fds->decmt;
+#endif
     size_t const prevOut = output->pos;
     size_t const prevIn = input->pos;
 
@@ -1111,12 +1153,18 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
             fds->stage = FL2DEC_STAGE_DECOMP;
         }
 #ifndef FL2_SINGLETHREAD
-        if (decmt)
-            CHECK_F(FL2_decompressStreamMt(fds, output, input));
+        if (decmt) {
+            size_t res = FL2_decompressStreamMt(fds, output, input);
+            if (FL2_isError(res)) {
+                FL2_Lzma2DecMt_Cleanup(decmt);
+                return res;
+            }
+        }
         else
 #endif
+        {
             CHECK_F(FL2_decompressInput(fds, output, input));
-
+        }
         if (fds->stage == FL2DEC_STAGE_HASH) {
 #ifndef NO_XXHASH
             XXH32_canonical_t canonical;
@@ -1126,7 +1174,8 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
             DEBUGLOG(4, "Checking hash");
 
 #ifndef FL2_SINGLETHREAD
-            if (decmt && decmt->cur) {
+            if (decmt && decmt->cur != NULL) {
+                /* Data remains in an MT input buffer */
                 avail += decmt->cur->length - decmt->curPos;
             }
 #endif
@@ -1134,6 +1183,7 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
                 size_t pos = 0;
 #ifndef FL2_SINGLETHREAD
                 if (decmt && decmt->cur) {
+                    /* Must copy buffered data before using input */
                     pos = decmt->cur->length - decmt->curPos;
                     memcpy(canonical.digest, decmt->cur->inBuf + decmt->curPos, pos);
                     decmt->curPos += pos;
@@ -1153,6 +1203,7 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
         }
     }
     if (fds->stage != FL2DEC_STAGE_FINISHED && prevOut == output->pos && prevIn == input->pos) {
+        /* No progress was made */
         ++fds->loopCount;
         if (fds->loopCount > 2)
             return FL2_ERROR(buffer);
@@ -1160,7 +1211,16 @@ static size_t FL2_decompressStream_blocking(FL2_DStream* fds, FL2_outBuffer* out
     else {
         fds->loopCount = 0;
     }
-    return fds->stage != FL2DEC_STAGE_FINISHED;
+
+    if (fds->stage == FL2DEC_STAGE_FINISHED) {
+#ifndef FL2_SINGLETHREAD
+        FL2_Lzma2DecMt_Cleanup(decmt);
+#endif
+        return 0;
+    }
+    else {
+        return 1;
+    }
 }
 
 /* FL2_decompressStream_async() : FL2POOL_function type */
@@ -1179,17 +1239,28 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
     fds->streamTotal += fds->progress;
     fds->progress = 0;
 
+#ifndef FL2_SINGLETHREAD
     if (fds->decompressThread != NULL) {
+        /* Calling FL2_decompressStream() while waiting for decompressThread to fall idle is not allowed */
         if (fds->wait)
             return FL2_ERROR(stage_wrong);
+
         fds->asyncOutput = output;
         fds->asyncInput = input;
+        /* FL2_decompressStream_async will reset fds->wait upon completion */
         fds->wait = 1;
+
         FL2POOL_add(fds->decompressThread, FL2_decompressStream_async, fds, 0);
+
+        /* Wait for completion or a timeout */
         CHECK_F(FL2_waitDStream(fds));
+
+        /* FL2_decompressStream_async() stores result in asyncRes */
         return fds->asyncRes;
     }
-    else {
+    else
+#endif
+    {
         return FL2_decompressStream_blocking(fds, output, input);
     }
 }

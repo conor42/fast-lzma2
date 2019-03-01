@@ -278,7 +278,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
  *  Sets a timeout in milliseconds. Zero disables the timeout. If a nonzero timout is set, functions
  *  FL2_compressStream(), FL2_updateDictionary(), FL2_getNextCStreamBuffer(), FL2_flushStream(), and
  *  FL2_endStream() may return a timeout code before compression of the current dictionary of data
- *  completes. FL2_isError returns true for the timeout code, so check the code with FL2_isTimedOut() before
+ *  completes. FL2_isError() returns true for the timeout code, so check the code with FL2_isTimedOut() before
  *  testing for errors. With the exception of FL2_updateDictionary(), the above functions may be called again
  *  to wait for completion. A typical application for timeouts is to update the user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
@@ -373,15 +373,51 @@ FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStream(void);
 FL2LIB_API FL2_DStream* FL2LIB_CALL FL2_createDStreamMt(unsigned nbThreads);
 FL2LIB_API size_t FL2LIB_CALL FL2_freeDStream(FL2_DStream* fds);
 
+/*! FL2_setDStreamMemoryLimitMt() :
+ *  Set a total size limit for multithreaded decoder input and output buffers. MT decoder memory
+ *  usage is unknown until the input is parsed. If the limit is exceeded, the decoder switches to
+ *  using a single thread.
+ *  MT decoding memory usage is typically dictionary_size * 4 * nbThreads for the output
+ *  buffers plus the size of the compressed input for that amount of output. */
 FL2LIB_API void FL2LIB_CALL FL2_setDStreamMemoryLimitMt(FL2_DStream* fds, size_t limit);
 
+/*! FL2_setDStreamTimeout() :
+ *  Sets a timeout in milliseconds. Zero disables the timeout. If a nonzero timout is set,
+ *  FL2_decompressStream() may return a timeout code before decompression of the available data
+ *  completes. FL2_isError() returns true for the timeout code, so check the code with FL2_isTimedOut()
+ *  before testing for errors. Do not call FL2_decompressStream() again after a timeout. Call
+ *  FL2_waitDStream() to continue waiting. A typical application for timeouts is to update the user
+ *  on decompression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned timeout);
+
+/*! FL2_waitDStream() :
+ *  Waits for decompression to end after a timeout has occurred. This function returns after the
+ *  timeout set using FL2_setDStreamTimeout() has elapsed. Unnecessary when no timeout is set. */
 FL2LIB_API size_t FL2LIB_CALL FL2_waitDStream(FL2_DStream * fds);
+
+/*! FL2_cancelDStream() :
+ *  Frees memory allocated for MT decoding. If a timeout is set and the caller is waiting
+ *  for completion of MT decoding, decompression in progress will be canceled. */
+FL2LIB_API void FL2LIB_CALL FL2_cancelDStream(FL2_DStream *fds);
+
+/*! FL2_getDStreamProgress() :
+ *  Returns the number of bytes decoded since the stream was initialized. */
 FL2LIB_API unsigned long long FL2LIB_CALL FL2_getDStreamProgress(const FL2_DStream * fds);
 
 /*===== Streaming decompression functions =====*/
+
+/*! FL2_initDStream() :
+ *  Call this function before decompressing a stream. FL2_initDStream_withProp()
+ *  must be used for streams which do not include a property byte at position zero.
+ *  The caller is responsible for storing and passing the property byte. */
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream(FL2_DStream* fds);
 FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigned char prop);
+
+/*! FL2_decompressStream() :
+ *  Reads data from input and decompresses to output.
+ *  Returns nonzero if the stream is unfinished, or zero if the terminator was encountered
+ *  and all data was written to output. Call this function repeatedly if necessary,
+ *  removing data from output and/or loading data into input before each call. */
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************

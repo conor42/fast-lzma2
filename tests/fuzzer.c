@@ -601,7 +601,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         FL2_setCStreamTimeout(cstream, 300);
         CHECK(FL2_compressStream(cstream, &out, &in));
         do {
-            r = FL2_endStream(cstream, NULL);
+            r = FL2_endStream(cstream, &out);
             if (FL2_isTimedOut(r)) {
                 if (FL2_getCStreamProgress(cstream, NULL) >= CNBuffSize / 4U)
                     break;
@@ -611,9 +611,8 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
             }
         } while (r);
         FL2_cancelOperation(cstream);
-        r = FL2_getCStreamProgress(cstream, NULL) * 100 / CNBuffSize;
+        r = (size_t)(FL2_getCStreamProgress(cstream, NULL) * 100 / CNBuffSize);
         DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)r, '%');
-        if (r >= 99) goto _output_error;
         FL2_setCStreamTimeout(cstream, 0);
     }
     DISPLAYLEVEL(4, " : OK \n");

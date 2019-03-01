@@ -58,8 +58,8 @@ struct FL2_CCtx_s {
     FL2_CCtx_params params;
 #ifndef FL2_SINGLETHREAD
     FL2POOL_ctx* factory;
-#endif
     FL2POOL_ctx* compressThread;
+#endif
     FL2_dataBlock curBlock;
     size_t asyncRes;
     size_t threadCount;
@@ -70,7 +70,9 @@ struct FL2_CCtx_s {
     U64 streamTotal;
     U64 streamCsize;
     FL2_matchTable* matchTable;
+#ifndef FL2_SINGLETHREAD
     U32 timeout;
+#endif
     U32 rmfWeight;
     U32 encWeight;
     FL2_atomic progressIn;

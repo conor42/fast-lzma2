@@ -44,7 +44,7 @@ struct FL2POOL_ctx_s {
     /* Indicates if the queue is shutting down */
     int shutdown;
 
-    /* The threads. Extras to be malloc'd */
+    /* The threads. Extras to be calloc'd */
     ZSTD_pthread_t threads[1];
 };
 
@@ -92,7 +92,7 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads)
     /* Check the parameters */
     if (!numThreads) { return NULL; }
     /* Allocate the context and zero initialize */
-    ctx = (FL2POOL_ctx*)calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(ZSTD_pthread_t));
+    ctx = calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(ZSTD_pthread_t));
     if (!ctx) { return NULL; }
     /* Initialize the busy count and jobs range */
     ctx->numThreadsBusy = 0;

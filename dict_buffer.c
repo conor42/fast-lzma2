@@ -1,9 +1,21 @@
+/*
+* Copyright (c) 2019, Conor McCarthy
+* All rights reserved.
+*
+* This source code is licensed under both the BSD-style license (found in the
+* LICENSE file in the root directory of this source tree) and the GPLv2 (found
+* in the COPYING file in the root directory of this source tree).
+* You may select, at your option, one of the above-listed licenses.
+*/
+
 #include <stdlib.h>
 #include "dict_buffer.h"
 #include "fl2_internal.h"
 
 #define ALIGNMENT_SIZE 16U
 #define ALIGNMENT_MASK (~(size_t)(ALIGNMENT_SIZE-1))
+
+/* DICT_buffer functions */
 
 int DICT_construct(DICT_buffer * const buf, int const async)
 {
@@ -22,8 +34,11 @@ int DICT_construct(DICT_buffer * const buf, int const async)
 
 int DICT_init(DICT_buffer * const buf, size_t const dict_size, int const do_hash)
 {
+    /* Allocate if not yet allocated or existing dict too small */
     if (buf->data[0] == NULL || dict_size > buf->size) {
+        /* Free any existing buffers */
         DICT_destruct(buf);
+
         buf->data[0] = malloc(dict_size);
 
         buf->data[1] = NULL;
@@ -80,6 +95,7 @@ size_t DICT_size(const DICT_buffer * const buf)
     return buf->size;
 }
 
+/* Get the dictionary buffer for adding input */
 size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * const dict)
 {
     DICT_shift(buf, overlap);
@@ -91,6 +107,7 @@ size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * c
     return dict->size - dict->pos;
 }
 
+/* Update with the amount added */
 int DICT_update(DICT_buffer * const buf, size_t const added_size)
 {
     buf->end += added_size;
@@ -98,6 +115,7 @@ int DICT_update(DICT_buffer * const buf, size_t const added_size)
     return !DICT_availSpace(buf);
 }
 
+/* Read from input and write to the dict */
 void DICT_put(DICT_buffer * const buf, FL2_inBuffer * const input)
 {
     size_t const to_read = MIN(buf->size - buf->end, input->size - input->pos);
@@ -115,11 +133,13 @@ size_t DICT_availSpace(const DICT_buffer * const buf)
     return buf->size - buf->end;
 }
 
+/* Get the size of uncompressed data. start is set to end after compression */
 int DICT_hasUnprocessed(const DICT_buffer * const buf)
 {
     return buf->start < buf->end;
 }
 
+/* Get the buffer, overlap and end for compression */
 void DICT_getBlock(DICT_buffer * const buf, FL2_dataBlock * const block)
 {
     block->data = buf->data[buf->index];
@@ -134,6 +154,7 @@ void DICT_getBlock(DICT_buffer * const buf, FL2_dataBlock * const block)
     buf->start = buf->end;
 }
 
+/* Shift occurs when all is processed and end is beyond the overlap size */
 int DICT_needShift(DICT_buffer * const buf, size_t const overlap)
 {
     return buf->start == buf->end && (overlap == 0 || buf->end >= overlap + ALIGNMENT_SIZE);
@@ -144,12 +165,15 @@ int DICT_async(const DICT_buffer * const buf)
     return (int)buf->async;
 }
 
+/* Shift the overlap amount to the start of either the only dict buffer or the alternate one
+ * if it exists */
 void DICT_shift(DICT_buffer * const buf, size_t overlap)
 {
     if (buf->start < buf->end)
         return;
 
     if (overlap == 0) {
+        /* No overlap means a simple buffer switch */
         buf->start = 0;
         buf->end = 0;
         buf->index ^= buf->async;
@@ -157,6 +181,7 @@ void DICT_shift(DICT_buffer * const buf, size_t overlap)
     else if (buf->end >= overlap + ALIGNMENT_SIZE) {
         size_t const from = (buf->end - overlap) & ALIGNMENT_MASK;
         const BYTE *const src = buf->data[buf->index];
+        /* Copy to the alternate if one exists */
         BYTE *const dst = buf->data[buf->index ^ buf->async];
 
         overlap = buf->end - from;
@@ -169,12 +194,11 @@ void DICT_shift(DICT_buffer * const buf, size_t overlap)
             DEBUGLOG(5, "Move overlap data : %u bytes from %u", (U32)overlap, (U32)from);
             memmove(dst, src + from, overlap);
         }
+        /* New data will be written after the overlap */
         buf->start = overlap;
         buf->end = overlap;
+        /* Switch buffers */
         buf->index ^= buf->async;
-    }
-    else {
-        buf->start = buf->end;
     }
 }
 

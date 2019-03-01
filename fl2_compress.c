@@ -152,9 +152,8 @@ static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
 
     cctx->matchTable = NULL;
 
-    cctx->compressThread = NULL;
-
 #ifndef FL2_SINGLETHREAD
+    cctx->compressThread = NULL;
     cctx->factory = FL2POOL_create(nbThreads - 1);
     if (nbThreads > 1 && cctx->factory == NULL) {
         FL2_freeCCtx(cctx);
@@ -209,8 +208,8 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx* cctx)
 
 #ifndef FL2_SINGLETHREAD
     FL2POOL_free(cctx->factory);
-#endif
     FL2POOL_free(cctx->compressThread);
+#endif
 
     RMF_freeMatchTable(cctx->matchTable);
     free(cctx);
@@ -409,9 +408,11 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     cctx->rmfWeight = rmfWeight;
     cctx->encWeight = encWeight;
 
+#ifndef FL2_SINGLETHREAD
     if(cctx->compressThread != NULL)
         FL2POOL_add(cctx->compressThread, FL2_compressCurBlock_async, cctx, streamProp);
     else
+#endif
         cctx->asyncRes = FL2_compressCurBlock_blocking(cctx, streamProp);
 
     return cctx->asyncRes;
@@ -545,10 +546,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressCCtx(FL2_CCtx* cctx,
 
     DEBUGLOG(4, "FL2_compressCCtx : level %u, %u src => %u avail", cctx->params.compressionLevel, (U32)srcSize, (U32)dstCapacity);
 
+#ifndef FL2_SINGLETHREAD
     /* No async compression for in-memory function */
     FL2POOL_free(cctx->compressThread);
     cctx->compressThread = NULL;
     cctx->timeout = 0;
+#endif
 
     FL2_preBeginFrame(cctx, srcSize);
     CHECK_F(FL2_beginFrame(cctx, srcSize));
@@ -878,6 +881,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout)
 {
+#ifndef FL2_SINGLETHREAD
     if (timeout != 0) {
         if (fcs->compressThread == NULL) {
             fcs->compressThread = FL2POOL_create(1);
@@ -891,7 +895,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
         fcs->compressThread = NULL;
     }
     fcs->timeout = timeout;
-
+#endif
     return FL2_error_no_error;
 }
 
@@ -1070,14 +1074,17 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStre
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
 {
+#ifndef FL2_SINGLETHREAD
     if (FL2POOL_waitAll(fcs->compressThread, fcs->timeout) != 0)
         return FL2_ERROR(timedOut);
     CHECK_F(fcs->asyncRes);
+#endif
     return fcs->outThread < fcs->threadCount;
 }
 
 FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)
 {
+#ifndef FL2_SINGLETHREAD
     if (fcs->compressThread != NULL) {
         fcs->canceled = 1;
 
@@ -1086,7 +1093,7 @@ FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)
 
         fcs->canceled = 0;
     }
-
+#endif
     FL2_endFrame(fcs);
 }
 

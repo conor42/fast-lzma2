@@ -41,7 +41,7 @@ static RMF_builder* RMF_createBuilder(size_t match_buffer_size)
     match_buffer_size = MIN(match_buffer_size, MAX_MATCH_BUFFER_SIZE);
     match_buffer_size = MAX(match_buffer_size, MIN_MATCH_BUFFER_SIZE);
 
-    RMF_builder* const builder = (RMF_builder*)malloc(
+    RMF_builder* const builder = malloc(
         sizeof(RMF_builder) + (match_buffer_size - 1) * sizeof(RMF_buildMatch));
 
     if (builder == NULL)
@@ -75,7 +75,7 @@ static RMF_builder** RMF_createBuilderTable(U32* const match_table, size_t const
 {
     DEBUGLOG(3, "RMF_createBuilderTable : match_buffer_size %u, builders %u", (U32)match_buffer_size, size);
 
-    RMF_builder** const builders = (RMF_builder**)malloc(size * sizeof(RMF_builder*));
+    RMF_builder** const builders = malloc(size * sizeof(RMF_builder*));
 
     if (builders == NULL)
         return NULL;
@@ -195,8 +195,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
 
     size_t const table_bytes = is_struct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
 		: dictionary_size * sizeof(U32);
-    FL2_matchTable* const tbl = (FL2_matchTable*)malloc(
-        sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
+    FL2_matchTable* const tbl = malloc(sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
     if (!tbl) return NULL;
 
     tbl->is_struct = is_struct;

@@ -8,13 +8,18 @@
 #ifndef FL2_DICT_BUFFER_H_
 #define FL2_DICT_BUFFER_H_
 
+/* DICT_buffer structure.
+ * Maintains one or two dictionary buffers. In a dual dict configuration (asyc==1), when the
+ * current buffer is full, the overlap region will be copied to the other buffer and it
+ * becomes the destination for input while the first is compressed. This is useful when I/O
+ * is much slower than compression. */
 typedef struct {
     BYTE* data[2];
     size_t index;
     size_t async;
-    size_t start;   /* start = 0 (first block) or overlap */
-    size_t end;     /* never < overlap */
-    size_t size; /* allocation size */
+    size_t start;  /* start = 0 (first block) or overlap */
+    size_t end;    /* never < overlap */
+    size_t size;   /* allocation size */
 #ifndef NO_XXHASH
     XXH32_state_t *xxh;
 #endif

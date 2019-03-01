@@ -945,7 +945,7 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const 
 
         if (!p->dic || dic_buf_size != p->dic_buf_size) {
             LZMA_freeDict(p);
-            p->dic = (BYTE *)malloc(dic_buf_size);
+            p->dic = malloc(dic_buf_size);
             if (!p->dic)
                 return FL2_ERROR(memory_allocation);
             p->ext_dic = 0;

@@ -1104,14 +1104,13 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                     + GET_PRICE_0(enc->states.is_match[state_2][pos_state_next])
                     + LZMA_getLiteralPriceMatched(LITERAL_PROBS(enc, index + len_test, data[len_test - 1]),
                         data[len_test], data_2[len_test]);
-                size_t offset;
 
                 state_2 = kState_LitAfterRep;
                 pos_state_next = (index + len_test + 1) & pos_mask;
                 rep_lit_rep_total_price +=
                     GET_PRICE_1(enc->states.is_match[state_2][pos_state_next]) +
                     GET_PRICE_1(enc->states.is_rep[state_2]);
-                offset = cur + len_test + 1 + len_test_2;
+                size_t const offset = cur + len_test + 1 + len_test_2;
                 rep_lit_rep_total_price += LZMA_getRepMatch0Price(enc, len_test_2, state_2, pos_state_next);
                 if (rep_lit_rep_total_price < enc->opt_buf[offset].price) {
                     len_end = MAX(len_end, offset);
@@ -1393,12 +1392,11 @@ size_t LZMA_initOptimizerPos0(LZMA2_ECtx *const enc, FL2_dataBlock const block,
     enc->opt_buf[1].len = 1;
     /* Test the rep match prices */
     for (size_t i = 0; i < kNumReps; ++i) {
-        unsigned price;
         size_t rep_len = rep_lens[i];
         if (rep_len < 2)
             continue;
 
-        price = rep_match_price + LZMA_getRepPrice(enc, i, state, pos_state);
+        unsigned const price = rep_match_price + LZMA_getRepPrice(enc, i, state, pos_state);
         /* Test every available length of the rep */
         do {
             unsigned const cur_and_len_price = price + enc->states.rep_len_states.prices[pos_state][rep_len - kMatchLenMin];
@@ -1905,7 +1903,6 @@ static size_t LZMA2_encodeChunk(LZMA2_ECtx *const enc,
                 index, end);
         }
     }
-
 }
 
 size_t LZMA2_encode(LZMA2_ECtx *const enc,

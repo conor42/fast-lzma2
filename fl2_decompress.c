@@ -838,8 +838,13 @@ static size_t FL2_LoadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
                     }
                 }
                 ++decmt->numThreads;
-                if (decmt->numThreads == decmt->maxThreads || decmt->isFinal)
+                if (decmt->numThreads == decmt->maxThreads || decmt->isFinal) {
+                    /* rewind input in case data beyond terminator was read. Required for container formats */
+                    size_t rewind = MIN(input->pos, inBlock->last->length - inBlock->endPos);
+                    input->pos -= rewind;
+                    inBlock->last->length -= rewind;
                     return 1;
+                }
                 /* Set up the start of the next series of chunks. The first buffer is the last of the those already loaded. */
                 inBlock = &decmt->threads[decmt->numThreads].inBlock;
                 inBlock->first = done->inBlock.last;

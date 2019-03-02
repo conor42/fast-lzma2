@@ -967,6 +967,8 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
         /* select dictionary size */
         size_t dictSize = FUZ_randomLength(&lseed, maxSampleLog + 1);
         dictSize = MAX(dictSize, 1U << 20);
+        if ((FUZ_rand(&lseed) & 7) == 0)
+            dictSize = ((size_t)1 << 26) + (dictSize & 0xFFFFFF); /* test structured match table */
 
         /* select src segment */
         sampleSize = FUZ_randomLength(&lseed, maxSampleLog);
@@ -987,8 +989,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cstream, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
             FL2_CCtx_setParameter(cstream, FL2_p_dictionarySize, dictSize);
-            if((FUZ_rand(&lseed) & 7) > 6)
-                FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, 64);
+            FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, 6 + (FUZ_rand(&lseed) & 63));
             if ((FUZ_rand(&lseed) & 3) > 2)
                 FL2_CCtx_setParameter(cstream, FL2_p_divideAndConquer, 0);
             FL2_CCtx_setParameter(cstream, FL2_p_literalCtxBits, lc);

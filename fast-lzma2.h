@@ -55,7 +55,7 @@ Introduction
 /*------   Version   ------*/
 #define FL2_VERSION_MAJOR    0
 #define FL2_VERSION_MINOR    9
-#define FL2_VERSION_RELEASE  10
+#define FL2_VERSION_RELEASE  11
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -392,7 +392,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setDStreamTimeout(FL2_DStream * fds, unsigned 
 
 /*! FL2_waitDStream() :
  *  Waits for decompression to end after a timeout has occurred. This function returns after the
- *  timeout set using FL2_setDStreamTimeout() has elapsed. Unnecessary when no timeout is set. */
+ *  timeout set using FL2_setDStreamTimeout() has elapsed, or when decompression is complete. Unnecessary
+ *  when no timeout is set. */
 FL2LIB_API size_t FL2LIB_CALL FL2_waitDStream(FL2_DStream * fds);
 
 /*! FL2_cancelDStream() :

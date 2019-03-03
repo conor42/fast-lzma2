@@ -66,7 +66,6 @@ struct FL2_CCtx_s {
     size_t outThread;
     size_t outPos;
     size_t dictMax;
-    U64 blockTotal;
     U64 streamTotal;
     U64 streamCsize;
     FL2_matchTable* matchTable;

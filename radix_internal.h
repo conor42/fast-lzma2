@@ -108,8 +108,8 @@ struct FL2_matchTable_s
     U32 table[1];
 };
 
-size_t RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
-size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const start, size_t const end);
+size_t RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
+size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
 void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
 	size_t const job,
     unsigned const multi_thread,
@@ -121,8 +121,8 @@ void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
-    BYTE const depth,
-    BYTE const max_depth,
+    U32 const depth,
+    U32 const max_depth,
     U32 const list_count,
     size_t const stack_base);
 int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);

@@ -32,7 +32,7 @@ int DICT_construct(DICT_buffer * const buf, int const async)
     return 0;
 }
 
-int DICT_init(DICT_buffer * const buf, size_t const dict_size, int const do_hash)
+int DICT_init(DICT_buffer * const buf, size_t const dict_size, size_t const overlap, unsigned const reset_multiplier, int const do_hash)
 {
     /* Allocate if not yet allocated or existing dict too small */
     if (buf->data[0] == NULL || dict_size > buf->size) {
@@ -51,9 +51,12 @@ int DICT_init(DICT_buffer * const buf, size_t const dict_size, int const do_hash
         }
     }
     buf->index = 0;
+    buf->overlap = overlap;
     buf->start = 0;
     buf->end = 0;
     buf->size = dict_size;
+    buf->total = 0;
+    buf->reset_interval = (reset_multiplier != 0) ? dict_size * reset_multiplier : ((size_t)1 << 31);
 
 #ifndef NO_XXHASH
     if (do_hash) {
@@ -96,9 +99,9 @@ size_t DICT_size(const DICT_buffer * const buf)
 }
 
 /* Get the dictionary buffer for adding input */
-size_t DICT_get(DICT_buffer * const buf, size_t const overlap, FL2_outBuffer * const dict)
+size_t DICT_get(DICT_buffer * const buf, FL2_outBuffer * const dict)
 {
-    DICT_shift(buf, overlap);
+    DICT_shift(buf);
 
     dict->dst = buf->data[buf->index] + buf->end;
     dict->pos = 0;
@@ -151,12 +154,17 @@ void DICT_getBlock(DICT_buffer * const buf, FL2_dataBlock * const block)
         XXH32_update(buf->xxh, buf->data[buf->index] + buf->start, buf->end - buf->start);
 #endif
 
+    buf->total += buf->end - buf->start;
     buf->start = buf->end;
 }
 
 /* Shift occurs when all is processed and end is beyond the overlap size */
-int DICT_needShift(DICT_buffer * const buf, size_t const overlap)
+int DICT_needShift(DICT_buffer * const buf)
 {
+    if (buf->start < buf->end)
+        return 0;
+    /* Reset the dict if the next compression cycle would exceed the reset interval */
+    size_t overlap = (buf->total + buf->size - buf->overlap > buf->reset_interval) ? 0 : buf->overlap;
     return buf->start == buf->end && (overlap == 0 || buf->end >= overlap + ALIGNMENT_SIZE);
 }
 
@@ -167,16 +175,24 @@ int DICT_async(const DICT_buffer * const buf)
 
 /* Shift the overlap amount to the start of either the only dict buffer or the alternate one
  * if it exists */
-void DICT_shift(DICT_buffer * const buf, size_t overlap)
+void DICT_shift(DICT_buffer * const buf)
 {
     if (buf->start < buf->end)
         return;
+
+    size_t overlap = buf->overlap;
+    /* Reset the dict if the next compression cycle would exceed the reset interval */
+    if (buf->total + buf->size - buf->overlap > buf->reset_interval) {
+        DEBUGLOG(4, "Resetting dictionary after %u bytes", (unsigned)buf->total);
+        overlap = 0;
+    }
 
     if (overlap == 0) {
         /* No overlap means a simple buffer switch */
         buf->start = 0;
         buf->end = 0;
         buf->index ^= buf->async;
+        buf->total = 0;
     }
     else if (buf->end >= overlap + ALIGNMENT_SIZE) {
         size_t const from = (buf->end - overlap) & ALIGNMENT_MASK;
@@ -187,11 +203,11 @@ void DICT_shift(DICT_buffer * const buf, size_t overlap)
         overlap = buf->end - from;
 
         if (overlap <= from || dst != src) {
-            DEBUGLOG(5, "Copy overlap data : %u bytes from %u", (U32)overlap, (U32)from);
+            DEBUGLOG(5, "Copy overlap data : %u bytes from %u", (unsigned)overlap, (unsigned)from);
             memcpy(dst, src + from, overlap);
         }
         else if (from != 0) {
-            DEBUGLOG(5, "Move overlap data : %u bytes from %u", (U32)overlap, (U32)from);
+            DEBUGLOG(5, "Move overlap data : %u bytes from %u", (unsigned)overlap, (unsigned)from);
             memmove(dst, src + from, overlap);
         }
         /* New data will be written after the overlap */

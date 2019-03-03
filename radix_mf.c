@@ -257,9 +257,9 @@ size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t c
     tbl->st_index = ATOMIC_INITIAL_VALUE;
 
     if (tbl->is_struct)
-        return RMF_structuredInit(tbl, data, start, end);
+        return RMF_structuredInit(tbl, data, end);
     else
-        return RMF_bitpackInit(tbl, data, start, end);
+        return RMF_bitpackInit(tbl, data, end);
 }
 
 static void RMF_handleRepeat(RMF_buildMatch* const match_buffer,
@@ -366,12 +366,12 @@ FORCE_INLINE_TEMPLATE
 void RMF_recurseListChunk_generic(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
-    BYTE depth,
-    BYTE const max_depth,
+    U32 depth,
+    U32 const max_depth,
     U32 list_count,
     size_t const stack_base)
 {
-    BYTE const base_depth = depth;
+    U32 const base_depth = depth;
     size_t st_index = stack_base;
     size_t index = 0;
     ++depth;
@@ -385,7 +385,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
         if (prev != RADIX_NULL_LINK) {
             ++tbl->tails_8[radix_8].list_count;
             /* Link the previous occurrence to this one and record the new length */
-            tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+            tbl->match_buffer[prev].next = (U32)index | (depth << 24);
         }
         else {
             tbl->tails_8[radix_8].list_count = 1;
@@ -404,7 +404,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
         U32 const prev = tbl->tails_8[radix_8].prev_index;
         if (prev != RADIX_NULL_LINK) {
             ++tbl->tails_8[radix_8].list_count;
-            tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+            tbl->match_buffer[prev].next = (U32)index | (depth << 24);
         }
     }
     /* Convert radix values on the stack to counts and reset any used tail slots */
@@ -473,7 +473,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 if (prev != RADIX_NULL_LINK) {
                     /* This char has occurred before in the chain. Link the previous (> index) occurance with this */
                     ++tbl->tails_8[radix_8].list_count;
-                    tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                    tbl->match_buffer[prev].next = (U32)index | (depth << 24);
                 }
                 else {
                     /* First occurrence in the chain */
@@ -495,7 +495,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 tbl->tails_8[radix_8].prev_index = (U32)index;
                 if (prev != RADIX_NULL_LINK) {
                     ++tbl->tails_8[radix_8].list_count;
-                    tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                    tbl->match_buffer[prev].next = (U32)index | (depth << 24);
                 }
                 else {
                     tbl->tails_8[radix_8].list_count = 1;
@@ -514,7 +514,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     tbl->match_buffer[index].src.u32 = MEM_read32(data_src + link);
 
                 ++tbl->tails_8[radix_8].list_count;
-                tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                tbl->match_buffer[prev].next = (U32)index | (depth << 24);
             }
             for (size_t j = prev_st_index; j < st_index; ++j) {
                 tbl->tails_8[tbl->stack[j].count].prev_index = RADIX_NULL_LINK;
@@ -542,7 +542,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     tbl->tails_8[radix_8].prev_index = (U32)index;
                     if (prev != RADIX_NULL_LINK) {
                         ++tbl->tails_8[radix_8].list_count;
-                        tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                        tbl->match_buffer[prev].next = (U32)index | (depth << 24);
                     }
                     else {
                         tbl->tails_8[radix_8].list_count = 1;
@@ -566,7 +566,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                         tbl->tails_8[radix_8].prev_index = (U32)index;
                         if (prev != RADIX_NULL_LINK) {
                             ++tbl->tails_8[radix_8].list_count;
-                            tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                            tbl->match_buffer[prev].next = (U32)index | (depth << 24);
                         }
                         else {
                             tbl->tails_8[radix_8].list_count = 1;
@@ -593,7 +593,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                     tbl->match_buffer[index].src.u32 = MEM_read32(data_src + link);
                 }
                 ++tbl->tails_8[radix_8].list_count;
-                tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                tbl->match_buffer[prev].next = (U32)index | (depth << 24);
             }
             for (size_t j = prev_st_index; j < st_index; ++j) {
                 tbl->tails_8[tbl->stack[j].count].prev_index = RADIX_NULL_LINK;
@@ -612,7 +612,7 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
                 U32 const prev = tbl->tails_8[radix_8].prev_index;
                 tbl->tails_8[radix_8].prev_index = (U32)index;
                 if (prev != RADIX_NULL_LINK) {
-                    tbl->match_buffer[prev].next = (U32)index | ((U32)depth << 24);
+                    tbl->match_buffer[prev].next = (U32)index | (depth << 24);
                 }
                 else {
                     tbl->stack[st_index].count = (U32)radix_8;
@@ -632,8 +632,8 @@ void RMF_recurseListChunk_generic(RMF_builder* const tbl,
 void RMF_recurseListChunk(RMF_builder* const tbl,
     const BYTE* const data_block,
     size_t const block_start,
-    BYTE const depth,
-    BYTE const max_depth,
+    U32 const depth,
+    U32 const max_depth,
     U32 const list_count,
     size_t const stack_base)
 {
@@ -703,7 +703,7 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const index)
         return RMF_bitpackAsOutputBuffer(tbl, index);
 }
 
-size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_log, unsigned const depth, unsigned const thread_count)
+size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_log, unsigned const thread_count)
 {
     size_t size = (size_t)(4U + RMF_isStruct(dict_size)) * dict_size;
     size_t const buf_size = dict_size >> buffer_log;

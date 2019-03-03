@@ -170,6 +170,8 @@ static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n
     BlockDecMt* const blocks = (BlockDecMt*)jobDescription;
     size_t srcLen = blocks[n].packSize;
 
+    DEBUGLOG(4, "Thread %u: decoding block of input size %u, output size %u", (unsigned)n, (unsigned)srcLen, (unsigned)blocks[n].unpackSize);
+
     blocks[n].res = LZMA2_decodeToDic(blocks[n].dec, blocks[n].unpackSize, blocks[n].src, &srcLen, blocks[n].finish);
 
     /* If no error occurred, store into res the dic_pos value, which is the end of the decompressed data in the buffer */
@@ -675,6 +677,8 @@ static size_t FL2_decompressBlockMt(FL2_DStream* const fds, size_t const thread)
     FL2_decMt *const decmt = fds->decmt;
     FL2_decJob *const ti = &decmt->threads[thread];
     LZMA2_DCtx *const dec = &ti->dec;
+
+    DEBUGLOG(4, "Thread %u: decoding block of size %u", (unsigned)thread, (unsigned)ti->bufSize);
 
     CHECK_F(LZMA2_initDecoder(dec, decmt->prop, ti->outBuf, ti->bufSize));
 

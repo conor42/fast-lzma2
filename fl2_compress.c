@@ -379,8 +379,6 @@ static size_t FL2_compressCurBlock(FL2_CCtx* const cctx, int const streamProp)
     /* update largest dict size used */
     cctx->dictMax = MAX(cctx->dictMax, cctx->curBlock.end);
 
-    cctx->blockTotal += cctx->curBlock.end - cctx->curBlock.start;
-
     cctx->outThread = 0;
     cctx->threadCount = 0;
     cctx->outPos = 0;
@@ -456,7 +454,6 @@ static size_t FL2_beginFrame(FL2_CCtx* const cctx, size_t const dictReduce)
     }
 
     cctx->dictMax = 0;
-    cctx->blockTotal = 0;
     cctx->streamTotal = 0;
     cctx->streamCsize = 0;
     cctx->progressIn = 0;
@@ -499,8 +496,11 @@ static size_t FL2_compressBuffer(FL2_CCtx* const cctx,
     cctx->curBlock.data = src;
     cctx->curBlock.start = 0;
 
+    size_t blockTotal = 0;
+
     do {
         cctx->curBlock.end = cctx->curBlock.start + MIN(srcSize, dictionarySize - cctx->curBlock.start);
+        blockTotal += cctx->curBlock.end - cctx->curBlock.start;
 
         CHECK_F(FL2_compressCurBlock(cctx, streamProp));
 
@@ -520,10 +520,11 @@ static size_t FL2_compressBuffer(FL2_CCtx* const cctx,
         }
         srcSize -= cctx->curBlock.end - cctx->curBlock.start;
         if (cctx->params.cParams.reset_interval
-            && cctx->blockTotal + MIN(cctx->curBlock.end - blockOverlap, srcSize) > dictionarySize * cctx->params.cParams.reset_interval) {
+            && blockTotal + MIN(dictionarySize - blockOverlap, srcSize) > dictionarySize * cctx->params.cParams.reset_interval) {
             /* periodically reset the dictionary for mt decompression */
+            DEBUGLOG(4, "Resetting dictionary after %u bytes", (unsigned)blockTotal);
             cctx->curBlock.start = 0;
-            cctx->blockTotal = 0;
+            blockTotal = 0;
         }
         else {
             cctx->curBlock.start = blockOverlap;
@@ -871,7 +872,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 #else
     int const doHash = (fcs->params.doXXH && !fcs->params.omitProp);
 #endif
-    if (DICT_init(buf, dictSize, doHash) != 0)
+    size_t dictOverlap = OVERLAP_FROM_DICT_SIZE(fcs->params.rParams.dictionary_size, fcs->params.rParams.overlap_fraction);
+    if (DICT_init(buf, dictSize, dictOverlap, fcs->params.cParams.reset_interval, doHash) != 0)
         return FL2_ERROR(memory_allocation);
 
     CHECK_F(FL2_beginFrame(fcs, 0));
@@ -961,25 +963,14 @@ static size_t FL2_compressStream_input(FL2_CStream* fcs, FL2_inBuffer* input)
     CHECK_F(fcs->asyncRes);
 
     DICT_buffer * const buf = &fcs->buf;
-    size_t const blockOverlap = OVERLAP_FROM_DICT_SIZE(fcs->params.rParams.dictionary_size, fcs->params.rParams.overlap_fraction);
 
     while (input->pos < input->size) {
         /* read input until the buffer(s) are full */
-        size_t overlap = blockOverlap;
-        if (!DICT_hasUnprocessed(buf)
-            && fcs->params.cParams.reset_interval != 0
-            && fcs->blockTotal + (fcs->params.rParams.dictionary_size - overlap)
-            > (fcs->params.rParams.dictionary_size * fcs->params.cParams.reset_interval))
-        {
-            /* periodically reset the dictionary for mt decompression */
-            overlap = 0;
-            fcs->blockTotal = 0;
-        }
-        if (DICT_needShift(buf, overlap)) {
+        if (DICT_needShift(buf)) {
             /* cannot shift single dict during compression */
             if(!DICT_async(buf))
                 CHECK_F(FL2_waitStream(fcs));
-            DICT_shift(buf, overlap);
+            DICT_shift(buf);
         }
         
         CHECK_F(fcs->asyncRes);
@@ -1041,12 +1032,10 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_out
 
     CHECK_F(fcs->asyncRes);
 
-    size_t const blockOverlap = OVERLAP_FROM_DICT_SIZE(fcs->params.rParams.dictionary_size, fcs->params.rParams.overlap_fraction);
-
-    if (DICT_needShift(&fcs->buf, blockOverlap) && !DICT_async(&fcs->buf))
+    if (DICT_needShift(&fcs->buf) && !DICT_async(&fcs->buf))
         CHECK_F(FL2_waitStream(fcs));
 
-    DICT_get(&fcs->buf, blockOverlap, dict);
+    DICT_get(&fcs->buf, dict);
 
     return FL2_error_no_error;
 }
@@ -1252,11 +1241,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int h
 }
 
 static size_t FL2_memoryUsage_internal(size_t const dictionarySize, unsigned const bufferLog,
-    unsigned const searchDepth, unsigned const chainLog,
+    unsigned const chainLog,
     FL2_strategy const strategy,
     unsigned const nbThreads)
 {
-    return RMF_memoryUsage(dictionarySize, bufferLog, searchDepth, nbThreads)
+    return RMF_memoryUsage(dictionarySize, bufferLog, nbThreads)
         + LZMA2_encMemoryUsage(chainLog, strategy, nbThreads);
 }
 
@@ -1274,7 +1263,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressio
 {
     return FL2_memoryUsage_internal(params->dictionarySize,
         params->bufferLog,
-        params->searchDepth,
         params->chainLog,
         params->strategy,
         nbThreads);
@@ -1284,7 +1272,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_usingCCtx(const FL2_CCtx * cc
 {
     return FL2_memoryUsage_internal(cctx->params.rParams.dictionary_size,
         cctx->params.rParams.match_buffer_log,
-        cctx->params.rParams.depth,
         cctx->params.cParams.second_dict_bits,
         cctx->params.cParams.strategy,
         cctx->jobCount) + DICT_memUsage(&cctx->buf);

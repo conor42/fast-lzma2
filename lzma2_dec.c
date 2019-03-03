@@ -1025,7 +1025,7 @@ static unsigned LZMA2_nextChunkInfo(BYTE *const control,
     return LZMA2_STATE_DATA;
 }
 
-size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
+static size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
     const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
 {
     if (p->state2 == LZMA2_STATE_FINISHED)

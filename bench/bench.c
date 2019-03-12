@@ -17,6 +17,7 @@
 #define GB *(1U<<30)
 
 static U32 g_nbSeconds = 10;
+static unsigned g_iterations = 2;
 
 static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t srcSize, char* compressedBuffer, size_t maxCompressedSize,
     char* resultBuffer)
@@ -29,6 +30,7 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
     U64 const maxTime = (g_nbSeconds * TIMELOOP_MICROSEC) + 1;
     U64 totalCTime = 0, totalDTime = 0;
     U32 cCompleted = 0, dCompleted = 0;
+    unsigned totalLoops = 0;
 #       define NB_MARKS 4
     const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
     U32 markNb = 0;
@@ -50,7 +52,6 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
         /* Compression */
         if (!cCompleted) memset(compressedBuffer, 0xE5, maxCompressedSize);  /* warm up and erase result buffer */
 
-        UTIL_sleepMilli(1);  /* give processor time to other processes */
         UTIL_waitForNextTick();
         clockStart = UTIL_getTime();
 
@@ -65,15 +66,15 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
                 }
                 nbLoops++;
             } while (UTIL_clockSpanMicro(clockStart) < clockLoop);
-            {   U64 const loopDuration = UTIL_clockSpanMicro(clockStart);
+            U64 const loopDuration = UTIL_clockSpanMicro(clockStart);
             if (loopDuration < fastestC*nbLoops)
                 fastestC = loopDuration / nbLoops;
             totalCTime += loopDuration;
-            cCompleted = (totalCTime >= maxTime);  /* end compression tests */
-            }
+            totalLoops += nbLoops;
+            cCompleted = (totalCTime >= maxTime && totalLoops >= g_iterations);  /* end compression tests */
         }
 
-#if 0       /* disable decompression test */
+#if 1       /* disable decompression test */
         dCompleted = 1;
         (void)totalDTime; (void)fastestD;   /* unused when decompression disabled */
 #else
@@ -161,6 +162,9 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
         unsigned value = atoi(argv[i] + j);
         if (strcmp(param, "t") == 0) {
             g_nbSeconds = value;
+        }
+        else if (strcmp(param, "i") == 0) {
+            g_iterations = value;
         }
         else if(strcmp(param, "d") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_dictionaryLog, value);

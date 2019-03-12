@@ -473,7 +473,7 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
         {
             UPDATE_1(prob);
             /*
-            // that case was checked before with kBadRepCode
+            that case was checked before with kBadRepCode:
             if (check_dic_size == 0 && processed_pos == 0)
             return 1;
             */
@@ -1332,9 +1332,9 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len
     }
 }
 
-size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len)
+U64 LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len)
 {
-    size_t unpack_total = 0;
+    U64 unpack_total = 0;
     size_t pos = 1;
     while (pos < src_len) {
         LZMA2_chunk inf;

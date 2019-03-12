@@ -200,7 +200,7 @@ size_t LZMA2_getDictSizeFromProp(BYTE const dict_prop);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len);
+U64 LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len);
 
 size_t LZMA2_decMemoryUsage(size_t const dict_size);
 

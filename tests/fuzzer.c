@@ -437,8 +437,8 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
 
     DISPLAYLEVEL(4, "test%3i : compress stream using buffer access : ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
-        FL2_outBuffer dict;
-        FL2_inBuffer cbuf;
+        FL2_dictBuffer dict;
+        FL2_cBuffer cbuf;
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
         FL2_getDictionaryBuffer(cstream, &dict);
@@ -473,12 +473,12 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
 
     DISPLAYLEVEL(4, "test%3i : compress stream using buffer access with flush: ", testNb++);
     {   FL2_outBuffer out = { compressedBuffer, compressedBufferSize, 0 };
-        FL2_outBuffer dict;
-        FL2_inBuffer cbuf;
+        FL2_dictBuffer dict;
+        FL2_cBuffer cbuf;
         size_t r;
         CHECK(FL2_initCStream(cstream, 4));
         FL2_getDictionaryBuffer(cstream, &dict);
-        memcpy((BYTE*)dict.dst + dict.pos, (BYTE*)CNBuffer, dict.size / 2);
+        memcpy((BYTE*)dict.dst, (BYTE*)CNBuffer, dict.size / 2);
         CHECK(FL2_updateDictionary(cstream, dict.size / 2));
         CHECK(FL2_flushStream(cstream, NULL));
         while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
@@ -610,7 +610,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
                 CHECK(r);
             }
         } while (r);
-        FL2_cancelOperation(cstream);
+        FL2_cancelCStream(cstream);
         r = (size_t)(FL2_getCStreamProgress(cstream, NULL) * 100 / CNBuffSize);
         DISPLAYLEVEL(4, "\b\b\b\b%3u%c", (unsigned)r, '%');
         FL2_setCStreamTimeout(cstream, 0);
@@ -989,9 +989,11 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cstream, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
             FL2_CCtx_setParameter(cstream, FL2_p_dictionarySize, dictSize);
-            FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, 6 + (FUZ_rand(&lseed) & 63));
-            if ((FUZ_rand(&lseed) & 3) > 2)
-                FL2_CCtx_setParameter(cstream, FL2_p_divideAndConquer, 0);
+            size_t depth = FL2_FASTLENGTH_MIN + FUZ_randomLength(&lseed, 8) - 1;
+            FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, MIN(depth, FL2_FASTLENGTH_MAX));
+            FL2_CCtx_setParameter(cstream, FL2_p_chainLog, FL2_CHAINLOG_MIN + (FUZ_rand(&lseed) % (FL2_CHAINLOG_MAX - FL2_CHAINLOG_MIN + 1)));
+            FL2_CCtx_setParameter(cstream, FL2_p_hybridCycles, FUZ_randomLength(&lseed, 6));
+            FL2_CCtx_setParameter(cstream, FL2_p_divideAndConquer, (FUZ_rand(&lseed) & 3) < 3);
             FL2_CCtx_setParameter(cstream, FL2_p_literalCtxBits, lc);
             FL2_CCtx_setParameter(cstream, FL2_p_literalPosBits, FUZ_rand(&lseed) % (5 - lc));
             FL2_CCtx_setParameter(cstream, FL2_p_posBits, FUZ_rand(&lseed) % 5);
@@ -1006,7 +1008,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                 FL2_setCStreamTimeout(cstream, (FUZ_rand(&lseed) & 1) ? 200 : 0);
                 FL2_outBuffer out = { cBuffer, cBufferSize, 0 };
                 FL2_inBuffer in = { sampleBuffer, 0, 0 };
-                FL2_inBuffer cbuf;
+                FL2_cBuffer cbuf;
                 BYTE *end = (BYTE*)sampleBuffer + sampleSize;
                 size_t r;
                 cSize = 0;
@@ -1015,17 +1017,17 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                     in.size = MIN(bufSize, (size_t)(end - (BYTE*)in.src));
                     in.pos = 0;
                     if (FUZ_rand(&lseed) & 1) {
-                        FL2_outBuffer dict;
+                        FL2_dictBuffer dict;
                         do {
                             r = FL2_getDictionaryBuffer(cstream, &dict);
                         } while (FL2_isTimedOut(r));
                         CHECK(FL2_isError(r), "FL2_getDictionaryBuffer failed : %s", FL2_getErrorName(r));
-                        dict.size = MIN(dict.size, in.size);
+                        dict.size = MIN(dict.size, (unsigned long)in.size);
                         memcpy(dict.dst, in.src, dict.size);
                         in.pos += dict.size;
                         r = FL2_updateDictionary(cstream, dict.size);
                         while (FL2_isTimedOut(r)) {
-                            r = FL2_waitStream(cstream);
+                            r = FL2_waitCStream(cstream);
                         }
                         CHECK(FL2_isError(r), "FL2_updateDictionary failed : %s", FL2_getErrorName(r));
                     }
@@ -1039,14 +1041,13 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                                 r = FL2_flushStream(cstream, &out);
                             } while (FL2_isTimedOut(r));
                             CHECK(FL2_isError(r), "FL2_flushStream failed : %s", FL2_getErrorName(r));
-                            r = !r;
                         }
                     }
-                    if (!r) {
+                    if (r) {
                         if (FUZ_rand(&lseed) & 1) {
                             r = FL2_compressStream(cstream, &out, &in);
                             while (FL2_isTimedOut(r))
-                                r = FL2_waitStream(cstream);
+                                r = FL2_waitCStream(cstream);
                             CHECK(FL2_isError(r), "FL2_compressStream failed : %s", FL2_getErrorName(r));
                         }
                         else while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {

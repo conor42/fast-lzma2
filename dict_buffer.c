@@ -99,15 +99,12 @@ size_t DICT_size(const DICT_buffer * const buf)
 }
 
 /* Get the dictionary buffer for adding input */
-size_t DICT_get(DICT_buffer * const buf, FL2_outBuffer * const dict)
+size_t DICT_get(DICT_buffer * const buf, void **const dict)
 {
     DICT_shift(buf);
 
-    dict->dst = buf->data[buf->index] + buf->end;
-    dict->pos = 0;
-    dict->size = buf->size - buf->end;
-
-    return dict->size - dict->pos;
+    *dict = buf->data[buf->index] + buf->end;
+    return buf->size - buf->end;
 }
 
 /* Update with the amount added */

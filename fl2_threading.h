@@ -129,7 +129,7 @@ mythread_condtime_set(struct timespec *condtime, U32 timeout_ms)
 	condtime->tv_sec += now.tv_sec;
 	condtime->tv_nsec += now.tv_usec * 1000L;
 
-	// tv_nsec must stay in the range [0, 999_999_999].
+	/* tv_nsec must stay in the range [0, 999_999_999]. */
 	if (condtime->tv_nsec >= 1000000000L) {
 		condtime->tv_nsec -= 1000000000L;
 		++condtime->tv_sec;

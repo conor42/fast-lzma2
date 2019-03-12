@@ -26,7 +26,7 @@
 #define LZMA2_PROP_UNINITIALIZED 0xFF
 
 
-FL2LIB_API size_t FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize)
+FL2LIB_API unsigned long long FL2LIB_CALL FL2_findDecompressedSize(const void *src, size_t srcSize)
 {
     return LZMA2_getUnpackSize(src, srcSize);
 }
@@ -1276,6 +1276,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads)
 {
+    nbThreads = FL2_checkNbThreads(nbThreads);
     if (nbThreads > 1)
         return nbThreads * (sizeof(BlockDecMt) + sizeof(FL2_DCtx));
 
@@ -1284,6 +1285,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads)
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateDStreamSize(size_t dictSize, unsigned nbThreads)
 {
+    nbThreads = FL2_checkNbThreads(nbThreads);
     if (nbThreads > 1) {
         /* Estimate 50% compression and a block size of 4 * dictSize */
         return nbThreads * sizeof(FL2_DCtx) + (dictSize + dictSize / 2) * 4 * nbThreads;

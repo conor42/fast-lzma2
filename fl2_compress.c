@@ -672,12 +672,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
 
     case FL2_p_resetInterval:
         if (value != 0)
-            CLAMPCHECK(value, FL2_BLOCK_MUL_MIN, FL2_BLOCK_MUL_MAX);
+            CLAMPCHECK(value, FL2_RESET_INTERVAL_MIN, FL2_RESET_INTERVAL_MAX);
         cctx->params.cParams.reset_interval = (unsigned)value;
         break;
 
     case FL2_p_bufferLog:
-        MAXCHECK(value, RMF_BUFFER_LOG_BASE - FL2_BUFFER_SIZE_LOG_MIN);
+        MAXCHECK(value, FL2_BUFFER_SIZE_LOG_MAX);
         cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - (unsigned)value;
         break;
 
@@ -856,7 +856,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
     fcs->wroteProp = 0;
     fcs->loopCount = 0;
 
-    FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, compressionLevel);
+    if(compressionLevel > 0)
+        FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, compressionLevel);
 
     DICT_buffer *const buf = &fcs->buf;
     size_t const dictSize = fcs->params.rParams.dictionary_size;
@@ -903,7 +904,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
 
 static size_t FL2_compressStream_internal(FL2_CStream* const fcs, int const ending)
 {
-    CHECK_F(FL2_waitStream(fcs));
+    CHECK_F(FL2_waitCStream(fcs));
 
     DICT_buffer *const buf = &fcs->buf;
 
@@ -969,7 +970,7 @@ static size_t FL2_compressStream_input(FL2_CStream* fcs, FL2_inBuffer* input)
         if (DICT_needShift(buf)) {
             /* cannot shift single dict during compression */
             if(!DICT_async(buf))
-                CHECK_F(FL2_waitStream(fcs));
+                CHECK_F(FL2_waitCStream(fcs));
             DICT_shift(buf);
         }
         
@@ -1022,20 +1023,23 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer
 
     CHECK_F(FL2_loopCheck(fcs, prevIn == input->pos && (output == NULL || prevOut == output->pos)));
 
-    return fcs->outThread == fcs->threadCount;
+    return fcs->outThread < fcs->threadCount;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_outBuffer * dict)
+FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_dictBuffer * dict)
 {
     if (!fcs->lockParams)
         return FL2_ERROR(init_missing);
 
     CHECK_F(fcs->asyncRes);
 
-    if (DICT_needShift(&fcs->buf) && !DICT_async(&fcs->buf))
-        CHECK_F(FL2_waitStream(fcs));
+    if (!DICT_availSpace(&fcs->buf))
+        CHECK_F(FL2_compressStream_internal(fcs, 0));
 
-    DICT_get(&fcs->buf, dict);
+    if (DICT_needShift(&fcs->buf) && !DICT_async(&fcs->buf))
+        CHECK_F(FL2_waitCStream(fcs));
+
+    dict->size = (unsigned long)DICT_get(&fcs->buf, &dict->dst);
 
     return FL2_error_no_error;
 }
@@ -1045,7 +1049,26 @@ FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream * fcs, size_t add
     if (DICT_update(&fcs->buf, addedSize))
         CHECK_F(FL2_compressStream_internal(fcs, 0));
 
-    return fcs->outThread == fcs->threadCount;
+    return fcs->outThread < fcs->threadCount;
+}
+
+FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_cBuffer* cbuf)
+{
+    cbuf->src = NULL;
+    cbuf->size = 0;
+
+#ifndef FL2_SINGLETHREAD
+    FL2POOL_waitAll(fcs->compressThread, 0);
+    CHECK_F(fcs->asyncRes);
+#endif
+
+    if (fcs->outThread < fcs->threadCount) {
+        cbuf->src = RMF_getTableAsOutputBuffer(fcs->matchTable, fcs->jobs[fcs->outThread].block.start) + fcs->outPos;
+        cbuf->size = fcs->jobs[fcs->outThread].cSize - fcs->outPos;
+        ++fcs->outThread;
+        fcs->outPos = 0;
+    }
+    return cbuf->size;
 }
 
 FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStream * fcs, unsigned long long *outputSize)
@@ -1061,7 +1084,7 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStre
     return fcs->streamTotal + ((fcs->rmfWeight * encodeSize) >> 4) + ((fcs->progressIn * fcs->encWeight) >> 4);
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
+FL2LIB_API size_t FL2LIB_CALL FL2_waitCStream(FL2_CStream * fcs)
 {
 #ifndef FL2_SINGLETHREAD
     if (FL2POOL_waitAll(fcs->compressThread, fcs->timeout) != 0)
@@ -1071,7 +1094,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_waitStream(FL2_CStream * fcs)
     return fcs->outThread < fcs->threadCount;
 }
 
-FL2LIB_API void FL2LIB_CALL FL2_cancelOperation(FL2_CStream *fcs)
+FL2LIB_API void FL2LIB_CALL FL2_cancelCStream(FL2_CStream *fcs)
 {
 #ifndef FL2_SINGLETHREAD
     if (fcs->compressThread != NULL) {
@@ -1095,23 +1118,6 @@ FL2LIB_API size_t FL2LIB_CALL FL2_remainingOutputSize(const FL2_CStream* fcs)
         cSize += fcs->jobs[u].cSize;
 
     return cSize;
-}
-
-FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_inBuffer* cbuf)
-{
-    cbuf->src = NULL;
-    cbuf->pos = 0;
-    cbuf->size = 0;
-
-    CHECK_F(FL2_waitStream(fcs));
-
-    if (fcs->outThread < fcs->threadCount) {
-        cbuf->src = RMF_getTableAsOutputBuffer(fcs->matchTable, fcs->jobs[fcs->outThread].block.start) + fcs->outPos;
-        cbuf->size = fcs->jobs[fcs->outThread].cSize - fcs->outPos;
-        ++fcs->outThread;
-        fcs->outPos = 0;
-    }
-    return cbuf->size;
 }
 
 /* Write the properties byte (if required), the hash and the end marker
@@ -1207,7 +1213,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
 
     CHECK_F(FL2_flushStream_internal(fcs, 1));
 
-    size_t res = FL2_waitStream(fcs);
+    size_t res = FL2_waitCStream(fcs);
     CHECK_F(res);
 
     if (!fcs->endMarked && !DICT_hasUnprocessed(&fcs->buf)) {
@@ -1261,6 +1267,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize(int compressionLevel, unsigne
 
 FL2LIB_API size_t FL2LIB_CALL FL2_estimateCCtxSize_byParams(const FL2_compressionParameters * params, unsigned nbThreads)
 {
+    nbThreads = FL2_checkNbThreads(nbThreads);
     return FL2_memoryUsage_internal(params->dictionarySize,
         params->bufferLog,
         params->chainLog,

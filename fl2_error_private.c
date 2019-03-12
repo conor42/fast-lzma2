@@ -30,7 +30,7 @@ const char* ERR_getErrorString(ERR_enum code)
     case PREFIX(memory_allocation): return "Allocation error : not enough memory";
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
     case PREFIX(srcSize_wrong): return "Src size is incorrect";
-    case PREFIX(canceled): return "Processing was canceled by a call to FL2_cancelOperation()";
+    case PREFIX(canceled): return "Processing was canceled by a call to FL2_cancelCStream() or FL2_cancelDStream()";
     case PREFIX(buffer): return "Streaming progress halted due to buffer(s) full/empty";
     case PREFIX(timedOut): return "Wait timed out. Timeouts should be handled before errors using FL2_isTimedOut()";
         /* following error codes are not stable and may be removed or changed in a future version */

@@ -110,7 +110,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
         else if (val>(max)) val=(max);   \
     }
     CLAMP(params.dictionary_size, DICTIONARY_SIZE_MIN, MEM_64bits() ? DICTIONARY_SIZE_MAX_64 : DICTIONARY_SIZE_MAX_32);
-    CLAMP(params.match_buffer_log, FL2_BUFFER_SIZE_LOG_MIN, FL2_BUFFER_SIZE_LOG_MAX);
+    CLAMP(params.match_buffer_log, RMF_BUFFER_LOG_MIN, RMF_BUFFER_LOG_MAX);
     if (params.overlap_fraction > FL2_BLOCK_OVERLAP_MAX)
         params.overlap_fraction = FL2_BLOCK_OVERLAP_MAX;
     CLAMP(params.depth, FL2_SEARCH_DEPTH_MIN, FL2_SEARCH_DEPTH_MAX);
@@ -163,7 +163,7 @@ static void RMF_reduceDict(RMF_parameters* const params, size_t const dict_reduc
     if (dict_reduce) {
         for (size_t dict_size = params->dictionary_size; dict_size > DICTIONARY_SIZE_MIN && (dict_size >> 1) >= dict_reduce; dict_size >>= 1) {
             /* Use unchanged match buffer size for reduced dict */
-            params->match_buffer_log = MAX(params->match_buffer_log - 1, FL2_BUFFER_SIZE_LOG_MIN);
+            params->match_buffer_log = MAX(params->match_buffer_log - 1, RMF_BUFFER_LOG_MIN);
         }
         params->dictionary_size = MIN(params->dictionary_size, MAX(dict_reduce, DICTIONARY_SIZE_MIN));
     }

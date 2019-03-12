@@ -36,7 +36,7 @@ void DICT_destruct(DICT_buffer *const buf);
 
 size_t DICT_size(const DICT_buffer *const buf);
 
-size_t DICT_get(DICT_buffer *const buf, FL2_outBuffer* const dict);
+size_t DICT_get(DICT_buffer *const buf, void **const dict);
 
 int DICT_update(DICT_buffer *const buf, size_t const added_size);
 

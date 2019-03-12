@@ -13,11 +13,26 @@
 #ifndef THREADING_H_938743
 #define THREADING_H_938743
 
+#include "mem.h"
+
+#ifndef FL2_XZ_BUILD
+#  ifdef _WIN32
+#    define MYTHREAD_VISTA
+#  else
+#    define MYTHREAD_POSIX  /* posix assumed ; need a better detection method */
+#  endif
+#elif defined(HAVE_CONFIG_H)
+#  include <config.h>
+#endif
+
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-#if !defined(FL2_SINGLETHREAD) && defined(_WIN32)
+unsigned FL2_checkNbThreads(unsigned nbThreads);
+
+
+#if !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_VISTA)
 
 /**
  * Windows minimalist Pthread Wrapper, based on :
@@ -38,6 +53,7 @@ extern "C" {
 #endif
 
 #include <windows.h>
+#include <synchapi.h>
 
 
 /* mutex */
@@ -48,12 +64,13 @@ extern "C" {
 #define ZSTD_pthread_mutex_unlock(a)   LeaveCriticalSection((a))
 
 /* condition variable */
-#define ZSTD_pthread_cond_t             CONDITION_VARIABLE
-#define ZSTD_pthread_cond_init(a, b)    (InitializeConditionVariable((a)), 0)
-#define ZSTD_pthread_cond_destroy(a)    /* No delete */
-#define ZSTD_pthread_cond_wait(a, b)    SleepConditionVariableCS((a), (b), INFINITE)
-#define ZSTD_pthread_cond_signal(a)     WakeConditionVariable((a))
-#define ZSTD_pthread_cond_broadcast(a)  WakeAllConditionVariable((a))
+#define ZSTD_pthread_cond_t                     CONDITION_VARIABLE
+#define ZSTD_pthread_cond_init(a, b)            (InitializeConditionVariable((a)), 0)
+#define ZSTD_pthread_cond_destroy(a)            /* No delete */
+#define ZSTD_pthread_cond_wait(a, b)            SleepConditionVariableCS((a), (b), INFINITE)
+#define ZSTD_pthread_cond_timedwait(a, b, c)    SleepConditionVariableCS((a), (b), (c))
+#define ZSTD_pthread_cond_signal(a)             WakeConditionVariable((a))
+#define ZSTD_pthread_cond_broadcast(a)          WakeAllConditionVariable((a))
 
 /* ZSTD_pthread_create() and ZSTD_pthread_join() */
 typedef struct {
@@ -72,8 +89,9 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
  */
 
 
-#elif !defined(FL2_SINGLETHREAD)   /* posix assumed ; need a better detection method */
+#elif !defined(FL2_SINGLETHREAD) && defined(MYTHREAD_POSIX)
 /* ===   POSIX Systems   === */
+#  include <sys/time.h>
 #  include <pthread.h>
 
 #define ZSTD_pthread_mutex_t            pthread_mutex_t
@@ -93,7 +111,45 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 #define ZSTD_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
 #define ZSTD_pthread_join(a, b)         pthread_join((a),(b))
 
-#else  /* FL2_SINGLETHREAD defined */
+/* Timed wait functions from XZ by Lasse Collin
+*/
+
+/* Sets condtime to the absolute time that is timeout_ms milliseconds
+ * in the future.
+ */
+static inline void
+mythread_condtime_set(struct timespec *condtime, U32 timeout_ms)
+{
+	condtime->tv_sec = timeout_ms / 1000;
+	condtime->tv_nsec = (timeout_ms % 1000) * 1000000;
+
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	condtime->tv_sec += now.tv_sec;
+	condtime->tv_nsec += now.tv_usec * 1000L;
+
+	/* tv_nsec must stay in the range [0, 999_999_999]. */
+	if (condtime->tv_nsec >= 1000000000L) {
+		condtime->tv_nsec -= 1000000000L;
+		++condtime->tv_sec;
+	}
+}
+
+/* Waits on a condition or until a timeout expires. If the timeout expires,
+ * non-zero is returned, otherwise zero is returned.
+ */
+static inline void
+ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mutex,
+    U32 timeout_ms)
+{
+    struct timespec condtime;
+    mythread_condtime_set(&condtime, timeout_ms);
+	pthread_cond_timedwait(cond, mutex, &condtime);
+}
+
+
+#elif defined(FL2_SINGLETHREAD)
 /* No multithreading support */
 
 typedef int ZSTD_pthread_mutex_t;
@@ -111,6 +167,8 @@ typedef int ZSTD_pthread_cond_t;
 
 /* do not use ZSTD_pthread_t */
 
+#else
+#  error FL2_SINGLETHREAD not defined but no threading support found
 #endif /* FL2_SINGLETHREAD */
 
 #if defined (__cplusplus)

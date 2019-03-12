@@ -52,9 +52,8 @@ void RMF_bitpackLimitLengths(FL2_matchTable* const tbl, size_t const index)
     SetNull(index - 1);
     for (U32 length = 2; length < RADIX_MAX_LENGTH && length <= index; ++length) {
         U32 const link = tbl->table[index - length];
-        if (link != RADIX_NULL_LINK) {
+        if (link != RADIX_NULL_LINK)
             tbl->table[index - length] = (MIN(length, link >> RADIX_LINK_BITS) << RADIX_LINK_BITS) | (link & RADIX_LINK_MASK);
-        }
     }
 }
 

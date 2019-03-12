@@ -16,44 +16,36 @@
 #include "fl2_pool.h"
 #include "fl2_internal.h"
 
-/* ======   Compiler specifics   ====== */
-#if defined(_MSC_VER)
-#  pragma warning(disable : 4204)        /* disable: C4204: non-constant aggregate initializer */
-#endif
-
 
 #ifndef FL2_SINGLETHREAD
 
 #include "fl2_threading.h"   /* pthread adaptation */
 
-/* A job is a function and an opaque argument */
-typedef struct FL2POOL_job_s {
-    FL2POOL_function function;
-    void *opaque;
-	size_t n;
-} FL2POOL_job;
-
 struct FL2POOL_ctx_s {
     /* Keep track of the threads */
-    ZSTD_pthread_t *threads;
     size_t numThreads;
 
-    /* The queue is a single job */
-    FL2POOL_job queue;
+    /* All threads work on the same function and object during a job */
+    FL2POOL_function function;
+    void *opaque;
 
     /* The number of threads working on jobs */
     size_t numThreadsBusy;
-    /* Indicates if the queue is empty */
-    int queueEmpty;
+    /* Indicates the number of threads requested and the values to pass */
+    ptrdiff_t queueIndex;
+    ptrdiff_t queueEnd;
 
     /* The mutex protects the queue */
     ZSTD_pthread_mutex_t queueMutex;
     /* Condition variable for pushers to wait on when the queue is full */
-    ZSTD_pthread_cond_t queuePushCond;
-    /* Condition variables for poppers to wait on when the queue is empty */
-    ZSTD_pthread_cond_t queuePopCond;
+    ZSTD_pthread_cond_t busyCond;
+    /* Condition variable for poppers to wait on when the queue is empty */
+    ZSTD_pthread_cond_t newJobsCond;
     /* Indicates if the queue is shutting down */
     int shutdown;
+
+    /* The threads. Extras to be calloc'd */
+    ZSTD_pthread_t threads[1];
 };
 
 /* FL2POOL_thread() :
@@ -61,61 +53,56 @@ struct FL2POOL_ctx_s {
    Waits for jobs and executes them.
    @returns : NULL on failure else non-null.
 */
-static void* FL2POOL_thread(void* opaque) {
+static void* FL2POOL_thread(void* opaque)
+{
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)opaque;
     if (!ctx) { return NULL; }
+    ZSTD_pthread_mutex_lock(&ctx->queueMutex);
     for (;;) {
-        /* Lock the mutex and wait for a non-empty queue or until shutdown */
-        ZSTD_pthread_mutex_lock(&ctx->queueMutex);
 
-        while (ctx->queueEmpty && !ctx->shutdown) {
-            ZSTD_pthread_cond_wait(&ctx->queuePopCond, &ctx->queueMutex);
+        /* While the mutex is locked, wait for a non-empty queue or until shutdown */
+        while (ctx->queueIndex >= ctx->queueEnd && !ctx->shutdown) {
+            ZSTD_pthread_cond_wait(&ctx->newJobsCond, &ctx->queueMutex);
         }
         /* empty => shutting down: so stop */
-        if (ctx->queueEmpty) {
+        if (ctx->shutdown) {
             ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
             return opaque;
         }
         /* Pop a job off the queue */
-        {   FL2POOL_job const job = ctx->queue;
-            ctx->queueEmpty = 1;
-            /* Unlock the mutex, signal a pusher, and run the job */
-            ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
-            ZSTD_pthread_cond_signal(&ctx->queuePushCond);
+        size_t n = ctx->queueIndex;
+        ++ctx->queueIndex;
+        ++ctx->numThreadsBusy;
+        /* Unlock the mutex and run the job */
+        ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
 
-            job.function(job.opaque, job.n);
+        ctx->function(ctx->opaque, n);
 
-			ZSTD_pthread_mutex_lock(&ctx->queueMutex);
-			ctx->numThreadsBusy--;
-			ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
-			ZSTD_pthread_cond_signal(&ctx->queuePushCond);
-		}
+        ZSTD_pthread_mutex_lock(&ctx->queueMutex);
+        --ctx->numThreadsBusy;
+        /* Signal the master thread waiting for jobs to complete */
+        ZSTD_pthread_cond_signal(&ctx->busyCond);
     }  /* for (;;) */
     /* Unreachable */
 }
 
-FL2POOL_ctx* FL2POOL_create(size_t numThreads) {
+FL2POOL_ctx* FL2POOL_create(size_t numThreads)
+{
     FL2POOL_ctx* ctx;
     /* Check the parameters */
     if (!numThreads) { return NULL; }
     /* Allocate the context and zero initialize */
-    ctx = (FL2POOL_ctx*)calloc(1, sizeof(FL2POOL_ctx));
+    ctx = calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(ZSTD_pthread_t));
     if (!ctx) { return NULL; }
-    /* Initialize the job queue.
-     * It needs one extra space since one space is wasted to differentiate empty
-     * and full queues.
-     */
+    /* Initialize the busy count and jobs range */
     ctx->numThreadsBusy = 0;
-    ctx->queueEmpty = 1;
+    ctx->queueIndex = 0;
+    ctx->queueEnd = 0;
     (void)ZSTD_pthread_mutex_init(&ctx->queueMutex, NULL);
-    (void)ZSTD_pthread_cond_init(&ctx->queuePushCond, NULL);
-    (void)ZSTD_pthread_cond_init(&ctx->queuePopCond, NULL);
+    (void)ZSTD_pthread_cond_init(&ctx->busyCond, NULL);
+    (void)ZSTD_pthread_cond_init(&ctx->newJobsCond, NULL);
     ctx->shutdown = 0;
-    /* Allocate space for the thread handles */
-    ctx->threads = (ZSTD_pthread_t*)malloc(numThreads * sizeof(ZSTD_pthread_t));
     ctx->numThreads = 0;
-    /* Check for errors */
-    if (!ctx->threads) { FL2POOL_free(ctx); return NULL; }
     /* Initialize the threads */
     {   size_t i;
         for (i = 0; i < numThreads; ++i) {
@@ -132,70 +119,80 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads) {
 /*! FL2POOL_join() :
     Shutdown the queue, wake any sleeping threads, and join all of the threads.
 */
-static void FL2POOL_join(FL2POOL_ctx* ctx) {
+static void FL2POOL_join(FL2POOL_ctx* ctx)
+{
     /* Shut down the queue */
     ZSTD_pthread_mutex_lock(&ctx->queueMutex);
     ctx->shutdown = 1;
-    ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
     /* Wake up sleeping threads */
-    ZSTD_pthread_cond_broadcast(&ctx->queuePushCond);
-    ZSTD_pthread_cond_broadcast(&ctx->queuePopCond);
+    ZSTD_pthread_cond_broadcast(&ctx->newJobsCond);
+    ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
     /* Join all of the threads */
-    {   size_t i;
-        for (i = 0; i < ctx->numThreads; ++i) {
-            ZSTD_pthread_join(ctx->threads[i], NULL);
-    }   }
+    for (size_t i = 0; i < ctx->numThreads; ++i)
+        ZSTD_pthread_join(ctx->threads[i], NULL);
 }
 
-void FL2POOL_free(FL2POOL_ctx *ctx) {
+void FL2POOL_free(FL2POOL_ctx *ctx)
+{
     if (!ctx) { return; }
     FL2POOL_join(ctx);
     ZSTD_pthread_mutex_destroy(&ctx->queueMutex);
-    ZSTD_pthread_cond_destroy(&ctx->queuePushCond);
-    ZSTD_pthread_cond_destroy(&ctx->queuePopCond);
-    free(ctx->threads);
+    ZSTD_pthread_cond_destroy(&ctx->busyCond);
+    ZSTD_pthread_cond_destroy(&ctx->newJobsCond);
     free(ctx);
 }
 
-size_t FL2POOL_sizeof(FL2POOL_ctx *ctx) {
+size_t FL2POOL_sizeof(FL2POOL_ctx *ctx)
+{
     if (ctx==NULL) return 0;  /* supports sizeof NULL */
-    return sizeof(*ctx)
-        + ctx->numThreads * sizeof(ZSTD_pthread_t);
+    return sizeof(*ctx) + ctx->numThreads * sizeof(ZSTD_pthread_t);
 }
 
-void FL2POOL_add(void* ctxVoid, FL2POOL_function function, void *opaque, size_t n) {
+void FL2POOL_addRange(void* ctxVoid, FL2POOL_function function, void *opaque, ptrdiff_t first, ptrdiff_t end)
+{
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)ctxVoid;
     if (!ctx)
 		return; 
 
-    ZSTD_pthread_mutex_lock(&ctx->queueMutex);
-    {   FL2POOL_job const job = {function, opaque, n};
+    /* Callers always wait for jobs to complete before adding a new set */
+    assert(!ctx->numThreadsBusy);
 
-        /* Wait until there is space in the queue for the new job */
-        while (!ctx->queueEmpty && !ctx->shutdown) {
-          ZSTD_pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
-        }
-        /* The queue is still going => there is space */
-        if (!ctx->shutdown) {
-			ctx->numThreadsBusy++;
-			ctx->queueEmpty = 0;
-            ctx->queue = job;
-        }
-    }
+    ZSTD_pthread_mutex_lock(&ctx->queueMutex);
+    ctx->function = function;
+    ctx->opaque = opaque;
+    ctx->queueIndex = first;
+    ctx->queueEnd = end;
+    ZSTD_pthread_cond_broadcast(&ctx->newJobsCond);
     ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
-    ZSTD_pthread_cond_signal(&ctx->queuePopCond);
 }
 
-void FL2POOL_waitAll(void *ctxVoid)
+void FL2POOL_add(void* ctxVoid, FL2POOL_function function, void *opaque, ptrdiff_t n)
+{
+    FL2POOL_addRange(ctxVoid, function, opaque, n, n + 1);
+}
+
+int FL2POOL_waitAll(void *ctxVoid, unsigned timeout)
 {
     FL2POOL_ctx* const ctx = (FL2POOL_ctx*)ctxVoid;
-    if (!ctx) { return; }
+    if (!ctx || (!ctx->numThreadsBusy && ctx->queueIndex >= ctx->queueEnd) || ctx->shutdown) { return 0; }
 
     ZSTD_pthread_mutex_lock(&ctx->queueMutex);
-    while (ctx->numThreadsBusy && !ctx->shutdown) {
-        ZSTD_pthread_cond_wait(&ctx->queuePushCond, &ctx->queueMutex);
+    /* Need to test for ctx->queueIndex < ctx->queueEnd in case not all jobs have started */
+    if (timeout != 0) {
+        if ((ctx->numThreadsBusy || ctx->queueIndex < ctx->queueEnd) && !ctx->shutdown)
+            ZSTD_pthread_cond_timedwait(&ctx->busyCond, &ctx->queueMutex, timeout);
+    }
+    else {
+        while ((ctx->numThreadsBusy || ctx->queueIndex < ctx->queueEnd) && !ctx->shutdown)
+            ZSTD_pthread_cond_wait(&ctx->busyCond, &ctx->queueMutex);
     }
     ZSTD_pthread_mutex_unlock(&ctx->queueMutex);
+    return ctx->numThreadsBusy && !ctx->shutdown;
+}
+
+size_t FL2POOL_threadsBusy(void * ctx)
+{
+    return ((FL2POOL_ctx*)ctx)->numThreadsBusy;
 }
 
 #endif  /* FL2_SINGLETHREAD */

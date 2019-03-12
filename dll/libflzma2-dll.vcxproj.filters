@@ -54,6 +54,9 @@
     <ClCompile Include="..\fl2_threading.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\dict_buffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\fl2_error_private.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -69,9 +72,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\data_block.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\error_private.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\fast-lzma2.h">
@@ -113,21 +113,30 @@
     <ClInclude Include="..\range_enc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\threading.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\xxhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\fl2pool.h">
+    <ClInclude Include="..\fl2_threading.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fl2_pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dict_buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\radix_get.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fl2_error_private.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="..\LzmaDecOpt.asm">
+    <MASM Include="..\lzma_dec_x86_64.asm">
       <Filter>Source Files</Filter>
     </MASM>
   </ItemGroup>

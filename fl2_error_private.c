@@ -24,10 +24,15 @@ const char* ERR_getErrorString(ERR_enum code)
     case PREFIX(checksum_wrong): return "Restored data doesn't match checksum";
     case PREFIX(parameter_unsupported): return "Unsupported parameter";
     case PREFIX(parameter_outOfBound): return "Parameter is out of bound";
+    case PREFIX(lclpMax_exceeded): return "Parameters lc+lp > 4";
+    case PREFIX(stage_wrong): return "Not possible at this stage of encoding";
     case PREFIX(init_missing): return "Context should be init first";
     case PREFIX(memory_allocation): return "Allocation error : not enough memory";
     case PREFIX(dstSize_tooSmall): return "Destination buffer is too small";
     case PREFIX(srcSize_wrong): return "Src size is incorrect";
+    case PREFIX(canceled): return "Processing was canceled by a call to FL2_cancelCStream() or FL2_cancelDStream()";
+    case PREFIX(buffer): return "Streaming progress halted due to buffer(s) full/empty";
+    case PREFIX(timedOut): return "Wait timed out. Timeouts should be handled before errors using FL2_isTimedOut()";
         /* following error codes are not stable and may be removed or changed in a future version */
     case PREFIX(maxCode):
     default: return notErrorCode;

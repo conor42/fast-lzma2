@@ -14,8 +14,6 @@
 /*-*************************************
 *  Dependencies
 ***************************************/
-#include <stdlib.h>      /* malloc, calloc, free */
-#include <string.h>      /* memset */
 #include "fast-lzma2.h"
 #include "fl2_error_private.h"
 #include "fl2_internal.h"
@@ -29,6 +27,9 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void) { return FL2_VERSION_NUM
 FL2LIB_API const char* FL2LIB_CALL FL2_versionString(void) { return FL2_VERSION_STRING; }
 
 
+/*-****************************************
+*  Compression helpers
+******************************************/
 FL2LIB_API size_t FL2LIB_CALL FL2_compressBound(size_t srcSize)
 {
     return FL2_COMPRESSBOUND(srcSize);
@@ -40,6 +41,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressBound(size_t srcSize)
 /*! FL2_isError() :
  *  tells if a return value is an error code */
 FL2LIB_API unsigned FL2LIB_CALL FL2_isError(size_t code) { return ERR_isError(code); }
+
+FL2LIB_API unsigned FL2LIB_CALL FL2_isTimedOut(size_t code) { return ERR_isTimedOut(code); }
 
 /*! FL2_getErrorName() :
  *  provides error code string from function result (useful for debugging) */

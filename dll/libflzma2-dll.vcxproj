@@ -144,18 +144,26 @@
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateMapFile>false</GenerateMapFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FL2_DEBUG=1;LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\dict_buffer.c" />
+    <ClCompile Include="..\fl2_error_private.c" />
     <ClCompile Include="..\fl2_common.c" />
     <ClCompile Include="..\fl2_compress.c" />
     <ClCompile Include="..\fl2_decompress.c" />
@@ -176,27 +184,29 @@
     <ClInclude Include="..\compiler.h" />
     <ClInclude Include="..\count.h" />
     <ClInclude Include="..\data_block.h" />
-    <ClInclude Include="..\error_private.h" />
+    <ClInclude Include="..\dict_buffer.h" />
+    <ClInclude Include="..\fl2_error_private.h" />
     <ClInclude Include="..\fast-lzma2.h" />
     <ClInclude Include="..\fastpos_table.h" />
     <ClInclude Include="..\fl2_compress_internal.h" />
     <ClInclude Include="..\fl2_errors.h" />
     <ClInclude Include="..\fl2_internal.h" />
+    <ClInclude Include="..\fl2_pool.h" />
+    <ClInclude Include="..\fl2_threading.h" />
     <ClInclude Include="..\lzma2_dec.h" />
     <ClInclude Include="..\lzma2_enc.h" />
     <ClInclude Include="..\mem.h" />
     <ClInclude Include="..\platform.h" />
-    <ClInclude Include="..\fl2pool.h" />
     <ClInclude Include="..\radix_engine.h" />
+    <ClInclude Include="..\radix_get.h" />
     <ClInclude Include="..\radix_internal.h" />
     <ClInclude Include="..\radix_mf.h" />
     <ClInclude Include="..\range_enc.h" />
-    <ClInclude Include="..\threading.h" />
     <ClInclude Include="..\util.h" />
     <ClInclude Include="..\xxhash.h" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="..\LzmaDecOpt.asm">
+    <MASM Include="..\lzma_dec_x86_64.asm">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/Dx64 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">-Dx64 %(AdditionalOptions)</AdditionalOptions>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>

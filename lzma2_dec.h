@@ -13,7 +13,7 @@ extern "C" {
 
 /* #define LZMA_DEC_PROB16 */
 /* 32-bit probs can increase the speed on some CPUs,
-   but memory usage for CLzma2Dec::probs will be doubled in that case */
+   but memory usage for LZMA2_DCtx::probs will be doubled in that case */
 
 #ifdef LZMA_DEC_PROB16
 #define Probability U16
@@ -24,14 +24,14 @@ extern "C" {
 
 /* ---------- LZMA Properties ---------- */
 
-typedef struct CLzmaProps_s
+typedef struct
 {
 	BYTE lc;
 	BYTE lp;
 	BYTE pb;
 	BYTE pad_;
-	U32 dicSize;
-} CLzmaProps;
+	U32 dic_size;
+} LZMA2_props;
 
 /* LzmaProps_Decode - decodes properties
 Returns:
@@ -123,52 +123,43 @@ Returns:
 #define LzmaProps_GetNumProbs(p) (NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << ((p)->lc + (p)->lp)))
 
 
-#define CALC_POS_STATE(processedPos, pbMask) (((processedPos) & (pbMask)) << 4)
-#define COMBINED_PS_STATE (posState + state)
-#define GET_LEN_STATE (posState)
+#define CALC_POS_STATE(processed_pos, pb_mask) (((processed_pos) & (pb_mask)) << 4)
+#define COMBINED_PS_STATE (pos_state + state)
+#define GET_LEN_STATE (pos_state)
 
 #define LZMA2_LCLP_MAX 4U
 
 
-typedef struct CLzma2Dec_s
+typedef struct
 {
-    CLzmaProps prop;
+    LZMA2_props prop;
     BYTE *dic;
-	size_t dicPos;
-	size_t dicBufSize;
+	size_t dic_pos;
+	size_t dic_buf_size;
 	const BYTE *buf;
 	Probability *probs_1664;
 	U32 range;
 	U32 code;
-    U32 processedPos;
-    U32 checkDicSize;
+    U32 processed_pos;
+    U32 check_dic_size;
     U32 reps[4];
 	unsigned state;
 	unsigned state2;
-	unsigned remainLen;
-    U32 packSize;
-    U32 unpackSize;
+	unsigned remain_len;
+    size_t pack_size;
+    size_t unpack_size;
     BYTE control;
-    BYTE needInitDic;
-	BYTE needInitState;
-	BYTE needInitState2;
-    BYTE needInitProp;
-	BYTE needFlush;
-	BYTE extDic;
+    BYTE need_init_dic;
+	BYTE need_init_state;
+	BYTE need_init_state2;
+    BYTE need_init_prop;
+	BYTE need_flush;
+	BYTE ext_dic;
 	BYTE pad_;
     Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
-} CLzma2Dec;
+} LZMA2_DCtx;
 
-typedef struct
-{
-    U32 packSize;
-    U32 unpackSize;
-    CLzmaProps prop;
-} ChunkInfo;
-
-void LzmaDec_Construct(CLzma2Dec *p);
-
-void FLzmaDec_Init(CLzma2Dec *p);
+void LZMA_constructDCtx(LZMA2_DCtx *p);
 
 typedef enum
 {
@@ -182,47 +173,67 @@ typedef enum
    covers last bytes of block. In other cases you must use LZMA_FINISH_ANY.
 
    If LZMA decoder sees end marker before reaching output limit, it returns SZ_OK,
-   and output value of destLen will be less than output buffer size limit.
+   and output value of dest_len will be less than output buffer size limit.
    You can check status result also.
 
    You can use multiple checks to test data integrity after full decompression:
      1) Check Result and "status" variable.
-     2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
-     3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
+     2) Check that output(dest_len) = uncompressed_size, if you know real uncompressed_size.
+     3) Check that output(src_len) = compressed_size, if you know real compressed_size.
         You must use correct finish mode in that case. */
 
 typedef enum
 {
-  LZMA_STATUS_NOT_SPECIFIED,               /* use main error code instead */
-  LZMA_STATUS_FINISHED_WITH_MARK,          /* stream was finished with end mark. */
-  LZMA_STATUS_NOT_FINISHED,                /* stream was not finished */
-  LZMA_STATUS_NEEDS_MORE_INPUT,            /* you must provide more input bytes */
-  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK  /* there is probability that stream was finished without end mark */
+  LZMA_STATUS_NOT_SPECIFIED,     /* use main error code instead */
+  LZMA_STATUS_FINISHED,          /* stream was finished */
+  LZMA_STATUS_NOT_FINISHED,      /* stream was not finished */
+  LZMA_STATUS_NEEDS_MORE_INPUT,  /* you must provide more input bytes */
+  LZMA_STATUS_OUTPUT_FULL        /* not finished; output buffer is full */
 } ELzmaStatus;
 
 /* ELzmaStatus is used only as output value for function call */
 
 
-void FLzmaDec_Free(CLzma2Dec *state);
+void LZMA_destructDCtx(LZMA2_DCtx *const p);
 
-size_t FLzmaDec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
-
-
-size_t FLzmaDec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_getDictSizeFromProp(BYTE const dict_prop);
 
 #define LZMA2_CONTENTSIZE_ERROR   (size_t)-1
 
-size_t FLzma2Dec_UnpackSize(const BYTE *src, size_t srcLen);
+U64 LZMA2_getUnpackSize(const BYTE *const src, size_t const src_len);
 
-size_t FLzma2Dec_Init(CLzma2Dec *p, BYTE dictProp, BYTE *dic, size_t dicBufSize);
+size_t LZMA2_decMemoryUsage(size_t const dict_size);
 
-size_t FLzma2Dec_DecodeToDic(CLzma2Dec *p, size_t dicLimit,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const dic, size_t dic_buf_size);
 
-size_t FLzma2Dec_DecodeToBuf(CLzma2Dec *p, BYTE *dest, size_t *destLen,
-    const BYTE *src, size_t *srcLen, ELzmaFinishMode finishMode);
+size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
+    const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode);
+
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len,
+    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);
+
+typedef enum
+{
+    CHUNK_MORE_DATA,
+    CHUNK_CONTINUE,
+    CHUNK_DICT_RESET,
+    CHUNK_FINAL,
+    CHUNK_ERROR
+} LZMA2_parseRes;
+
+typedef struct
+{
+    size_t pack_size;
+    size_t unpack_size;
+} LZMA2_chunk;
+
+#if defined(FL2_DEBUG) && (FL2_DEBUG>=1)
+#  define LZMA2_MT_INPUT_SIZE 0x400
+#else
+#  define LZMA2_MT_INPUT_SIZE 0x40000
+#endif
+
+LZMA2_parseRes LZMA2_parseInput(const BYTE* const in_buf, size_t const pos, ptrdiff_t const len, LZMA2_chunk *const inf);
 
 #if defined (__cplusplus)
 }

@@ -67,23 +67,21 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 
 #else
 
-#define FL2_CLEVEL_DEFAULT   9
-#define FL2_MAX_CLEVEL      12
+#define FL2_CLEVEL_DEFAULT   6
+#define FL2_MAX_CLEVEL      10
 
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
     { 1 MB, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
-    { 1 MB, 2, 7, 0, 12, 32, 1, 4, FL2_fast }, /* 2 */
-    { 2 MB, 2, 7, 0, 14, 32, 1, 4, FL2_fast }, /* 3 */
-    { 1 MB, 2, 7, 0, 12, 32, 1, 4, FL2_opt }, /* 4 */
-    { 2 MB, 2, 7, 0, 14, 40, 1, 4, FL2_opt }, /* 5 */
-    { 4 MB, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 6 */
-    { 8 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 7 */
-    { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 8 */
-    { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 9 */
-    { 64 MB, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 10 */
-    { 128 MB, 2, 12, 2, 126, 96, 1, 2, FL2_ultra }, /* 11 */
-    { 256 MB, 2, 14, 3, 254, 160, 1, 2, FL2_ultra } /* 12 */
+    { 2 MB, 2, 7, 0, 10, 32, 1, 4, FL2_fast }, /* 2 */
+    { 2 MB, 2, 7, 0, 10, 32, 1, 4, FL2_opt }, /* 3 */
+    { 4 MB, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 4 */
+    { 8 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
+    { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
+    { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
+    { 64 MB, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 8 */
+    { 128 MB, 2, 12, 2, 126, 96, 1, 2, FL2_ultra }, /* 9 */
+    { 256 MB, 2, 14, 3, 254, 160, 1, 2, FL2_ultra } /* 10 */
 };
 
 #endif

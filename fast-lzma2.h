@@ -493,7 +493,7 @@ typedef enum {
                              * Default level is FL2_CLEVEL_DEFAULT==8.
                              * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table. */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
-                             * Has 9 levels instead of 12, with dictionaryLog 20 - 28. */
+                             * Has 9 levels instead of 10, with dictionaryLog 20 - 28. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
     FL2_p_dictionarySize,   /* Same as above but expressed as an absolute value. 

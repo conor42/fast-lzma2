@@ -16,7 +16,7 @@
 #define MB *(1 <<20)
 #define GB *(1U<<30)
 
-static U32 g_nbSeconds = 10;
+static U32 g_nbSeconds = 0;
 static unsigned g_iterations = 2;
 
 static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t srcSize, char* compressedBuffer, size_t maxCompressedSize,
@@ -202,9 +202,6 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
         else if (strcmp(param, "x") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_highCompression, value);
         }
-        else if (strcmp(param, "s") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_blockSizeLog, value);
-        }
         else if (strcmp(param, "e") == 0) {
             end_level = value;
         }
@@ -267,7 +264,6 @@ int FL2LIB_CALL main(int argc, char** argv)
         benchmark(fcs, dctx, src, size, compressedBuffer, maxCompressedSize, resultBuffer);
         FL2_CCtx_setParameter(fcs, FL2_p_compressionLevel, level + 1);
         printf("%u\r\n", level);
-        g_nbSeconds += 5;
     }
     FL2_freeDCtx(dctx);
     FL2_freeCCtx(fcs);

@@ -163,7 +163,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\dict_buffer.c" />
-    <ClCompile Include="..\fl2_error_private.c" />
     <ClCompile Include="..\fl2_common.c" />
     <ClCompile Include="..\fl2_compress.c" />
     <ClCompile Include="..\fl2_decompress.c" />

@@ -69,9 +69,9 @@ Public domain
 
 #define kMatchesMax 65U /* Doesn't need to be larger than FL2_HYBRIDCYCLES_MAX + 1 */
 
-#define kOptimizerEndSize 16U
+#define kOptimizerEndSize 32U
 #define kOptimizerBufferSize (kMatchLenMax * 2U + kOptimizerEndSize)
-#define kOptimizerSkipSize 8U
+#define kOptimizerSkipSize 16U
 #define kInfinityPrice (1UL << 30U)
 #define kNullDist (U32)-1
 
@@ -1001,7 +1001,7 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
         Probability const is_match_prob = enc->states.is_match[state][pos_state];
         unsigned const cur_byte = *data;
         unsigned const match_byte = *(data - reps[0] - 1);
-        
+       
         U32 cur_and_lit_price = cur_price + GET_PRICE_0(is_match_prob);
         /* This is a compromise to try to filter out cases where literal + rep0 is unlikely to be cheaper */
         BYTE try_lit = cur_and_lit_price + kMinLitPrice / 2U <= next_price;
@@ -1013,7 +1013,8 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
                 next_opt->price = cur_and_lit_price;
                 next_opt->len = 1;
                 MARK_LITERAL(*next_opt);
-                try_lit = 0;
+                if (is_hybrid) /* Evaluates as a constant expression due to inlining */
+                    try_lit = 0;
             }
         }
         match_price = cur_price + GET_PRICE_1(is_match_prob);
@@ -1031,8 +1032,8 @@ size_t LZMA_optimalParse(LZMA2_ECtx* const enc, FL2_dataBlock const block,
         if (bytes_avail < 2)
             return len_end;
 
-        /* If match_byte == cur_byte a rep0 must begin at the current position */
-        if (try_lit && match_byte != cur_byte) {
+        /* If match_byte == cur_byte a rep0 begins at the current position */
+        if (is_hybrid && try_lit && match_byte != cur_byte) {
             /* Try literal + rep0 */
             const BYTE *const data_2 = data - reps[0];
             size_t limit = MIN(bytes_avail - 1, fast_length);

@@ -1,4 +1,4 @@
-objects =
+objects = \
 ../dict_buffer.o \
 ../fl2_common.o \
 ../fl2_compress.o \

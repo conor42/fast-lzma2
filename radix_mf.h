@@ -46,7 +46,7 @@ BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_paramet
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const params, size_t const dict_reduce);
 size_t RMF_threadCount(const FL2_matchTable * const tbl);
 void RMF_initProgress(FL2_matchTable * const tbl);
-size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end);
+size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const end);
 int RMF_buildTable(FL2_matchTable* const tbl,
 	size_t const job,
     unsigned const multi_thread,

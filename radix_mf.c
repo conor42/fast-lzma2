@@ -250,9 +250,9 @@ void RMF_initProgress(FL2_matchTable * const tbl)
         tbl->progress = 0;
 }
 
-size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const start, size_t const end)
+size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const end)
 {
-    DEBUGLOG(5, "RMF_initTable : start %u, size %u", (U32)start, (U32)end);
+    DEBUGLOG(5, "RMF_initTable : size %u", (U32)end);
 
     tbl->st_index = ATOMIC_INITIAL_VALUE;
 

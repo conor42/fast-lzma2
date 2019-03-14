@@ -41,10 +41,10 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 2 MB, 2, 7, 0, 14, 40, 1, 4, FL2_opt }, /* 3 */
     { 4 MB, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 4 */
     { 16 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
-    { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
-    { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
-    { 64 MB, 2, 11, 1, 60, 96, 1, 3, FL2_ultra }, /* 8 */
-    { 64 MB, 3, 12, 2, 126, 160, 1, 3, FL2_ultra }, /* 9 */
+    { 16 MB, 2, 9, 1, 42, 48, 1, 4, FL2_ultra }, /* 6 */
+    { 32 MB, 2, 10, 1, 50, 64, 1, 4, FL2_ultra }, /* 7 */
+    { 64 MB, 2, 11, 2, 60, 96, 1, 3, FL2_ultra }, /* 8 */
+    { 64 MB, 3, 12, 3, 126, 160, 1, 3, FL2_ultra }, /* 9 */
 };
 
 #elif defined(FL2_7ZIP_BUILD)
@@ -55,12 +55,12 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
     { 1 MB, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
-    { 1 MB, 2, 7, 0, 12, 32, 1, 4, FL2_fast }, /* 2 */
-    { 2 MB, 2, 7, 0, 16, 32, 1, 4, FL2_fast }, /* 3 */
-    { 1 MB, 2, 7, 0, 16, 32, 1, 4, FL2_opt }, /* 4 */
-    { 16 MB, 2, 9, 0, 40, 48, 1, 4, FL2_ultra }, /* 5 */
-    { 32 MB, 2, 10, 0, 48, 64, 1, 4, FL2_ultra }, /* 6 */
-    { 64 MB, 2, 11, 1, 60, 96, 1, 3, FL2_ultra }, /* 7 */
+    { 2 MB, 2, 7, 0, 10, 32, 1, 4, FL2_fast }, /* 2 */
+    { 2 MB, 2, 7, 0, 10, 32, 1, 4, FL2_opt }, /* 3 */
+    { 4 MB, 2, 7, 0, 14, 32, 1, 4, FL2_opt }, /* 4 */
+    { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 5 */
+    { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 6 */
+    { 64 MB, 2, 11, 1, 62, 96, 1, 3, FL2_ultra }, /* 7 */
     { 128 MB, 2, 12, 2, 128, 128, 1, 2, FL2_ultra }, /* 8 */
     { 128 MB, 3, 14, 3, 252, 160, 0, 2, FL2_ultra } /* 9 */
 };
@@ -79,8 +79,8 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 8 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
     { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
-    { 64 MB, 2, 11, 1, 60, 64, 1, 3, FL2_ultra }, /* 8 */
-    { 128 MB, 2, 12, 2, 126, 96, 1, 2, FL2_ultra }, /* 9 */
+    { 64 MB, 2, 11, 1, 62, 96, 1, 3, FL2_ultra }, /* 8 */
+    { 128 MB, 2, 12, 2, 126, 128, 1, 2, FL2_ultra }, /* 9 */
     { 256 MB, 2, 14, 3, 254, 160, 1, 2, FL2_ultra } /* 10 */
 };
 
@@ -289,7 +289,7 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx* const cctx, int const stre
     cctx->jobs[nbThreads - 1].block.end = cctx->curBlock.end;
 
     /* initialize to length 2 */
-    cctx->matchTable->progress = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.start, cctx->curBlock.end);
+    cctx->matchTable->progress = RMF_initTable(cctx->matchTable, cctx->curBlock.data, cctx->curBlock.end);
 
     if (cctx->canceled) {
         RMF_resetIncompleteBuild(cctx->matchTable);
@@ -1031,13 +1031,15 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream * fcs, FL2_dic
 
     CHECK_F(fcs->asyncRes);
 
-    if (!DICT_availSpace(&fcs->buf))
+    DICT_buffer *buf = &fcs->buf;
+
+    if (!DICT_availSpace(buf) && DICT_hasUnprocessed(buf))
         CHECK_F(FL2_compressStream_internal(fcs, 0));
 
-    if (DICT_needShift(&fcs->buf) && !DICT_async(&fcs->buf))
+    if (DICT_needShift(buf) && !DICT_async(buf))
         CHECK_F(FL2_waitCStream(fcs));
 
-    dict->size = (unsigned long)DICT_get(&fcs->buf, &dict->dst);
+    dict->size = (unsigned long)DICT_get(buf, &dict->dst);
 
     return FL2_error_no_error;
 }

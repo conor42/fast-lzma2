@@ -1,3 +1,13 @@
+/*
+* Copyright (c) 2018, Conor McCarthy
+* All rights reserved.
+*
+* This source code is licensed under both the BSD-style license (found in the
+* LICENSE file in the root directory of this source tree) and the GPLv2 (found
+* in the COPYING file in the root directory of this source tree).
+* You may select, at your option, one of the above-listed licenses.
+*/
+
 #include "fast-lzma2.h"
 #include "mem.h"
 #include "data_block.h"
@@ -7,6 +17,10 @@
 
 #ifndef FL2_DICT_BUFFER_H_
 #define FL2_DICT_BUFFER_H_
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
 
 /* DICT_buffer structure.
  * Maintains one or two dictionary buffers. In a dual dict configuration (asyc==1), when the
@@ -59,5 +73,9 @@ XXH32_hash_t DICT_getDigest(const DICT_buffer *const buf);
 #endif
 
 size_t DICT_memUsage(const DICT_buffer *const buf);
+
+#if defined (__cplusplus)
+}
+#endif
 
 #endif /* FL2_DICT_BUFFER_H_ */

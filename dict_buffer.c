@@ -103,6 +103,7 @@ size_t DICT_get(DICT_buffer * const buf, void **const dict)
 {
     DICT_shift(buf);
 
+    DEBUGLOG(5, "Getting dict buffer %u, pos %u, avail %u", (unsigned)buf->index, (unsigned)buf->end, (unsigned)(buf->size - buf->end));
     *dict = buf->data[buf->index] + buf->end;
     return buf->size - buf->end;
 }
@@ -110,6 +111,7 @@ size_t DICT_get(DICT_buffer * const buf, void **const dict)
 /* Update with the amount added */
 int DICT_update(DICT_buffer * const buf, size_t const added_size)
 {
+    DEBUGLOG(5, "Added %u bytes to dict buffer %u", (unsigned)added_size, (unsigned)buf->index);
     buf->end += added_size;
     assert(buf->end <= buf->size);
     return !DICT_availSpace(buf);

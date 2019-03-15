@@ -2000,7 +2000,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         header[2] = (BYTE)(uncompressed_size - 1);
         /* Output an uncompressed chunk if necessary */
         if (not_compressible || uncompressed_size + 3 <= compressed_size + header_size) {
-            DEBUGLOG(5, "Storing chunk : was %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
+            DEBUGLOG(6, "Storing chunk : was %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
 
             header[0] = (index == 0) ? kChunkUncompressedDictReset : kChunkUncompressed;
 
@@ -2013,7 +2013,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
                 enc->states = saved_states;
         }
         else {
-            DEBUGLOG(5, "Compressed chunk : %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
+            DEBUGLOG(6, "Compressed chunk : %u => %u", (unsigned)uncompressed_size, (unsigned)compressed_size);
 
             if (index == 0)
                 header[0] = kChunkCompressedFlag | kChunkAllReset;

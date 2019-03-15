@@ -8,6 +8,13 @@
 * You may select, at your option, one of the above-listed licenses.
 */
 
+#ifndef FL2_RADIX_GET_H_
+#define FL2_RADIX_GET_H_
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 typedef struct
 {
     U32 length;
@@ -196,3 +203,8 @@ RMF_match RMF_getNextMatch(FL2_dataBlock block,
     }
 }
 
+#if defined (__cplusplus)
+}
+#endif
+
+#endif /* FL2_RADIX_GET_H_ */

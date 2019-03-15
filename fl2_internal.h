@@ -20,15 +20,28 @@
 #include "compiler.h"
 #include "fl2_error_private.h"
 
+
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
+
+/*-****************************************
+*  Error codes handling
+******************************************/
+#define PREFIX(name) FL2_error_##name
+#define FL2_ERROR(name) ((size_t)-PREFIX(name))
+
+
+/*-*************************************
+*  Stream properties
+***************************************/
 #define FL2_PROP_HASH_BIT 7
 #define FL2_LZMA_PROP_MASK 0x3FU
 #ifndef NO_XXHASH
 #  define XXHASH_SIZEOF sizeof(XXH32_canonical_t)
 #endif
+
 
 /*-*************************************
 *  Debug

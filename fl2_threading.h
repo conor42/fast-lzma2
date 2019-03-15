@@ -57,32 +57,32 @@ unsigned FL2_checkNbThreads(unsigned nbThreads);
 
 
 /* mutex */
-#define ZSTD_pthread_mutex_t           CRITICAL_SECTION
-#define ZSTD_pthread_mutex_init(a, b)  (InitializeCriticalSection((a)), 0)
-#define ZSTD_pthread_mutex_destroy(a)  DeleteCriticalSection((a))
-#define ZSTD_pthread_mutex_lock(a)     EnterCriticalSection((a))
-#define ZSTD_pthread_mutex_unlock(a)   LeaveCriticalSection((a))
+#define FL2_pthread_mutex_t           CRITICAL_SECTION
+#define FL2_pthread_mutex_init(a, b)  (InitializeCriticalSection((a)), 0)
+#define FL2_pthread_mutex_destroy(a)  DeleteCriticalSection((a))
+#define FL2_pthread_mutex_lock(a)     EnterCriticalSection((a))
+#define FL2_pthread_mutex_unlock(a)   LeaveCriticalSection((a))
 
 /* condition variable */
-#define ZSTD_pthread_cond_t                     CONDITION_VARIABLE
-#define ZSTD_pthread_cond_init(a, b)            (InitializeConditionVariable((a)), 0)
-#define ZSTD_pthread_cond_destroy(a)            /* No delete */
-#define ZSTD_pthread_cond_wait(a, b)            SleepConditionVariableCS((a), (b), INFINITE)
-#define ZSTD_pthread_cond_timedwait(a, b, c)    SleepConditionVariableCS((a), (b), (c))
-#define ZSTD_pthread_cond_signal(a)             WakeConditionVariable((a))
-#define ZSTD_pthread_cond_broadcast(a)          WakeAllConditionVariable((a))
+#define FL2_pthread_cond_t                     CONDITION_VARIABLE
+#define FL2_pthread_cond_init(a, b)            (InitializeConditionVariable((a)), 0)
+#define FL2_pthread_cond_destroy(a)            /* No delete */
+#define FL2_pthread_cond_wait(a, b)            SleepConditionVariableCS((a), (b), INFINITE)
+#define FL2_pthread_cond_timedwait(a, b, c)    SleepConditionVariableCS((a), (b), (c))
+#define FL2_pthread_cond_signal(a)             WakeConditionVariable((a))
+#define FL2_pthread_cond_broadcast(a)          WakeAllConditionVariable((a))
 
-/* ZSTD_pthread_create() and ZSTD_pthread_join() */
+/* FL2_pthread_create() and FL2_pthread_join() */
 typedef struct {
     HANDLE handle;
     void* (*start_routine)(void*);
     void* arg;
-} ZSTD_pthread_t;
+} FL2_pthread_t;
 
-int ZSTD_pthread_create(ZSTD_pthread_t* thread, const void* unused,
+int FL2_pthread_create(FL2_pthread_t* thread, const void* unused,
                    void* (*start_routine) (void*), void* arg);
 
-int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
+int FL2_pthread_join(FL2_pthread_t thread, void** value_ptr);
 
 /**
  * add here more wrappers as required
@@ -94,22 +94,22 @@ int ZSTD_pthread_join(ZSTD_pthread_t thread, void** value_ptr);
 #  include <sys/time.h>
 #  include <pthread.h>
 
-#define ZSTD_pthread_mutex_t            pthread_mutex_t
-#define ZSTD_pthread_mutex_init(a, b)   pthread_mutex_init((a), (b))
-#define ZSTD_pthread_mutex_destroy(a)   pthread_mutex_destroy((a))
-#define ZSTD_pthread_mutex_lock(a)      pthread_mutex_lock((a))
-#define ZSTD_pthread_mutex_unlock(a)    pthread_mutex_unlock((a))
+#define FL2_pthread_mutex_t            pthread_mutex_t
+#define FL2_pthread_mutex_init(a, b)   pthread_mutex_init((a), (b))
+#define FL2_pthread_mutex_destroy(a)   pthread_mutex_destroy((a))
+#define FL2_pthread_mutex_lock(a)      pthread_mutex_lock((a))
+#define FL2_pthread_mutex_unlock(a)    pthread_mutex_unlock((a))
 
-#define ZSTD_pthread_cond_t             pthread_cond_t
-#define ZSTD_pthread_cond_init(a, b)    pthread_cond_init((a), (b))
-#define ZSTD_pthread_cond_destroy(a)    pthread_cond_destroy((a))
-#define ZSTD_pthread_cond_wait(a, b)    pthread_cond_wait((a), (b))
-#define ZSTD_pthread_cond_signal(a)     pthread_cond_signal((a))
-#define ZSTD_pthread_cond_broadcast(a)  pthread_cond_broadcast((a))
+#define FL2_pthread_cond_t             pthread_cond_t
+#define FL2_pthread_cond_init(a, b)    pthread_cond_init((a), (b))
+#define FL2_pthread_cond_destroy(a)    pthread_cond_destroy((a))
+#define FL2_pthread_cond_wait(a, b)    pthread_cond_wait((a), (b))
+#define FL2_pthread_cond_signal(a)     pthread_cond_signal((a))
+#define FL2_pthread_cond_broadcast(a)  pthread_cond_broadcast((a))
 
-#define ZSTD_pthread_t                  pthread_t
-#define ZSTD_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
-#define ZSTD_pthread_join(a, b)         pthread_join((a),(b))
+#define FL2_pthread_t                  pthread_t
+#define FL2_pthread_create(a, b, c, d) pthread_create((a), (b), (c), (d))
+#define FL2_pthread_join(a, b)         pthread_join((a),(b))
 
 /* Timed wait functions from XZ by Lasse Collin
 */
@@ -140,7 +140,7 @@ mythread_condtime_set(struct timespec *condtime, U32 timeout_ms)
  * non-zero is returned, otherwise zero is returned.
  */
 static inline void
-ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mutex,
+FL2_pthread_cond_timedwait(FL2_pthread_cond_t *cond, FL2_pthread_mutex_t *mutex,
     U32 timeout_ms)
 {
     struct timespec condtime;
@@ -152,20 +152,20 @@ ZSTD_pthread_cond_timedwait(ZSTD_pthread_cond_t *cond, ZSTD_pthread_mutex_t *mut
 #elif defined(FL2_SINGLETHREAD)
 /* No multithreading support */
 
-typedef int ZSTD_pthread_mutex_t;
-#define ZSTD_pthread_mutex_init(a, b)   ((void)a, 0)
-#define ZSTD_pthread_mutex_destroy(a)
-#define ZSTD_pthread_mutex_lock(a)
-#define ZSTD_pthread_mutex_unlock(a)
+typedef int FL2_pthread_mutex_t;
+#define FL2_pthread_mutex_init(a, b)   ((void)a, 0)
+#define FL2_pthread_mutex_destroy(a)
+#define FL2_pthread_mutex_lock(a)
+#define FL2_pthread_mutex_unlock(a)
 
-typedef int ZSTD_pthread_cond_t;
-#define ZSTD_pthread_cond_init(a, b)    ((void)a, 0)
-#define ZSTD_pthread_cond_destroy(a)
-#define ZSTD_pthread_cond_wait(a, b)
-#define ZSTD_pthread_cond_signal(a)
-#define ZSTD_pthread_cond_broadcast(a)
+typedef int FL2_pthread_cond_t;
+#define FL2_pthread_cond_init(a, b)    ((void)a, 0)
+#define FL2_pthread_cond_destroy(a)
+#define FL2_pthread_cond_wait(a, b)
+#define FL2_pthread_cond_signal(a)
+#define FL2_pthread_cond_broadcast(a)
 
-/* do not use ZSTD_pthread_t */
+/* do not use FL2_pthread_t */
 
 #else
 #  error FL2_SINGLETHREAD not defined but no threading support found

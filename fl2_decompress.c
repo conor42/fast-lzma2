@@ -11,6 +11,7 @@
 
 #include <string.h>
 #include "fast-lzma2.h"
+#include "fl2_errors.h"
 #include "fl2_internal.h"
 #include "mem.h"
 #include "util.h"

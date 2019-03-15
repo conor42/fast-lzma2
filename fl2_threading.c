@@ -38,12 +38,12 @@ int g_ZSTD_threading_useles_symbol;
 
 static unsigned __stdcall worker(void *arg)
 {
-    ZSTD_pthread_t* const thread = (ZSTD_pthread_t*) arg;
+    FL2_pthread_t* const thread = (FL2_pthread_t*) arg;
     thread->arg = thread->start_routine(thread->arg);
     return 0;
 }
 
-int ZSTD_pthread_create(ZSTD_pthread_t* thread, const void* unused,
+int FL2_pthread_create(FL2_pthread_t* thread, const void* unused,
             void* (*start_routine) (void*), void* arg)
 {
     (void)unused;
@@ -57,7 +57,7 @@ int ZSTD_pthread_create(ZSTD_pthread_t* thread, const void* unused,
         return 0;
 }
 
-int ZSTD_pthread_join(ZSTD_pthread_t thread, void **value_ptr)
+int FL2_pthread_join(FL2_pthread_t thread, void **value_ptr)
 {
     DWORD result;
 

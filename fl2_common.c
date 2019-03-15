@@ -15,7 +15,7 @@
 *  Dependencies
 ***************************************/
 #include "fast-lzma2.h"
-#include "fl2_error_private.h"
+#include "fl2_errors.h"
 #include "fl2_internal.h"
 
 
@@ -70,9 +70,9 @@ FL2LIB_API const char* FL2LIB_CALL FL2_getErrorName(size_t code)
 FL2LIB_API FL2_ErrorCode FL2LIB_CALL FL2_getErrorCode(size_t code)
 {
     if (!IsError(code)) 
-        return (ERR_enum)0;
+        return (FL2_ErrorCode)0;
 
-    return (ERR_enum)(0 - code);
+    return (FL2_ErrorCode)(0 - code);
 }
 
 /*! FL2_getErrorString() :

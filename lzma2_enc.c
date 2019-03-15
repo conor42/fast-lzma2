@@ -7,6 +7,7 @@ Public domain
 #include <stdlib.h>
 #include <math.h>
 
+#include "fl2_errors.h"
 #include "fl2_internal.h"
 #include "lzma2_enc.h"
 #include "fl2_compress_internal.h"

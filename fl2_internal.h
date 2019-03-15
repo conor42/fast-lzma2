@@ -18,7 +18,6 @@
 ***************************************/
 #include "mem.h"
 #include "compiler.h"
-#include "fl2_error_private.h"
 
 
 #if defined (__cplusplus)
@@ -89,8 +88,8 @@ extern int g_debuglog_enable;
 #undef MAX
 #define MIN(a,b) ((a)<(b) ? (a) : (b))
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
-#define CHECK_F(f) do { size_t const errcod = f; if (ERR_isError(errcod)) return errcod; } while(0)  /* check and Forward error code */
-#define CHECK_E(f, e) do { size_t const errcod = f; if (ERR_isError(errcod)) return FL2_ERROR(e); } while(0)  /* check and send Error code */
+#define CHECK_F(f) do { size_t const errcod = f; if (FL2_isError(errcod)) return errcod; } while(0)  /* check and Forward error code */
+#define CHECK_E(f, e) do { size_t const errcod = f; if (FL2_isError(errcod)) return FL2_ERROR(e); } while(0)  /* check and send Error code */
 
 MEM_STATIC U32 ZSTD_highbit32(U32 val)
 {

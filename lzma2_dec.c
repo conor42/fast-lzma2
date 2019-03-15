@@ -3,8 +3,9 @@ Based upon LzmaDec.c 2018-02-28 : Igor Pavlov : Public domain
 Modified for FL2 by Conor McCarthy */
 
 #include <stdlib.h>
-#include "lzma2_dec.h"
+#include "fl2_errors.h"
 #include "fl2_internal.h"
+#include "lzma2_dec.h"
 #include "platform.h"
 
 #include <string.h>
@@ -1113,7 +1114,7 @@ static size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit
             p->pack_size -= in_cur;
             p->unpack_size -= p->dic_pos - dic_pos;
 
-            if (ERR_isError(res))
+            if (FL2_isError(res))
                 return res;
 
             /* error if decoder not finished but chunk output is complete */
@@ -1149,7 +1150,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
         size_t len = in_size - in_pos;
         res = LZMA2_decodeChunkToDic(p, dic_limit, src + in_pos, &len, finish_mode);
         in_pos += len;
-        if (ERR_isError(res)) {
+        if (FL2_isError(res)) {
             p->state2 = LZMA2_STATE_ERROR;
             break;
         }
@@ -1263,7 +1264,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
             out_cur = p->dic_pos - dic_pos;
             p->unpack_size -= (U32)out_cur;
 
-            if (ERR_isError(res))
+            if (FL2_isError(res))
                 break;
 
             if (res == LZMA_STATUS_NEEDS_MORE_INPUT)
@@ -1288,7 +1289,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
     }
 
     p->state2 = LZMA2_STATE_ERROR;
-    if (ERR_isError(res))
+    if (FL2_isError(res))
         return res;
     return FL2_ERROR(corruption_detected);
 }
@@ -1325,7 +1326,7 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len
         dest += out_cur;
         out_size -= out_cur;
         *dest_len += out_cur;
-        if (ERR_isError(res) || res == LZMA_STATUS_FINISHED)
+        if (FL2_isError(res) || res == LZMA_STATUS_FINISHED)
             return res;
         if (out_cur == 0 || out_size == 0)
             return FL2_error_no_error;

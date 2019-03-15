@@ -74,7 +74,7 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             cCompleted = (totalCTime >= maxTime && totalLoops >= g_iterations);  /* end compression tests */
         }
 
-#if 1       /* disable decompression test */
+#if 0       /* disable decompression test */
         dCompleted = 1;
         (void)totalDTime; (void)fastestD;   /* unused when decompression disabled */
 #else

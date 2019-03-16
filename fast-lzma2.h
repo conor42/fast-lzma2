@@ -53,9 +53,9 @@ Introduction
 *********************************************************************************************************/
 
 /*------   Version   ------*/
-#define FL2_VERSION_MAJOR    0
-#define FL2_VERSION_MINOR    9
-#define FL2_VERSION_RELEASE  11
+#define FL2_VERSION_MAJOR    1
+#define FL2_VERSION_MINOR    0
+#define FL2_VERSION_RELEASE  0
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -89,10 +89,13 @@ FL2LIB_API size_t FL2LIB_CALL FL2_compressMt(void* dst, size_t dstCapacity,
     unsigned nbThreads);
 
 /*! FL2_decompress() :
- *  `compressedSize` : must be at least the size of an LZMA2 stream.
- *  `dstCapacity` is an upper bound of the original size to regenerate.
- *  If user cannot imply a maximum upper bound, it's better to use streaming mode to decompress data.
- *  Call FL2_decompressMt() to use > 1 thread. Specify nbThreads = 0 to use all cores.
+ *  Decompresses a single LZMA2 compressed stream from `src` into already allocated `dst`.
+ *  `compressedSize` : must be at least the size of the LZMA2 stream.
+ *  `dstCapacity` is the original, uncompressed size to regenerate, returned by calling
+ *  FL2_findDecompressedSize().
+ *  Call FL2_decompressMt() to use > 1 thread. Specify nbThreads = 0 to use all cores. The stream
+ *  must contain dictionary resets to use multiple threads. These are inserted during compression by
+ *  default. The frequency can be changed/disabled with the FL2_p_resetInterval parameter setting.
  *  @return : the number of bytes decompressed into `dst` (<= `dstCapacity`),
  *            or an errorCode if it fails (which can be tested using FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_decompress(void* dst, size_t dstCapacity,
@@ -105,6 +108,8 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressMt(void* dst, size_t dstCapacity,
 /*! FL2_findDecompressedSize()
  *  `src` should point to the start of a LZMA2 encoded stream.
  *  `srcSize` must be at least as large as the LZMA2 stream including end marker.
+ *  A property byte is assumed to exist at position 0 in `src`. If the stream was created without one,
+ *  subtract 1 byte from `src` when passing it to the function.
  *  @return : - decompressed size of the stream in `src`, if known
  *            - FL2_CONTENTSIZE_ERROR if an error occurred (e.g. corruption, srcSize too small)
  *   note 1 : a 0 return value means the stream is valid but "empty".
@@ -119,7 +124,7 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_findDecompressedSize(const void *s
 
 
 /*======  Helper functions  ======*/
-#define FL2_COMPRESSBOUND(srcSize)   ((srcSize) + (((srcSize) + 0xFFF) / 0x1000) * 3 + 6)  /* this formula calculates the maximum size of data stored in uncompressed chunks */
+#define FL2_COMPRESSBOUND(srcSize)   ((srcSize) + (((srcSize) + 0xFFF) / 0x1000) * 3 + 6)  /*!< calculates the maximum size of data stored in a sequence of uncompressed chunks */
 FL2LIB_API size_t      FL2LIB_CALL FL2_compressBound(size_t srcSize); /*!< maximum compressed size in worst case scenario */
 FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells if a `size_t` function result is an error code */
 FL2LIB_API unsigned    FL2LIB_CALL FL2_isTimedOut(size_t code);       /*!< tells if a `size_t` function result is the timeout code */
@@ -165,14 +170,14 @@ FL2LIB_API unsigned char FL2LIB_CALL FL2_getCCtxDictProp(FL2_CCtx* cctx);
 
 /*= Decompression context
  *  When decompressing many times, it is recommended to allocate a context only once,
- *  and re-use it for each successive compression operation. This will make the workload
+ *  and re-use it for each successive decompression operation. This will make the workload
  *  friendlier for the system's memory.
  *  The context may not allocate the number of threads requested if the library is
  *  compiled for single-threaded compression or nbThreads > FL2_MAXTHREADS.
  *  Call FL2_getDCtxThreadCount to obtain the actual number allocated.
  *  At least nbThreads dictionary resets must exist in the stream to use all of the
- *  threads. Dictionary resets are inserted into the stream according to the resetInterval
- *  parameter used in the compression context. */
+ *  threads. Dictionary resets are inserted into the stream according to the
+ *  FL2_p_resetInterval parameter used in the compression context. */
 typedef struct FL2_DCtx_s FL2_DCtx;
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtx(void);
 FL2LIB_API FL2_DCtx* FL2LIB_CALL FL2_createDCtxMt(unsigned nbThreads);
@@ -208,6 +213,8 @@ typedef struct {
     size_t pos;         /**< position where writing stopped. Will be updated. Necessarily 0 <= pos <= size */
 } FL2_outBuffer;
 
+/*** Push/pull structs ***/
+
 typedef struct {
     void*  dst;         /**< start of available dict buffer */
     unsigned long size; /**< size of dict remaining */
@@ -230,7 +237,7 @@ typedef struct {
  *  Call FL2_createCStreamMt() with a nonzero dualBuffer parameter to use two input dictionary buffers.
  *  The stream will not block on FL2_compressStream() and continues to accept data while compression is
  *  underway, until both buffers are full. Useful when I/O is slow.
- *  To compress with a single thread and dual buffering, call FL2_createCStreamMt with nbThreads=1.
+ *  To compress with a single thread with dual buffering, call FL2_createCStreamMt with nbThreads=1.
  *
  *  Use FL2_initCStream() on the FL2_CStream object to start a new compression operation.
  *
@@ -240,8 +247,8 @@ typedef struct {
  *  unlike the decompression function.
  *
  *  The radix match finder allows compressed data to be stored in its match table during encoding.
- *  Applications may pass NULL instead of an FL2_outBuffer object pointer. In this case,
- *  when FL2_compressStream returns 1, the compressed data must be read from the internal buffers.
+ *  Applications may call streaming compression functions with output == NULL. In this case,
+ *  when the function returns 1, the compressed data must be read from the internal buffers.
  *  Call FL2_getNextCStreamBuffer() repeatedly until it returns 0.
  *  Each call returns buffer information in the FL2_inBuffer parameter. Applications typically will 
  *  passed this to an I/O write function or downstream filter.
@@ -249,8 +256,7 @@ typedef struct {
  *  case the return value is 1 if the buffer is full and more compressed data remains.
  *
  *  FL2_endStream() instructs to finish a stream. It will perform a flush and write the LZMA2
- *  termination byte (required).
- *  Call FL2_endStream() until it returns 0.
+ *  termination byte (required). Call FL2_endStream() repeatedly until it returns 0.
  *
  *  Most functions may return a size_t error code, which can be tested using FL2_isError().
  *
@@ -282,11 +288,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
 
 /*! FL2_compressStream() :
  *  Reads data from input into the dictionary buffer. Compression will begin if the buffer fills up.
- *  A dual buffering stream will fill the second buffer from input and compress if both buffers are full.
+ *  A dual buffering stream will fill the second buffer while compression proceeds on the first.
  *  A call to FL2_compressStream() will wait for ongoing compression to complete if all dictionary space
- *  is filled. FL2_compressStream() must not be called with output == NULL until the caller reads all
+ *  is filled. FL2_compressStream() must not be called with output == NULL unless the caller has read all
  *  compressed data from the CStream object.
- *  Returns 1 to indicate compressed data must be read, or 0 otherwise. */
+ *  Returns 1 to indicate compressed data must be read (or output is full), or 0 otherwise. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer *output, FL2_inBuffer* input);
 
 /*** Push/pull functions ***/
@@ -362,7 +368,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
  *  The function will update both `pos` fields.
  *  If `input.pos < input.size`, some input has not been consumed.
  *  It's up to the caller to present again the remaining data.
- *  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`
+ *  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`. In this case,
+ *  move the remaining input (<= LZMA_REQUIRED_INPUT_MAX bytes) to the start of the buffer and
+ *  load new data after it.
  *  If `output.pos < output.size`, decoder has flushed everything it could.
  *  @return : 0 when a stream is completely decoded and fully flushed,
  *            1, which means there is still some decoding to do to complete the stream,
@@ -426,7 +434,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigne
  *  Reads data from input and decompresses to output.
  *  Returns 1 if the stream is unfinished, 0 if the terminator was encountered (he'll be back)
  *  and all data was written to output, or an error code. Call this function repeatedly if
- *  necessary, removing data from output and/or loading data into input before each call. */
+ *  necessary, removing data from output and/or loading data into input before each call.
+ *  Note the requirement for LZMA_REQUIRED_INPUT_MAX bytes of input if the input data is
+ *  incomplete (see intro above). */
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************
@@ -434,28 +444,29 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
  *
  *  Any function that takes a 'compressionLevel' parameter will replace any
  *  parameters affected by compression level that are already set.
- *  Call FL2_CCtx_setParameter with FL2_p_compressionLevel to set the level,
- *  then call FL2_CCtx_setParameter again with any other settings to change.
- *  Specify compressionLevel=0 when calling a compression function to keep the
- *  current parameters.
+ *  To use a preset level and modify it, call FL2_CCtx_setParameter with
+ *  FL2_p_compressionLevel to set the level, then call FL2_CCtx_setParameter again
+ *  with any other settings to change.
+ *  Specify a compressionLevel of 0 when calling a compression function to keep
+ *  the current parameters.
  * *******************************************************************************/
 
+#define FL2_DICTLOG_MIN      20
 #define FL2_DICTLOG_MAX_32   27
 #define FL2_DICTLOG_MAX_64   30
 #define FL2_DICTLOG_MAX      ((unsigned)(sizeof(size_t) == 4 ? FL2_DICTLOG_MAX_32 : FL2_DICTLOG_MAX_64))
-#define FL2_DICTLOG_MIN      20
 #define FL2_DICTSIZE_MAX     (1U << FL2_DICTLOG_MAX)
 #define FL2_DICTSIZE_MIN     (1U << FL2_DICTLOG_MIN)
 #define FL2_BLOCK_OVERLAP_MIN 0
 #define FL2_BLOCK_OVERLAP_MAX 14
 #define FL2_RESET_INTERVAL_MIN 1
-#define FL2_RESET_INTERVAL_MAX 16      /* small enough to fit FL2_DICTSIZE_MAX * FL2_RESET_INTERVAL_MAX in 32-bit size_t */
+#define FL2_RESET_INTERVAL_MAX 16  /* small enough to fit FL2_DICTSIZE_MAX * FL2_RESET_INTERVAL_MAX in 32-bit size_t */
 #define FL2_BUFFER_SIZE_LOG_MIN 0
 #define FL2_BUFFER_SIZE_LOG_MAX 6
-#define FL2_CHAINLOG_MAX       14
 #define FL2_CHAINLOG_MIN       4
-#define FL2_HYBRIDCYCLES_MAX   64
+#define FL2_CHAINLOG_MAX       14
 #define FL2_HYBRIDCYCLES_MIN    1
+#define FL2_HYBRIDCYCLES_MAX   64
 #define FL2_SEARCH_DEPTH_MIN 6
 #define FL2_SEARCH_DEPTH_MAX 254
 #define FL2_FASTLENGTH_MIN    6   /* only used by optimizer */
@@ -477,7 +488,7 @@ typedef enum {
 typedef struct {
     size_t   dictionarySize;   /* largest match distance : larger == more compression, more memory needed during decompression; >= 27 == more memory per byte, slower */
     unsigned overlapFraction;  /* overlap between consecutive blocks in 1/16 units: larger == more compression, slower */
-    unsigned chainLog;         /* fully searched segment : larger == more compression, slower, more memory; hybrid mode only (ultra) */
+    unsigned chainLog;         /* HC3 sliding window : larger == more compression, slower; hybrid mode only (ultra) */
     unsigned cyclesLog;        /* nb of searches : larger == more compression, slower; hybrid mode only (ultra) */
     unsigned searchDepth;      /* maximum depth for resolving string matches : larger == more compression, slower */
     unsigned fastLength;       /* acceptable match size for parser : larger == more compression, slower; fast bytes parameter from 7-zip */
@@ -490,44 +501,61 @@ typedef struct {
 typedef enum {
     /* compression parameters */
     FL2_p_compressionLevel, /* Update all compression parameters according to pre-defined cLevel table
-                             * Default level is FL2_CLEVEL_DEFAULT==8.
+                             * Default level is FL2_CLEVEL_DEFAULT==6.
                              * Setting FL2_p_highCompression to 1 switches to an alternate cLevel table. */
     FL2_p_highCompression,  /* Maximize compression ratio for a given dictionary size.
-                             * Has 9 levels instead of 10, with dictionaryLog 20 - 28. */
+                             * Levels 1..10 = dictionaryLog 20..29 (1 Mb..512 Mb).
+                             * Typically provides a poor speed/ratio tradeoff. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
-                             * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX. */
+                             * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
+                             * Default = 24 */
     FL2_p_dictionarySize,   /* Same as above but expressed as an absolute value. 
-                             * Must be clamped between FL2_DICTSIZE_MIN and FL2_DICTSIZE_MAX. */
+                             * Must be clamped between FL2_DICTSIZE_MIN and FL2_DICTSIZE_MAX.
+                             * Default = 16 Mb */
     FL2_p_overlapFraction,  /* The radix match finder is block-based, so some overlap is retained from
                              * each block to improve compression of the next. This value is expressed
                              * as n / 16 of the block size (dictionary size). Larger values are slower.
-                             * Values above 2 mostly yield only a small improvement in compression. */
+                             * Values above 2 mostly yield only a small improvement in compression.
+                             * A large value for a small dictionary may worsen multithreaded compression.
+                             * Default = 2 */
     FL2_p_resetInterval,    /* For multithreaded decompression. A dictionary reset will occur
-                             * after each dictionarySize * resetInterval bytes of input. */
+                             * after each dictionarySize * resetInterval bytes of input.
+                             * Default = 4 */
     FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
                              * (dictionarySize >> (12 - bufferLog)) * 12 bytes. Higher number = slower,
-                             * better compression, higher memory usage. */
-    FL2_p_chainLog,         /* Size of the hybrid mode HC3 hash chain, as a power of 2.
+                             * better compression, higher memory usage. A CPU with a large memory cache
+                             * may make effective use of a larger buffer.
+                             * Default = 4 */
+    FL2_p_hybridChainLog,   /* Size of the hybrid mode HC3 hash chain, as a power of 2.
                              * Resulting table size is (1 << (chainLog+2)) bytes.
                              * Larger tables result in better and slower compression.
-                             * This parameter is only used by the hybrid "ultra" strategy. */
+                             * This parameter is only used by the hybrid "ultra" strategy.
+                             * Default = 9 */
     FL2_p_hybridCycles,     /* Number of search attempts made by the HC3 match finder.
                              * Used only by the hybrid "ultra" strategy.
-                             * More attempts result in slightly better and slower compression. */
+                             * More attempts result in slightly better and slower compression.
+                             * Default = 1 */
     FL2_p_searchDepth,      /* Match finder will resolve string matches up to this length. If a longer
-                             * match exists further back in the input, it will not be found. */
+                             * match exists further back in the input, it will not be found.
+                             * Default = 42 */
     FL2_p_fastLength,       /* Only useful for strategies >= opt.
                              * Length of match considered "good enough" to stop search.
-                             * Larger values make compression stronger and slower. */
+                             * Larger values make compression stronger and slower.
+                             * Default = 48 */
     FL2_p_divideAndConquer, /* Split long chains of 2-byte matches into shorter chains with a small overlap
                              * for further processing. Allows buffering of all chains at length 2.
-                             * Faster, less compression. Generally a good tradeoff. Enabled by default. */
+                             * Faster, less compression. Generally a good tradeoff.
+                             * Default = enabled */
     FL2_p_strategy,         /* 1 = fast; 2 = optimized, 3 = ultra (hybrid mode).
                              * The higher the value of the selected strategy, the more complex it is,
-                             * resulting in stronger and slower compression. */
-    FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder */
-    FL2_p_literalPosBits,   /* lp value for LZMA2 encoder */
-    FL2_p_posBits,          /* pb value for LZMA2 encoder */
+                             * resulting in stronger and slower compression.
+                             * Default = ultra */
+    FL2_p_literalCtxBits,   /* lc value for LZMA2 encoder
+                             * Default = 3 */
+    FL2_p_literalPosBits,   /* lp value for LZMA2 encoder
+                             * Default = 0 */
+    FL2_p_posBits,          /* pb value for LZMA2 encoder
+                             * Default = 2 */
     FL2_p_omitProperties,   /* Omit the property byte at the start of the stream. For use within 7-zip */
                             /* or other containers which store the property byte elsewhere. */
                             /* A stream compressed under this setting cannot be decoded by this library. */
@@ -548,13 +576,30 @@ typedef enum {
  *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParameter param, size_t value);
 
+/*! FL2_CCtx_getParameter() :
+ *  Get one compression parameter, selected by enum FL2_cParameter.
+ *  @result : the parameter value, or the parameter_unsupported error code
+ *            (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParameter param);
 
+/*! FL2_CStream_setParameter() :
+ *  Set one compression parameter, selected by enum FL2_cParameter.
+ *  @result : informational value (typically, the one being set, possibly corrected),
+ *            or an error code (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CStream_setParameter(FL2_CStream* fcs, FL2_cParameter param, size_t value);
 
+/*! FL2_CStream_getParameter() :
+ *  Get one compression parameter, selected by enum FL2_cParameter.
+ *  @result : the parameter value, or the parameter_unsupported error code
+ *            (which can be tested with FL2_isError()). */
 FL2LIB_API size_t FL2LIB_CALL FL2_CStream_getParameter(FL2_CStream* fcs, FL2_cParameter param);
 
+/*! FL2_getLevelParameters() :
+ *  Get all compression parameter values defined by the preset compressionLevel.
+ *  @result : the values in a FL2_compressionParameters struct, or the parameter_outOfBound error code
+ *            (which can be tested with FL2_isError()) if compressionLevel is invalid. */
 FL2LIB_API size_t FL2LIB_CALL FL2_getLevelParameters(int compressionLevel, int high, FL2_compressionParameters *params);
+
 
 /***************************************
 *  Context memory usage

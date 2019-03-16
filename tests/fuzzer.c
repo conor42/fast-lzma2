@@ -991,7 +991,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_dictionarySize, dictSize);
             size_t depth = FL2_FASTLENGTH_MIN + FUZ_randomLength(&lseed, 8) - 1;
             FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, MIN(depth, FL2_FASTLENGTH_MAX));
-            FL2_CCtx_setParameter(cstream, FL2_p_chainLog, FL2_CHAINLOG_MIN + (FUZ_rand(&lseed) % (FL2_CHAINLOG_MAX - FL2_CHAINLOG_MIN + 1)));
+            FL2_CCtx_setParameter(cstream, FL2_p_hybridChainLog, FL2_CHAINLOG_MIN + (FUZ_rand(&lseed) % (FL2_CHAINLOG_MAX - FL2_CHAINLOG_MIN + 1)));
             FL2_CCtx_setParameter(cstream, FL2_p_hybridCycles, FUZ_randomLength(&lseed, 6));
             FL2_CCtx_setParameter(cstream, FL2_p_divideAndConquer, (FUZ_rand(&lseed) & 3) < 3);
             FL2_CCtx_setParameter(cstream, FL2_p_literalCtxBits, lc);

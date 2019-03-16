@@ -30,7 +30,7 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
     U64 const maxTime = (g_nbSeconds * TIMELOOP_MICROSEC) + 1;
     U64 totalCTime = 0, totalDTime = 0;
     U32 cCompleted = 0, dCompleted = 0;
-    unsigned totalLoops = 0;
+    unsigned totalCLoops = 0, totalDLoops = 0;
 #       define NB_MARKS 4
     const char* const marks[NB_MARKS] = { " |", " /", " =",  "\\" };
     U32 markNb = 0;
@@ -70,8 +70,8 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             if (loopDuration < fastestC*nbLoops)
                 fastestC = loopDuration / nbLoops;
             totalCTime += loopDuration;
-            totalLoops += nbLoops;
-            cCompleted = (totalCTime >= maxTime && totalLoops >= g_iterations);  /* end compression tests */
+            totalCLoops += nbLoops;
+            cCompleted = (totalCTime >= maxTime && totalCLoops >= g_iterations);  /* end compression tests */
         }
 
 #if 0       /* disable decompression test */
@@ -81,7 +81,6 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
         /* Decompression */
         if (!dCompleted) memset(resultBuffer, 0xD6, srcSize);  /* warm result buffer */
 
-        UTIL_sleepMilli(1); /* give processor time to other processes */
         UTIL_waitForNextTick();
 
         if (!dCompleted) {
@@ -103,7 +102,8 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
             if (loopDuration < fastestD*nbLoops)
                 fastestD = loopDuration / nbLoops;
             totalDTime += loopDuration;
-            dCompleted = (totalDTime >= maxTime);
+            totalDLoops += nbLoops;
+            dCompleted = (totalDTime >= maxTime && totalDLoops >= g_iterations);
         }
             if (memcmp(resultBuffer, srcBuffer, srcSize) != 0)
                 printf("Corruption on dSize %u cSize %u\r\n", (unsigned)srcSize, (unsigned)cSize);
@@ -173,7 +173,7 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
             FL2_CCtx_setParameter(fcs, FL2_p_overlapFraction, value);
         }
         else if (strcmp(param, "ds") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_chainLog, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_hybridChainLog, value);
         }
         else if (strcmp(param, "mc") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_hybridCycles, value);

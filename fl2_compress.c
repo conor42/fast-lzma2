@@ -28,7 +28,7 @@
 
 #define MB *(1U<<20)
 
-#define FL2_MAX_HIGH_CLEVEL 9
+#define FL2_MAX_HIGH_CLEVEL 10
 
 #ifdef FL2_XZ_BUILD
 
@@ -89,15 +89,16 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
 
 static const FL2_compressionParameters FL2_highCParameters[FL2_MAX_HIGH_CLEVEL + 1] = {
     { 0,0,0,0,0,0,0,0,0 },
-    { 1 MB, 3, 9, 2, 254, 273, 0, 4, FL2_ultra }, /* 1 */
-    { 2 MB, 3, 10, 2, 254, 273, 0, 4, FL2_ultra }, /* 2 */
-    { 4 MB, 3, 11, 2, 254, 273, 0, 4, FL2_ultra }, /* 3 */
-    { 8 MB, 3, 12, 2, 254, 273, 0, 4, FL2_ultra }, /* 4 */
-    { 16 MB, 3, 13, 3, 254, 273, 0, 4, FL2_ultra }, /* 5 */
-    { 32 MB, 3, 14, 3, 254, 273, 0, 4, FL2_ultra }, /* 6 */
-    { 64 MB, 3, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 7 */
-    { 128 MB, 3, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 8 */
-    { 256 MB, 3, 14, 5, 254, 273, 0, 3, FL2_ultra } /* 9 */
+    { 1 MB, 4, 9, 2, 254, 273, 0, 4, FL2_ultra }, /* 1 */
+    { 2 MB, 4, 10, 2, 254, 273, 0, 4, FL2_ultra }, /* 2 */
+    { 4 MB, 4, 11, 2, 254, 273, 0, 4, FL2_ultra }, /* 3 */
+    { 8 MB, 4, 12, 2, 254, 273, 0, 4, FL2_ultra }, /* 4 */
+    { 16 MB, 4, 13, 3, 254, 273, 0, 4, FL2_ultra }, /* 5 */
+    { 32 MB, 4, 14, 3, 254, 273, 0, 4, FL2_ultra }, /* 6 */
+    { 64 MB, 4, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 7 */
+    { 128 MB, 4, 14, 4, 254, 273, 0, 4, FL2_ultra }, /* 8 */
+    { 256 MB, 4, 14, 5, 254, 273, 0, 3, FL2_ultra }, /* 9 */
+    { 512 MB, 4, 14, 5, 254, 273, 0, 2, FL2_ultra } /* 10 */
 };
 
 #undef MB
@@ -129,6 +130,9 @@ static void FL2_fillParameters(FL2_CCtx* const cctx, const FL2_compressionParame
     rParams->overlap_fraction = params->overlapFraction;
     rParams->divide_and_conquer = params->divideAndConquer;
     rParams->depth = params->searchDepth;
+#ifdef RMF_REFERENCE
+    rParams->use_ref_mf = 1;
+#endif
 }
 
 static FL2_CCtx* FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffer)
@@ -680,7 +684,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - (unsigned)value;
         break;
 
-    case FL2_p_chainLog:
+    case FL2_p_hybridChainLog:
         CLAMPCHECK(value, FL2_CHAINLOG_MIN, FL2_CHAINLOG_MAX);
         cctx->params.cParams.second_dict_bits = (unsigned)value;
         break;
@@ -780,7 +784,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_getParameter(FL2_CCtx* cctx, FL2_cParamet
     case FL2_p_bufferLog:
         return RMF_BUFFER_LOG_BASE - cctx->params.rParams.match_buffer_log;
 
-    case FL2_p_chainLog:
+    case FL2_p_hybridChainLog:
         return cctx->params.cParams.second_dict_bits;
 
     case FL2_p_hybridCycles:

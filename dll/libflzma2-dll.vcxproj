@@ -160,6 +160,9 @@
     <ClCompile>
       <PreprocessorDefinitions>FL2_DEBUG=1;LZMA2_DEC_OPT;FL2_DLL_EXPORT=1;</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\dict_buffer.c" />

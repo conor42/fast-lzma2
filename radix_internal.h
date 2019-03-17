@@ -121,8 +121,8 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     U32 const max_depth,
     U32 const list_count,
     size_t const stack_base);
-int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);
-int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth);
+int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned max_depth);
+int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned max_depth);
 void RMF_bitpackLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
 void RMF_structuredLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
 BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const index);

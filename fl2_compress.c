@@ -44,8 +44,8 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 16 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
     { 16 MB, 2, 9, 1, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 1, 50, 64, 1, 4, FL2_ultra }, /* 7 */
-    { 64 MB, 2, 11, 2, 60, 96, 1, 3, FL2_ultra }, /* 8 */
-    { 64 MB, 3, 12, 3, 126, 160, 1, 3, FL2_ultra }, /* 9 */
+    { 64 MB, 2, 11, 2, 62, 96, 1, 3, FL2_ultra }, /* 8 */
+    { 64 MB, 4, 12, 3, 90, 273, 0, 3, FL2_ultra }, /* 9 */
 };
 
 #elif defined(FL2_7ZIP_BUILD)
@@ -62,8 +62,8 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 5 */
     { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 6 */
     { 64 MB, 2, 11, 1, 62, 96, 1, 3, FL2_ultra }, /* 7 */
-    { 128 MB, 2, 12, 2, 128, 128, 1, 2, FL2_ultra }, /* 8 */
-    { 128 MB, 3, 14, 3, 252, 160, 0, 2, FL2_ultra } /* 9 */
+    { 64 MB, 4, 12, 2, 90, 273, 1, 3, FL2_ultra }, /* 8 */
+    { 128 MB, 2, 14, 3, 254, 273, 0, 2, FL2_ultra } /* 9 */
 };
 
 #else
@@ -81,8 +81,8 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 16 MB, 2, 9, 0, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 0, 50, 64, 1, 4, FL2_ultra }, /* 7 */
     { 64 MB, 2, 11, 1, 62, 96, 1, 3, FL2_ultra }, /* 8 */
-    { 128 MB, 2, 12, 2, 126, 128, 1, 2, FL2_ultra }, /* 9 */
-    { 256 MB, 2, 14, 3, 254, 160, 1, 2, FL2_ultra } /* 10 */
+    { 64 MB, 4, 12, 2, 90, 273, 1, 3, FL2_ultra }, /* 9 */
+    { 128 MB, 2, 14, 3, 254, 273, 0, 2, FL2_ultra } /* 10 */
 };
 
 #endif

@@ -13,8 +13,9 @@
 #define MAX_READ_BEYOND_DEPTH 2
 
 /* If a repeating byte is found, fill that section of the table with matches of distance 1 */
-static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i)
+static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i, U32 depth)
 {
+    /* Normally the last 2 bytes, but may be 4 if depth == 4 */
     ptrdiff_t const last_2 = i + MAX_REPEAT / 2 - 1;
 
     /* Find the start */
@@ -28,7 +29,7 @@ static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_bl
     ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */
     if (last_2 >= (ptrdiff_t)start) {
-        U32 len = 2;
+        U32 len = depth;
         /* Set matches at distance 1 and available length */
         for (i = last_2; i > rpt_index && len <= RADIX_MAX_LENGTH; --i) {
             SetMatchLinkAndLength(i, (U32)(i - 1), len);
@@ -42,8 +43,9 @@ static size_t RMF_handleRepeat(RMF_builder* const tbl, const BYTE* const data_bl
 }
 
 /* If a 2-byte repeat is found, fill that section of the table with matches of distance 2 */
-static size_t RMF_handleRepeat2(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i)
+static size_t RMF_handleRepeat2(RMF_builder* const tbl, const BYTE* const data_block, size_t const start, ptrdiff_t i, U32 depth)
 {
+    /* Normally the last 2 bytes, but may be 4 if depth == 4 */
     ptrdiff_t const last_2 = i + MAX_REPEAT * 2U - 4;
 
     /* Find the start */
@@ -59,7 +61,7 @@ static size_t RMF_handleRepeat2(RMF_builder* const tbl, const BYTE* const data_b
     ptrdiff_t const rpt_index = i;
     /* No point if it's in the overlap region */
     if (i >= (ptrdiff_t)start) {
-        U32 len = 2 + (data_block[last_2 + 2] == data_block[last_2]);
+        U32 len = depth + (data_block[last_2 + depth] == data_block[last_2]);
         /* Set matches at distance 2 and available length */
         for (i = last_2; i > rpt_index && len <= RADIX_MAX_LENGTH; i -= 2) {
             SetMatchLinkAndLength(i, (U32)(i - 2), len);
@@ -232,12 +234,12 @@ static void RMF_recurseListsBuffered(RMF_builder* const tbl,
                 else {
                     /* Eliminate the repeat from the linked list to save time */
                     if (dist == 1) {
-                        link = RMF_handleRepeat(tbl, data_block, block_start, link);
+                        link = RMF_handleRepeat(tbl, data_block, block_start, link, depth);
                         count -= MAX_REPEAT / 2;
                         orig_list_count -= (U32)(rpt_tail - link);
                     }
                     else {
-                        link = RMF_handleRepeat2(tbl, data_block, block_start, link);
+                        link = RMF_handleRepeat2(tbl, data_block, block_start, link, depth);
                         count -= MAX_REPEAT - 1;
                         orig_list_count -= (U32)(rpt_tail - link) >> 1;
                     }
@@ -488,7 +490,7 @@ static void RMF_recurseLists16(RMF_builder* const tbl,
     U32 count,
     U32 const max_depth)
 {
-    U32 const table_max_depth = MIN(max_depth, RADIX_MAX_LENGTH) & ~1;
+    U32 const table_max_depth = MIN(max_depth, RADIX_MAX_LENGTH);
     /* Offset data pointer. This function is only called at depth 2 */
     const BYTE* const data_src = data_block + 2;
     /* Load radix values from the data chars */
@@ -987,8 +989,9 @@ RMF_bitpackIntegrityCheck
 #else
 RMF_structuredIntegrityCheck
 #endif
-(const FL2_matchTable* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned const max_depth)
+(const FL2_matchTable* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned max_depth)
 {
+    max_depth &= ~1;
     int err = 0;
     for (index += !index; index < end; ++index) {
         if (IsNull(index))
@@ -1011,6 +1014,7 @@ RMF_structuredIntegrityCheck
             err = 1;
         }
         if (length < max_depth && len_test > length)
+            /* These occur occasionally due to splitting of chains in the buffer when long repeats are present */
             printf("Shortened match at %X: %u of %u\r\n", (U32)index, length, len_test);
     }
     return err;

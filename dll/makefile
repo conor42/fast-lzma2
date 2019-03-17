@@ -1,4 +1,4 @@
-objects = ../fl2_error_private.o \
+objects = \
 ../dict_buffer.o \
 ../fl2_common.o \
 ../fl2_compress.o \
@@ -46,8 +46,7 @@ libflzma2-x64 : $(objects)
 	$(CC) -shared -pthread -o libflzma2-x64$(dll_ext) $(objects)
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
-fl2_error_private.o : ../fl2_error_private.h
-fl2_common.o : ../fast-lzma2.h ../fl2_error_private.h ../fl2_internal.h
+fl2_common.o : ../fast-lzma2.h ../fl2_errors.h ../fl2_internal.h
 fl2_compress.o : ../dict_buffer.h ../fast-lzma2.h ../fl2_internal.h ../mem.h ../util.h ../fl2_compress_internal.h ../fl2_threading.h ../fl2_pool.h ../radix_mf.h ../lzma2_enc.h
 fl2_decompress.o : ../fast-lzma2.h ../fl2_internal.h ../mem.h ../util.h ../lzma2_dec.h ../xxhash.h
 fl2_pool.o : ../fl2_pool.h ../fl2_internal.h

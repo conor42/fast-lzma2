@@ -10,7 +10,7 @@ speed gain at the higher levels over the default LZMA2 algorithm used in 7-zip, 
 depend on the nature of the source data. The library also uses some threading, portability, and testing code from Zstandard.
 
 Use of the parallel buffered radix match finder allows multithreaded execution with a simple design and low memory requirement. The
-library can compress using many threads without dividing the input into large chunks, and the resulting duplication of the match
+library can compress using many threads without dividing the input into large chunks requiring the duplication of the match
 finder tables and chains. Extra memory used per thread is typically no more than a few megabytes.
 
 The largest caveat is that the matchfinder is a block algorithm, and to achieve about the same ratio as 7-Zip requires double the

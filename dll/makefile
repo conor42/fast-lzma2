@@ -14,17 +14,19 @@ objects = \
 ../util.o \
 ../xxhash.o \
 
-CFLAGS := -Wall -O3 -DFL2_DLL_EXPORT=1 -pthread
+CFLAGS := -Wall -O3 -pthread
 CC := gcc
 
 ASFLAGS :=
 
 x86_64 := 0
 
+dll_name := libflzma2-x86
 dll_ext :=.so
 
 ifeq ($(OS),Windows_NT)
 	dll_ext :=.dll
+	CFLAGS += -DFL2_DLL_EXPORT=1
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
     ASFLAGS += -D MS_x64_CALL=1
 	x86_64 := 1
@@ -40,10 +42,11 @@ endif
 ifeq ($(x86_64),1)
 	CFLAGS += -DLZMA2_DEC_OPT
 	objects += ../lzma_dec_x86_64.o
+	dll_name := libflzma2-x64
 endif
 
-libflzma2-x64 : $(objects)
-	$(CC) -shared -pthread -o libflzma2-x64$(dll_ext) $(objects)
+libflzma2 : $(objects)
+	$(CC) -shared -pthread -o $(dll_name)$(dll_ext) $(objects)
 
 dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
 fl2_common.o : ../fast-lzma2.h ../fl2_errors.h ../fl2_internal.h
@@ -59,3 +62,6 @@ radix_struct.o : ../fast-lzma2.h ../mem.h ../fl2_threading.h ../fl2_internal.h .
 range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
 util.o : ../util.h
 xxhash.o : ../xxhash.h
+
+clean:
+	rm $(dll_name)$(dll_ext) $(objects)

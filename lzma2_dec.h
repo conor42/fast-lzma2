@@ -118,16 +118,16 @@ Returns:
 #endif
 
 
-#define LZMA_LIT_SIZE 0x300
+#define kLzmaLitSize 0x300
 
-#define LzmaProps_GetNumProbs(p) (NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << ((p)->lc + (p)->lp)))
+#define LzmaProps_GetNumProbs(p) (NUM_BASE_PROBS + ((U32)kLzmaLitSize << ((p)->lc + (p)->lp)))
 
 
 #define CALC_POS_STATE(processed_pos, pb_mask) (((processed_pos) & (pb_mask)) << 4)
 #define COMBINED_PS_STATE (pos_state + state)
 #define GET_LEN_STATE (pos_state)
 
-#define LZMA2_LCLP_MAX 4U
+#define kLzma2LcLpMax 4U
 
 
 typedef struct
@@ -156,7 +156,7 @@ typedef struct
 	BYTE need_flush;
 	BYTE ext_dic;
 	BYTE pad_;
-    Probability probs[NUM_BASE_PROBS + ((U32)LZMA_LIT_SIZE << LZMA2_LCLP_MAX)];
+    Probability probs[NUM_BASE_PROBS + ((U32)kLzmaLitSize << kLzma2LcLpMax)];
 } LZMA2_DCtx;
 
 void LZMA_constructDCtx(LZMA2_DCtx *p);

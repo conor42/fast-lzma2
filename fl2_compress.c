@@ -446,7 +446,7 @@ static size_t FL2_beginFrame(FL2_CCtx* const cctx, size_t const dictReduce)
     if (FL2_initEncoders(cctx) != 0) /* Create hash objects together, leaving the (large) match table last */
         return FL2_ERROR(memory_allocation);
 
-    if (!cctx->matchTable) {
+    if (cctx->matchTable == NULL) {
         cctx->matchTable = RMF_createMatchTable(&cctx->params.rParams, dictReduce, cctx->jobCount);
         if (cctx->matchTable == NULL)
             return FL2_ERROR(memory_allocation);
@@ -999,8 +999,10 @@ static size_t FL2_loopCheck(FL2_CStream* fcs, int unchanged)
 {
     if (unchanged) {
         ++fcs->loopCount;
-        if (fcs->loopCount > FL2_MAX_LOOPS)
+        if (fcs->loopCount > FL2_MAX_LOOPS) {
+            FL2_cancelCStream(fcs);
             return FL2_ERROR(buffer);
+        }
     }
     else {
         fcs->loopCount = 0;

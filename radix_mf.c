@@ -197,7 +197,8 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     size_t const table_bytes = is_struct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
 		: dictionary_size * sizeof(U32);
     FL2_matchTable* const tbl = malloc(sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
-    if (!tbl) return NULL;
+    if (tbl == NULL)
+        return NULL;
 
     tbl->is_struct = is_struct;
     tbl->alloc_struct = is_struct;

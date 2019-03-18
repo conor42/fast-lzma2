@@ -368,16 +368,11 @@ FL2LIB_API size_t FL2LIB_CALL FL2_endStream(FL2_CStream* fcs, FL2_outBuffer *out
  *  The function will update both `pos` fields.
  *  If `input.pos < input.size`, some input has not been consumed.
  *  It's up to the caller to present again the remaining data.
- *  More data must be loaded if `input.pos + LZMA_REQUIRED_INPUT_MAX >= input.size`. In this case,
- *  move the remaining input (<= LZMA_REQUIRED_INPUT_MAX bytes) to the start of the buffer and
- *  load new data after it.
  *  If `output.pos < output.size`, decoder has flushed everything it could.
  *  @return : 0 when a stream is completely decoded and fully flushed,
  *            1, which means there is still some decoding to do to complete the stream,
  *            or an error code, which can be tested using FL2_isError().
  * *******************************************************************************/
-
-#define LZMA_REQUIRED_INPUT_MAX 20
 
 typedef struct FL2_DStream_s FL2_DStream;
 
@@ -434,9 +429,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initDStream_withProp(FL2_DStream* fds, unsigne
  *  Reads data from input and decompresses to output.
  *  Returns 1 if the stream is unfinished, 0 if the terminator was encountered (he'll be back)
  *  and all data was written to output, or an error code. Call this function repeatedly if
- *  necessary, removing data from output and/or loading data into input before each call.
- *  Note the requirement for LZMA_REQUIRED_INPUT_MAX bytes of input if the input data is
- *  incomplete (see intro above). */
+ *  necessary, removing data from output and/or loading data into input before each call. */
 FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuffer* output, FL2_inBuffer* input);
 
 /*-***************************************************************************

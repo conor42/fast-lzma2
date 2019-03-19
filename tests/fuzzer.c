@@ -861,9 +861,9 @@ static size_t FUZ_rLogLength(U32* seed, U32 logLength)
     return (lengthMask+1) + (FUZ_rand(seed) & lengthMask);
 }
 
-static size_t FUZ_randomLength(U32* seed, U32 maxLog)
+static size_t FUZ_randomLength(U32* seed, U32 minLog, U32 maxLog)
 {
-    U32 const logLength = FUZ_rand(seed) % maxLog;
+    U32 const logLength = minLog + FUZ_rand(seed) % (maxLog - minLog);
     return FUZ_rLogLength(seed, logLength);
 }
 
@@ -977,13 +977,13 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
         }
 
         /* select dictionary size */
-        size_t dictSize = FUZ_randomLength(&lseed, maxSampleLog + 1);
+        size_t dictSize = FUZ_randomLength(&lseed, 19, maxSampleLog + 1);
         dictSize = MAX(dictSize, 1U << 20);
         if ((FUZ_rand(&lseed) & 7) == 0)
             dictSize = ((size_t)1 << 26) + (dictSize & 0xFFFFFF); /* test structured match table */
 
         /* select src segment */
-        sampleSize = FUZ_randomLength(&lseed, maxSampleLog);
+        sampleSize = FUZ_randomLength(&lseed, 19, maxSampleLog);
 
         /* create sample buffer (to catch read error with valgrind & sanitizers)  */
         sampleBuffer = (BYTE*)malloc(sampleSize);
@@ -1001,10 +1001,12 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             FL2_CCtx_setParameter(cstream, FL2_p_compressionLevel, cLevel);
             FL2_CCtx_setParameter(cstream, FL2_p_highCompression, (FUZ_rand(&lseed) & 3) > 2);
             FL2_CCtx_setParameter(cstream, FL2_p_dictionarySize, dictSize);
-            size_t depth = FL2_FASTLENGTH_MIN + FUZ_randomLength(&lseed, 8) - 1;
-            FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, MIN(depth, FL2_FASTLENGTH_MAX));
-            FL2_CCtx_setParameter(cstream, FL2_p_hybridChainLog, FL2_CHAINLOG_MIN + (FUZ_rand(&lseed) % (FL2_CHAINLOG_MAX - FL2_CHAINLOG_MIN + 1)));
-            FL2_CCtx_setParameter(cstream, FL2_p_hybridCycles, FUZ_randomLength(&lseed, 6));
+            FL2_CCtx_setParameter(cstream, FL2_p_resetInterval, 2);
+            size_t depth = 2 + FUZ_randomLength(&lseed, 2, 8);
+            FL2_CCtx_setParameter(cstream, FL2_p_searchDepth, MIN(depth, FL2_SEARCH_DEPTH_MAX));
+            FL2_CCtx_setParameter(cstream, FL2_p_fastLength, FL2_FASTLENGTH_MIN + FUZ_rand(&lseed) % (FL2_FASTLENGTH_MAX - FL2_FASTLENGTH_MIN + 1));
+            FL2_CCtx_setParameter(cstream, FL2_p_hybridChainLog, FL2_CHAINLOG_MIN + FUZ_rand(&lseed) % (FL2_CHAINLOG_MAX - FL2_CHAINLOG_MIN + 1));
+            FL2_CCtx_setParameter(cstream, FL2_p_hybridCycles, FUZ_randomLength(&lseed, 0, 6));
             FL2_CCtx_setParameter(cstream, FL2_p_divideAndConquer, (FUZ_rand(&lseed) & 3) < 3);
             FL2_CCtx_setParameter(cstream, FL2_p_literalCtxBits, lc);
             FL2_CCtx_setParameter(cstream, FL2_p_literalPosBits, FUZ_rand(&lseed) % (5 - lc));
@@ -1118,7 +1120,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             BYTE *iend = (BYTE*)cBuffer + cSize;
             BYTE *oend = (BYTE*)dstBuffer + sampleSize;
             ptrdiff_t bufSize = 0x4000 + (FUZ_rand(&lseed) & 0xFFFF);
-            FL2_setDStreamMemoryLimitMt(dstream, (FUZ_rand(&lseed) << 3) % (dictSize * 16U * nbThreads));
+            FL2_setDStreamMemoryLimitMt(dstream, (FUZ_rand(&lseed) << 3) % (dictSize * 4U * nbThreads));
             size_t r;
             CHECK(FL2_isError(FL2_initDStream(dstream)), "FL2_initDStream failed");
             do {

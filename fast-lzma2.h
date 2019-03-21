@@ -295,6 +295,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
  *  Returns 1 to indicate compressed data must be read (or output is full), or 0 otherwise. */
 FL2LIB_API size_t FL2LIB_CALL FL2_compressStream(FL2_CStream* fcs, FL2_outBuffer *output, FL2_inBuffer* input);
 
+/*! FL2_copyCStreamOutput() :
+ *  Copies compressed data to the output buffer until the buffer is full or all available data is copied.
+ *  If asynchronous compression is in progress, the function returns 0 without waiting.
+ *  Returns 1 to indicate some compressed data remains, or 0 otherwise. */
+FL2LIB_API size_t FL2LIB_CALL FL2_copyCStreamOutput(FL2_CStream* fcs, FL2_outBuffer *output);
+
 /*** Push/pull functions ***/
 
 /*! FL2_getDictionaryBuffer() :

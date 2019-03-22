@@ -40,7 +40,7 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 1 MB, 1, 7, 0, 6, 32, 1, 4, FL2_fast }, /* 1 */
     { 2 MB, 2, 7, 0, 14, 32, 1, 4, FL2_fast }, /* 2 */
     { 2 MB, 2, 7, 0, 14, 40, 1, 4, FL2_opt }, /* 3 */
-    { 4 MB, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 4 */
+    { 8 MB, 2, 7, 0, 26, 40, 1, 4, FL2_opt }, /* 4 */
     { 16 MB, 2, 8, 0, 42, 48, 1, 4, FL2_opt }, /* 5 */
     { 16 MB, 2, 9, 1, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 1, 50, 64, 1, 4, FL2_ultra }, /* 7 */
@@ -1060,14 +1060,13 @@ FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream * fcs, size_t add
     return fcs->outThread < fcs->threadCount;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_cBuffer* cbuf)
+FL2LIB_API size_t FL2LIB_CALL FL2_getNextCompressedBuffer(FL2_CStream* fcs, FL2_cBuffer* cbuf)
 {
     cbuf->src = NULL;
     cbuf->size = 0;
 
 #ifndef FL2_SINGLETHREAD
-    FL2POOL_waitAll(fcs->compressThread, 0);
-    CHECK_F(fcs->asyncRes);
+	CHECK_F(FL2_waitCStream(fcs));
 #endif
 
     if (fcs->outThread < fcs->threadCount) {

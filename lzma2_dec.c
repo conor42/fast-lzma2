@@ -8,8 +8,6 @@ Modified for FL2 by Conor McCarthy */
 #include "lzma2_dec.h"
 #include "platform.h"
 
-#include <string.h>
-#include <stdlib.h>
 
 #ifdef HAVE_SMALL
 #  define LZMA_SIZE_OPT
@@ -30,8 +28,8 @@ Modified for FL2 by Conor McCarthy */
 #define UPDATE_0(p) range = bound; *(p) = (Probability)(ttt + ((kBitModelTotal - ttt) >> kNumMoveBits));
 #define UPDATE_1(p) range -= bound; code -= bound; *(p) = (Probability)(ttt - (ttt >> kNumMoveBits));
 #define GET_BIT2(p, i, A0, A1) IF_BIT_0(p) \
-  { UPDATE_0(p); i = (i + i); A0; } else \
-  { UPDATE_1(p); i = (i + i) + 1; A1; }
+    { UPDATE_0(p); i = (i + i); A0; } else \
+    { UPDATE_1(p); i = (i + i) + 1; A1; }
 
 #if defined __x86_64__s || defined _M_X64
 
@@ -44,83 +42,83 @@ Modified for FL2 by Conor McCarthy */
 #define UPDATE_CODE code = code - ((code < bound) ? 0 : bound)
 
 #define TREE_GET_BIT(probs, i) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
-  UPDATE_PREP_0; unsigned i0 = (i + i); \
-  UPDATE_PREP_1; unsigned i1 = (i + i) + 1; \
-  UPDATE_COND(pp); \
-  i = (code < bound) ? i0 : i1; \
-  UPDATE_CODE; \
+    UPDATE_PREP_0; unsigned i0 = (i + i); \
+    UPDATE_PREP_1; unsigned i1 = (i + i) + 1; \
+    UPDATE_COND(pp); \
+    i = (code < bound) ? i0 : i1; \
+    UPDATE_CODE; \
 }
 
 #define REV_BIT_VAR(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
-  UPDATE_PREP_0; U32 i0 = i + m; U32 m2 = m + m; \
-  UPDATE_PREP_1; U32 i1 = i + m2; \
-  UPDATE_COND(pp); \
-  i = (code < bound) ? i0 : i1; \
-  m = m2; \
-  UPDATE_CODE; \
+    UPDATE_PREP_0; U32 i0 = i + m; U32 m2 = m + m; \
+    UPDATE_PREP_1; U32 i1 = i + m2; \
+    UPDATE_COND(pp); \
+    i = (code < bound) ? i0 : i1; \
+    m = m2; \
+    UPDATE_CODE; \
 }
 #define REV_BIT_CONST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
-  UPDATE_PREP_0; \
-  UPDATE_PREP_1; \
-  UPDATE_COND(pp); \
-  i += m + (code < bound ? 0 : m); \
-  UPDATE_CODE; \
+    UPDATE_PREP_0; \
+    UPDATE_PREP_1; \
+    UPDATE_COND(pp); \
+    i += m + (code < bound ? 0 : m); \
+    UPDATE_CODE; \
 }
 #define REV_BIT_LAST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
-  UPDATE_PREP_0; \
-  UPDATE_PREP_1; \
-  UPDATE_COND(pp); \
-  i -= code < bound ? m : 0; \
-  UPDATE_CODE; \
+    UPDATE_PREP_0; \
+    UPDATE_PREP_1; \
+    UPDATE_COND(pp); \
+    i -= code < bound ? m : 0; \
+    UPDATE_CODE; \
 }
 
 #define MATCHED_LITER_DEC \
-  match_byte += match_byte; \
-  bit = offs; \
-  offs &= match_byte; \
-  prob_lit = prob + (offs + bit + symbol); \
-  PREP_BIT(prob_lit); \
-  { UPDATE_PREP_0; unsigned i0 = (symbol + symbol); \
-  UPDATE_PREP_1; unsigned i1 = (symbol + symbol) + 1; \
-  UPDATE_COND(prob_lit); \
-  symbol = (code < bound) ? i0 : i1; \
-  offs = (code < bound) ? offs ^ bit : offs; \
-  UPDATE_CODE; }
+    match_byte += match_byte; \
+    bit = offs; \
+    offs &= match_byte; \
+    prob_lit = prob + (offs + bit + symbol); \
+    PREP_BIT(prob_lit); \
+    { UPDATE_PREP_0; unsigned i0 = (symbol + symbol); \
+    UPDATE_PREP_1; unsigned i1 = (symbol + symbol) + 1; \
+    UPDATE_COND(prob_lit); \
+    symbol = (code < bound) ? i0 : i1; \
+    offs = (code < bound) ? offs ^ bit : offs; \
+    UPDATE_CODE; }
 
 #else
 #define TREE_GET_BIT(probs, i) { GET_BIT2(probs + i, i, ;, ;); }
 
 #define REV_BIT(p, i, A0, A1) IF_BIT_0(p + i) \
-  { UPDATE_0(p + i); A0; } else \
-  { UPDATE_1(p + i); A1; }
+    { UPDATE_0(p + i); A0; } else \
+    { UPDATE_1(p + i); A1; }
 #define REV_BIT_VAR(  p, i, m) REV_BIT(p, i, i += m; m += m, m += m; i += m; )
 #define REV_BIT_CONST(p, i, m) REV_BIT(p, i, i += m;       , i += m * 2; )
 #define REV_BIT_LAST( p, i, m) REV_BIT(p, i, i -= m        , ; )
 
 #define MATCHED_LITER_DEC \
-  match_byte += match_byte; \
-  bit = offs; \
-  offs &= match_byte; \
-  prob_lit = prob + (offs + bit + symbol); \
-  GET_BIT2(prob_lit, symbol, offs ^= bit; , ;)
+    match_byte += match_byte; \
+    bit = offs; \
+    offs &= match_byte; \
+    prob_lit = prob + (offs + bit + symbol); \
+    GET_BIT2(prob_lit, symbol, offs ^= bit; , ;)
 
 #endif
 
 #define TREE_DECODE(probs, limit, i) \
-  { i = 1; do { TREE_GET_BIT(probs, i); } while (i < limit); i -= limit; }
+    { i = 1; do { TREE_GET_BIT(probs, i); } while (i < limit); i -= limit; }
 
 #ifdef LZMA_SIZE_OPT
 #define TREE_6_DECODE(probs, i) TREE_DECODE(probs, (1 << 6), i)
 #else
 #define TREE_6_DECODE(probs, i) \
-  { i = 1; \
-  TREE_GET_BIT(probs, i); \
-  TREE_GET_BIT(probs, i); \
-  TREE_GET_BIT(probs, i); \
-  TREE_GET_BIT(probs, i); \
-  TREE_GET_BIT(probs, i); \
-  TREE_GET_BIT(probs, i); \
-  i -= 0x40; }
+    { i = 1; \
+    TREE_GET_BIT(probs, i); \
+    TREE_GET_BIT(probs, i); \
+    TREE_GET_BIT(probs, i); \
+    TREE_GET_BIT(probs, i); \
+    TREE_GET_BIT(probs, i); \
+    TREE_GET_BIT(probs, i); \
+    i -= 0x40; }
 #endif
 
 #define NORMAL_LITER_DEC TREE_GET_BIT(prob, symbol)
@@ -131,15 +129,15 @@ Modified for FL2 by Conor McCarthy */
 #define UPDATE_0_CHECK range = bound;
 #define UPDATE_1_CHECK range -= bound; code -= bound;
 #define GET_BIT2_CHECK(p, i, A0, A1) IF_BIT_0_CHECK(p) \
-  { UPDATE_0_CHECK; i = (i + i); A0; } else \
-  { UPDATE_1_CHECK; i = (i + i) + 1; A1; }
+    { UPDATE_0_CHECK; i = (i + i); A0; } else \
+    { UPDATE_1_CHECK; i = (i + i) + 1; A1; }
 #define GET_BIT_CHECK(p, i) GET_BIT2_CHECK(p, i, ; , ;)
 #define TREE_DECODE_CHECK(probs, limit, i) \
-  { i = 1; do { GET_BIT_CHECK(probs + i, i) } while (i < limit); i -= limit; }
+    { i = 1; do { GET_BIT_CHECK(probs + i, i) } while (i < limit); i -= limit; }
 
 #define REV_BIT_CHECK(p, i, m) IF_BIT_0_CHECK(p + i) \
-  { UPDATE_0_CHECK; i += m; m += m; } else \
-  { UPDATE_1_CHECK; m += m; i += m; }
+    { UPDATE_0_CHECK; i += m; m += m; } else \
+    { UPDATE_1_CHECK; m += m; i += m; }
 
 /*
 00000000  -  EOS

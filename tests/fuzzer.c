@@ -450,13 +450,13 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         CHECK(FL2_updateDictionary(cstream, r / 2));
         r = FL2_endStream(cstream, NULL);
         if (r == 0) goto _output_error;
-        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+        while (FL2_getNextCompressedBuffer(cstream, &cbuf) != 0) {
             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
             out.pos += cbuf.size;
         }
         r = FL2_endStream(cstream, NULL);
         if (r == 0) goto _output_error;
-        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+        while (FL2_getNextCompressedBuffer(cstream, &cbuf) != 0) {
             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
             out.pos += cbuf.size;
         }
@@ -481,13 +481,13 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
         memcpy((BYTE*)dict.dst, (BYTE*)CNBuffer, dict.size / 2);
         CHECK(FL2_updateDictionary(cstream, dict.size / 2));
         CHECK(FL2_flushStream(cstream, NULL));
-        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+        while (FL2_getNextCompressedBuffer(cstream, &cbuf) != 0) {
             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
             out.pos += cbuf.size;
         }
         r = FL2_endStream(cstream, NULL);
         if (r == 0) goto _output_error;
-        while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+        while (FL2_getNextCompressedBuffer(cstream, &cbuf) != 0) {
             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
             out.pos += cbuf.size;
         }
@@ -1064,7 +1064,7 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
                                 r = FL2_waitCStream(cstream);
                             CHECK(FL2_isError(r), "FL2_compressStream failed : %s", FL2_getErrorName(r));
                         }
-                        else while (FL2_getNextCStreamBuffer(cstream, &cbuf) != 0) {
+                        else while (FL2_getNextCompressedBuffer(cstream, &cbuf) != 0) {
                             memcpy((BYTE*)out.dst + out.pos, cbuf.src, cbuf.size);
                             out.pos += cbuf.size;
                         }

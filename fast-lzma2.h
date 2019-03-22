@@ -249,7 +249,7 @@ typedef struct {
  *  The radix match finder allows compressed data to be stored in its match table during encoding.
  *  Applications may call streaming compression functions with output == NULL. In this case,
  *  when the function returns 1, the compressed data must be read from the internal buffers.
- *  Call FL2_getNextCStreamBuffer() repeatedly until it returns 0.
+ *  Call FL2_getNextCompressedBuffer() repeatedly until it returns 0.
  *  Each call returns buffer information in the FL2_inBuffer parameter. Applications typically will 
  *  passed this to an I/O write function or downstream filter.
  *  Alternately, applications may pass an FL2_outBuffer object pointer to receive the output. In this
@@ -279,11 +279,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 
 /*! FL2_setCStreamTimeout() :
  *  Sets a timeout in milliseconds. Zero disables the timeout (default). If a nonzero timout is set, functions
- *  FL2_compressStream(), FL2_updateDictionary(), FL2_getNextCStreamBuffer(), FL2_flushStream(), and
- *  FL2_endStream() may return a timeout code before compression of the current dictionary of data
- *  completes. FL2_isError() returns true for the timeout code, so check the code with FL2_isTimedOut() before
- *  testing for errors. With the exception of FL2_updateDictionary(), the above functions may be called again
- *  to wait for completion. A typical application for timeouts is to update the user on compression progress. */
+ *  FL2_compressStream(), FL2_getDictionaryBuffer(), FL2_updateDictionary(), FL2_getNextCompressedBuffer(),
+ *  FL2_flushStream(), and FL2_endStream() may return a timeout code before compression of the current
+ *  dictionary of data completes. FL2_isError() returns true for the timeout code, so check the code with
+ *  FL2_isTimedOut() before testing for errors. With the exception of FL2_updateDictionary(), the above
+ *  functions may be called again to wait for completion. A typical application for timeouts is to update the
+ *  user on compression progress. */
 FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned timeout);
 
 /*! FL2_compressStream() :
@@ -314,12 +315,12 @@ FL2LIB_API size_t FL2LIB_CALL FL2_getDictionaryBuffer(FL2_CStream* fcs, FL2_dict
  *  was filled. Returns 1 to indicate compressed data must be read, 0 if not, or an error code. */
 FL2LIB_API size_t FL2LIB_CALL FL2_updateDictionary(FL2_CStream* fcs, size_t addedSize);
 
-/*! FL2_getNextCStreamBuffer() :
+/*! FL2_getNextCompressedBuffer() :
  *  Returns a buffer containing a slice of the compressed data. Call this function and process the data
  *  until the function returns zero. In most cases it will return a buffer for each compression thread
  *  used. It is sometimes less but never more than nbThreads. If asynchronous compression is in progress,
  *  this function will wait for completion before returning, or it will return the timeout code. */
-FL2LIB_API size_t FL2LIB_CALL FL2_getNextCStreamBuffer(FL2_CStream* fcs, FL2_cBuffer* cbuf);
+FL2LIB_API size_t FL2LIB_CALL FL2_getNextCompressedBuffer(FL2_CStream* fcs, FL2_cBuffer* cbuf);
 
 /******/
 

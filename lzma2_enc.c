@@ -76,6 +76,8 @@ Public domain
 #define kInfinityPrice (1UL << 30U)
 #define kNullDist (U32)-1
 
+#define kMaxMatchEncodeSize 20
+
 #define kMaxChunkCompressedSize (1UL << 16U)
 /* Need to leave sufficient space for expanded output from a full opt buffer with bad starting probs */
 #define kChunkSize (kMaxChunkCompressedSize - 2048U)
@@ -205,6 +207,10 @@ struct LZMA2_ECtx_s
     FL2_strategy strategy;
 
     RangeEncoder rc;
+    /* Finish writing the chunk at this size */
+    size_t chunk_size;
+    /* Don't encode a symbol beyond this limit (used by fast mode) */
+    size_t chunk_limit;
 
     EncoderStates states;
 
@@ -228,6 +234,7 @@ struct LZMA2_ECtx_s
     ptrdiff_t hash_prev_index;
     ptrdiff_t hash_alloc_3;
 
+    /* Temp output buffer before space frees up in the match table */
     BYTE out_buf[kTempBufferSize];
 };
 
@@ -579,7 +586,8 @@ size_t LZMA_encodeChunkFast(LZMA2_ECtx *const enc,
     size_t const pos_mask = enc->pos_mask;
     size_t prev = index;
     unsigned const search_depth = tbl->params.depth;
-    while (index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size) {
+
+    while (index < uncompressed_end && enc->rc.out_index < enc->chunk_size) {
         size_t max_len;
         const BYTE* data;
         /* Table of distance restrictions for short matches */
@@ -723,8 +731,10 @@ size_t LZMA_encodeChunkFast(LZMA2_ECtx *const enc,
 _encode:
         assert(index + best_match.length <= block.end);
 
-        size_t rc_end = enc->rc.chunk_size;
-        while (prev < index && enc->rc.out_index < rc_end) {
+        while (prev < index) {
+            if (enc->rc.out_index >= enc->chunk_limit)
+                return prev;
+
             if (block.data[prev] != block.data[prev - enc->states.reps[0] - 1]) {
                 LZMA_encodeLiteralBuf(enc, block.data, prev);
                 ++prev;
@@ -734,8 +744,6 @@ _encode:
                 ++prev;
             }
         }
-        if (prev < index)
-            break;
 
         if(best_match.length >= kMatchLenMin) {
             if (best_match.dist >= kNumReps) {
@@ -750,7 +758,7 @@ _encode:
             }
         }
     }
-    while (prev < index && enc->rc.out_index < enc->rc.chunk_size) {
+    while (prev < index && enc->rc.out_index < enc->chunk_limit) {
         if (block.data[prev] != block.data[prev - enc->states.reps[0] - 1])
             LZMA_encodeLiteralBuf(enc, block.data, prev);
         else
@@ -1536,7 +1544,7 @@ reverse:
         start_index += i;
         /* Do another round if there is a long match pending,
          * because the reps must be checked and the match encoded. */
-    } while (match.length >= enc->fast_length && start_index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size);
+    } while (match.length >= enc->fast_length && start_index < uncompressed_end && enc->rc.out_index < enc->chunk_size);
 
     enc->len_end_max = len_end;
 
@@ -1651,7 +1659,8 @@ size_t LZMA_encodeChunkBest(LZMA2_ECtx *const enc,
     LZMA_fillAlignPrices(enc);
     LZMA_lengthStates_updatePrices(enc, &enc->states.len_states);
     LZMA_lengthStates_updatePrices(enc, &enc->states.rep_len_states);
-    while (index < uncompressed_end && enc->rc.out_index < enc->rc.chunk_size)
+
+    while (index < uncompressed_end && enc->rc.out_index < enc->chunk_size)
     {
         RMF_match const match = RMF_getMatch(block, tbl, search_depth, struct_tbl, index);
         if (match.length > 1) {
@@ -1934,8 +1943,13 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     int *const canceled)
 {
     size_t const start = block.start;
+
+    /* Output starts in the temp buffer */
     BYTE* out_dest = enc->out_buf;
-	/* Each encoder writes a properties byte because the upstream encoder(s) could */
+    enc->chunk_size = kTempMinOutput;
+    enc->chunk_limit = kTempBufferSize - kMaxMatchEncodeSize * 2;
+
+    /* Each encoder writes a properties byte because the upstream encoder(s) could */
 	/* write only uncompressed chunks with no properties. */
 	BYTE encode_properties = 1;
     BYTE incompressible = 0;
@@ -1975,7 +1989,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         EncoderStates saved_states;
         size_t next_index;
         RC_reset(&enc->rc);
-        RC_setOutputBuffer(&enc->rc, out_dest + header_size, kChunkSize);
+        RC_setOutputBuffer(&enc->rc, out_dest + header_size);
         if (!incompressible) {
             size_t cur = index;
             size_t const end = (enc->strategy == FL2_fast) ? MIN(block.end, index + kChunkUncompressedLimit)
@@ -1989,14 +2003,14 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
             if (index == start) {
                 /* After kTempMinOutput bytes we can write data to the match table because the */
                 /* compressed data will never catch up with the table position being read. */
-                enc->rc.chunk_size = kTempMinOutput;
                 cur = LZMA2_encodeChunk(enc, tbl, block, cur, end);
 				if (header_size + enc->rc.out_index > kTempBufferSize)
 					return FL2_ERROR(internal);
-				enc->rc.chunk_size = kChunkSize;
                 out_dest = RMF_getTableAsOutputBuffer(tbl, start);
                 memcpy(out_dest, enc->out_buf, header_size + enc->rc.out_index);
                 enc->rc.out_buffer = out_dest + header_size;
+                enc->chunk_size = kChunkSize;
+                enc->chunk_limit = kMaxChunkCompressedSize - kMaxMatchEncodeSize * 2;
             }
             next_index = LZMA2_encodeChunk(enc, tbl, block, cur, end);
             RC_flush(&enc->rc);

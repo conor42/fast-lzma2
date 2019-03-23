@@ -66,7 +66,7 @@ void RC_printPriceTable()
     for (Probability i = 31; i <= kBitModelTotal - 31; ++i) {
         RangeEncoder rc;
         RC_reset(&rc);
-        RC_setOutputBuffer(&rc, buf, sizeof(buf));
+        RC_setOutputBuffer(&rc, buf);
         for (unsigned j = 0; j < test_size; ++j) {
             Probability prob = i;
             RC_encodeBit0(&rc, &prob);
@@ -74,7 +74,7 @@ void RC_printPriceTable()
         RC_flush(&rc);
         table0[i >> kNumMoveReducingBits] += (unsigned)rc.out_index - 5;
         RC_reset(&rc);
-        RC_setOutputBuffer(&rc, buf, sizeof(buf));
+        RC_setOutputBuffer(&rc, buf);
         for (unsigned j = 0; j < test_size; ++j) {
             Probability prob = i;
             RC_encodeBit1(&rc, &prob);
@@ -104,10 +104,9 @@ void RC_printPriceTable()
 
 #endif
 
-void RC_setOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer, size_t chunk_size)
+void RC_setOutputBuffer(RangeEncoder* const rc, BYTE *const out_buffer)
 {
     rc->out_buffer = out_buffer;
-    rc->chunk_size = chunk_size;
     rc->out_index = 0;
 }
 

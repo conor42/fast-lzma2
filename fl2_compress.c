@@ -45,7 +45,7 @@ static const FL2_compressionParameters FL2_defaultCParameters[FL2_MAX_CLEVEL + 1
     { 16 MB, 2, 9, 1, 42, 48, 1, 4, FL2_ultra }, /* 6 */
     { 32 MB, 2, 10, 1, 50, 64, 1, 4, FL2_ultra }, /* 7 */
     { 64 MB, 2, 11, 2, 62, 96, 1, 3, FL2_ultra }, /* 8 */
-    { 64 MB, 4, 12, 3, 90, 273, 0, 3, FL2_ultra }, /* 9 */
+    { 64 MB, 4, 12, 3, 90, 273, 1, 3, FL2_ultra }, /* 9 */
 };
 
 #elif defined(FL2_7ZIP_BUILD)

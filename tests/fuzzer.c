@@ -1102,8 +1102,8 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
         }
 
         /* Incompressible test */
-        {size_t ccSize = FL2_compressCCtx(cstream, dstBuffer, dstBufferSize, cBuffer, cSize, 0);
-        CHECK(ccSize > FL2_compressBound(cSize), "FL2_compressBound failed : %u > %u", (U32)ccSize, (U32)FL2_compressBound(cSize));
+        {   size_t ccSize = FL2_compressCCtx(cstream, dstBuffer, dstBufferSize, cBuffer, cSize, 0);
+            CHECK(ccSize > FL2_compressBound(cSize), "FL2_compressBound failed : %u > %u", (U32)ccSize, (U32)FL2_compressBound(cSize));
         }
 
         /* successful decompression test */

@@ -124,7 +124,6 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_findDecompressedSize(const void *s
 
 
 /*======  Helper functions  ======*/
-#define FL2_COMPRESSBOUND(srcSize)   ((srcSize) + (((srcSize) + 0xFFF) / 0x1000) * 3 + 6)  /*!< calculates the maximum size of data stored in a sequence of uncompressed chunks */
 FL2LIB_API size_t      FL2LIB_CALL FL2_compressBound(size_t srcSize); /*!< maximum compressed size in worst case scenario */
 FL2LIB_API unsigned    FL2LIB_CALL FL2_isError(size_t code);          /*!< tells if a `size_t` function result is an error code */
 FL2LIB_API unsigned    FL2LIB_CALL FL2_isTimedOut(size_t code);       /*!< tells if a `size_t` function result is the timeout code */

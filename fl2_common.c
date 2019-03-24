@@ -85,6 +85,7 @@ FL2LIB_API const char* FL2LIB_CALL FL2_getErrorString(FL2_ErrorCode code)
     {
     case PREFIX(no_error): return "No error detected";
     case PREFIX(GENERIC):  return "Error (generic)";
+    case PREFIX(internal): return "Internal error (bug)";
     case PREFIX(corruption_detected): return "Corrupted block detected";
     case PREFIX(checksum_wrong): return "Restored data doesn't match checksum";
     case PREFIX(parameter_unsupported): return "Unsupported parameter";

@@ -89,7 +89,6 @@ Public domain
 #define kTempBufferSize (kTempMinOutput + kOptimizerBufferSize + kOptimizerBufferSize / 4U)
 
 #define kMaxChunkUncompressedSize (1UL << 21U)
-#define kChunkUncompressedLimit (kMaxChunkUncompressedSize - kMatchLenMax)
 
 #define kChunkHeaderSize 5U
 #define kChunkResetShift 5U
@@ -684,48 +683,46 @@ size_t LZMA_encodeChunkFast(LZMA2_ECtx *const enc,
                     }
                 }
             }
-            if (next < uncompressed_end - 4) {
-                ++next;
+            ++next;
 
-                next_match = RMF_getNextMatch(block, tbl, search_depth, struct_tbl, next);
-                if (next_match.length < 4)
-                    break;
+            next_match = RMF_getNextMatch(block, tbl, search_depth, struct_tbl, next);
+            if (next_match.length < 4)
+                break;
 
-                data = block.data + next;
-                max_len = MIN(kMatchLenMax, block.end - next);
-                best_rep.length = 0;
+            data = block.data + next;
+            max_len = MIN(kMatchLenMax, block.end - next);
+            best_rep.length = 0;
 
-                for (rep_match.dist = 0; rep_match.dist < kNumReps; ++rep_match.dist) {
-                    const BYTE *data_2 = data - enc->states.reps[rep_match.dist] - 1;
-                    if (MEM_read16(data) != MEM_read16(data_2))
-                        continue;
+            for (rep_match.dist = 0; rep_match.dist < kNumReps; ++rep_match.dist) {
+                const BYTE *data_2 = data - enc->states.reps[rep_match.dist] - 1;
+                if (MEM_read16(data) != MEM_read16(data_2))
+                    continue;
 
-                    rep_match.length = (U32)(ZSTD_count(data + 2, data_2 + 2, data + max_len) + 2);
-                    if (rep_match.length > best_rep.length)
-                        best_rep = rep_match;
-                }
-                if (best_rep.length >= 4) {
-                    int const gain2 = (int)(best_rep.length * 4 - (best_rep.dist >> 1));
-                    int const gain1 = (int)(best_match.length * 4 - ZSTD_highbit32((U32)best_match.dist + 1) + 1);
-                    if (gain2 > gain1) {
-                        DEBUGLOG(7, "Replace match (%u, %u) with rep (%u, %u)", best_match.length, best_match.dist, best_rep.length, best_rep.dist);
-                        best_match = best_rep;
-                        index = next;
-                    }
-                }
-                if (next_match.length >= 4 && next_match.dist != best_match.dist) {
-                    int const gain2 = (int)(next_match.length * 4 - ZSTD_highbit32((U32)next_match.dist + 1));
-                    int const gain1 = (int)(best_match.length * 4 - ZSTD_highbit32((U32)best_match.dist + 1) + 7);
-                    if (gain2 > gain1) {
-                        DEBUGLOG(7, "Replace match (%u, %u) with match (%u, %u)", best_match.length, best_match.dist, next_match.length, next_match.dist + kNumReps);
-                        best_match = next_match;
-                        best_match.dist += kNumReps;
-                        index = next;
-                        continue;
-                    }
-                }
-
+                rep_match.length = (U32)(ZSTD_count(data + 2, data_2 + 2, data + max_len) + 2);
+                if (rep_match.length > best_rep.length)
+                    best_rep = rep_match;
             }
+            if (best_rep.length >= 4) {
+                int const gain2 = (int)(best_rep.length * 4 - (best_rep.dist >> 1));
+                int const gain1 = (int)(best_match.length * 4 - ZSTD_highbit32((U32)best_match.dist + 1) + 1);
+                if (gain2 > gain1) {
+                    DEBUGLOG(7, "Replace match (%u, %u) with rep (%u, %u)", best_match.length, best_match.dist, best_rep.length, best_rep.dist);
+                    best_match = best_rep;
+                    index = next;
+                }
+            }
+            if (next_match.dist != best_match.dist) {
+                int const gain2 = (int)(next_match.length * 4 - ZSTD_highbit32((U32)next_match.dist + 1));
+                int const gain1 = (int)(best_match.length * 4 - ZSTD_highbit32((U32)best_match.dist + 1) + 7);
+                if (gain2 > gain1) {
+                    DEBUGLOG(7, "Replace match (%u, %u) with match (%u, %u)", best_match.length, best_match.dist, next_match.length, next_match.dist + kNumReps);
+                    best_match = next_match;
+                    best_match.dist += kNumReps;
+                    index = next;
+                    continue;
+                }
+            }
+
             break;
         }
 _encode:
@@ -1992,8 +1989,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         RC_setOutputBuffer(&enc->rc, out_dest + header_size);
         if (!incompressible) {
             size_t cur = index;
-            size_t const end = (enc->strategy == FL2_fast) ? MIN(block.end, index + kChunkUncompressedLimit)
-                : MIN(block.end, index + kChunkUncompressedLimit - kOptimizerBufferSize);
+            size_t const end = (enc->strategy == FL2_fast) ? MIN(block.end, index + kMaxChunkUncompressedSize - kMatchLenMax)
+                : MIN(block.end, index + kMaxChunkUncompressedSize - kOptimizerBufferSize + 2);
             saved_states = enc->states;
             if (index == 0) {
                 /* First byte of the dictionary */

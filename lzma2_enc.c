@@ -83,8 +83,9 @@ Public domain
 #define kChunkSize (kMaxChunkCompressedSize - 2048U)
 #define kSqrtChunkSize 252U
 
-/* Hard to define where the match table read pos definitely catches up with the output size,
- * but the chance of 64 bytes of input expanding to 256 after an encoder reset is remote. */
+/* Hard to define where the match table read pos definitely catches up with the output size, but
+ * 64 bytes of input expanding beyond 256 bytes right after an encoder reset is most likely impossible.
+ * The encoder will error out if this happens. */
 #define kTempMinOutput 256U
 #define kTempBufferSize (kTempMinOutput + kOptimizerBufferSize + kOptimizerBufferSize / 4U)
 
@@ -1958,14 +1959,14 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
         return 0;
 
     enc->lc = options->lc;
-    enc->lp = MIN(options->lp, 4);
+    enc->lp = MIN(options->lp, kNumLiteralPosBitsMax);
 
-    if (enc->lc + enc->lp > 4)
-        enc->lc = 4 - enc->lp;
+    if (enc->lc + enc->lp > kLcLpMax)
+        enc->lc = kLcLpMax - enc->lp;
 
-    enc->pb = options->pb;
+    enc->pb = MIN(options->pb, kNumPositionBitsMax);
     enc->strategy = options->strategy;
-    enc->fast_length = options->fast_length;
+    enc->fast_length = MIN(options->fast_length, kMatchLenMax);
     enc->match_cycles = MIN(options->match_cycles, kMatchesMax - 1);
 
     LZMA2_reset(enc, block.end);
@@ -1986,8 +1987,7 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     /* Limit the matches near the end of this slice to not exceed block.end */
     RMF_limitLengths(tbl, block.end);
 
-    for (size_t index = start; index < block.end;)
-    {
+    for (size_t index = start; index < block.end;) {
         size_t header_size = (stream_prop >= 0) + (encode_properties ? kChunkHeaderSize + 1 : kChunkHeaderSize);
         EncoderStates saved_states;
         size_t next_index;
@@ -2039,9 +2039,10 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
 
         BYTE* header = out_dest;
 
-        if (stream_prop >= 0)
+        if (stream_prop >= 0) {
             *header++ = (BYTE)stream_prop;
-        stream_prop = -1;
+            stream_prop = -1;
+        }
 
         header[1] = (BYTE)((uncompressed_size - 1) >> 8);
         header[2] = (BYTE)(uncompressed_size - 1);
@@ -2056,6 +2057,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
 
             compressed_size = uncompressed_size;
             header_size = 3 + (header - out_dest);
+
+            /* Restore states if compression was attempted */
             if (!incompressible)
                 enc->states = saved_states;
         }
@@ -2082,9 +2085,13 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
             incompressible = LZMA2_isChunkIncompressible(tbl, block, next_index, enc->strategy);
         }
         out_dest += compressed_size + header_size;
+
+        /* Update progress concurrently with other encoder threads */
         FL2_atomic_add(*progress_in, (long)(next_index - index));
         FL2_atomic_add(*progress_out, (long)(compressed_size + header_size));
+
         index = next_index;
+
         if (*canceled)
             return FL2_ERROR(canceled);
     }

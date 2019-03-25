@@ -124,7 +124,8 @@ void FORCE_NOINLINE RC_shiftLow(RangeEncoder* const rc)
 {
     U64 low = rc->low;
     rc->low = (U32)(low << 8);
-    if (low < 0xFF000000 || low > 0xFFFFFFFF) {
+    /* VC15 compiles 'if (low < 0xFF000000 || low > 0xFFFFFFFF)' to this single-branch conditional */
+    if (low + 0xFFFFFFFF01000000 > 0xFFFFFF) {
         BYTE high = (BYTE)(low >> 32);
         rc->out_buffer[rc->out_index++] = rc->cache + high;
         rc->cache = (BYTE)(low >> 24);

@@ -669,8 +669,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_CCtx_setParameter(FL2_CCtx* cctx, FL2_cParamet
         CLAMPCHECK(value, FL2_DICTSIZE_MIN, FL2_DICTSIZE_MAX);
         cctx->params.rParams.dictionary_size = value;
 		if (value >= ((size_t)1 << 26)) {
-			size_t dictLog = 25;
-			while (cctx->params.rParams.match_buffer_log < RMF_BUFFER_LOG_MAX && ((size_t)3 << dictLog) <= cctx->params.rParams.dictionary_size) {
+			cctx->params.rParams.match_buffer_log = RMF_BUFFER_LOG_BASE - FL2_defaultCParameters[FL2_CLEVEL_DEFAULT].bufferLog + 1;
+			size_t dictLog = 27;
+			while (cctx->params.rParams.match_buffer_log < RMF_BUFFER_LOG_MAX && ((size_t)1 << dictLog) <= cctx->params.rParams.dictionary_size) {
 				++cctx->params.rParams.match_buffer_log;
 				++dictLog;
 			}

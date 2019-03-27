@@ -24,9 +24,9 @@ typedef struct FL2_matchTable_s FL2_matchTable;
 
 #define RMF_MIN_BYTES_PER_THREAD 1024
 
-#define RMF_BUFFER_LOG_BASE 12
+#define RMF_BUFFER_LOG_BASE 14
 #define RMF_BUFFER_LOG_MIN 6
-#define RMF_BUFFER_LOG_MAX 12
+#define RMF_BUFFER_LOG_MAX RMF_BUFFER_LOG_BASE
 
 typedef struct
 {

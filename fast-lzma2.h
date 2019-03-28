@@ -460,8 +460,9 @@ FL2LIB_API size_t FL2LIB_CALL FL2_decompressStream(FL2_DStream* fds, FL2_outBuff
 #define FL2_BLOCK_OVERLAP_MAX 14
 #define FL2_RESET_INTERVAL_MIN 1
 #define FL2_RESET_INTERVAL_MAX 16  /* small enough to fit FL2_DICTSIZE_MAX * FL2_RESET_INTERVAL_MAX in 32-bit size_t */
-#define FL2_BUFFER_SIZE_LOG_MIN 0
-#define FL2_BUFFER_SIZE_LOG_MAX 8
+#define FL2_BUFFER_RESIZE_MIN 0
+#define FL2_BUFFER_RESIZE_MAX 4
+#define FL2_BUFFER_RESIZE_DEFAULT 2
 #define FL2_CHAINLOG_MIN       4
 #define FL2_CHAINLOG_MAX       14
 #define FL2_HYBRIDCYCLES_MIN    1
@@ -492,8 +493,6 @@ typedef struct {
     unsigned searchDepth;      /* maximum depth for resolving string matches : larger == more compression, slower */
     unsigned fastLength;       /* acceptable match size for parser : larger == more compression, slower; fast bytes parameter from 7-zip */
     unsigned divideAndConquer; /* split long chains of 2-byte matches into shorter chains with a small overlap : faster, somewhat less compression; enabled by default */
-    unsigned bufferLog;        /* buffer size for processing match chains is (dictionarySize >> (14 - bufferLog)) : affects compression when divideAndConquer enabled; */
-                               /* when divideAndConquer disabled, affects speed in a hardware-dependent manner */
     FL2_strategy strategy;     /* encoder strategy : fast, optimized or ultra (hybrid) */
 } FL2_compressionParameters;
 
@@ -507,9 +506,7 @@ typedef enum {
                              * Typically provides a poor speed/ratio tradeoff. */
     FL2_p_dictionaryLog,    /* Maximum allowed back-reference distance, expressed as power of 2.
                              * Must be clamped between FL2_DICTLOG_MIN and FL2_DICTLOG_MAX.
-                             * Default = 24
-							 * Setting a dict log >= 26 (64 Mb) reduces bufferLog. Any custom bufferLog
-							 * value must be set after dictionaryLog. */
+                             * Default = 24 */
     FL2_p_dictionarySize,   /* Same as above but expressed as an absolute value. 
                              * Must be clamped between FL2_DICTSIZE_MIN and FL2_DICTSIZE_MAX.
                              * Default = 16 Mb */
@@ -522,11 +519,12 @@ typedef enum {
     FL2_p_resetInterval,    /* For multithreaded decompression. A dictionary reset will occur
                              * after each dictionarySize * resetInterval bytes of input.
                              * Default = 4 */
-    FL2_p_bufferLog,        /* Buffering speeds up the matchfinder. Buffer size is 
-                             * (dictionarySize >> (14 - bufferLog)) * 12 bytes. Higher number = slower,
-                             * better compression, higher memory usage. A CPU with a large memory cache
+    FL2_p_bufferResize,     /* Buffering speeds up the matchfinder. Buffer resize determines the percentage of
+                             * the normal buffer size used, which depends on dictionary size.
+                             * 0=50, 1=75, 2=100, 3=150, 4=200. Higher number = slower, better
+                             * compression, higher memory usage. A CPU with a large memory cache
                              * may make effective use of a larger buffer.
-                             * Default = 6 */
+                             * Default = 2 */
     FL2_p_hybridChainLog,   /* Size of the hybrid mode HC3 hash chain, as a power of 2.
                              * Resulting table size is (1 << (chainLog+2)) bytes.
                              * Larger tables result in better and slower compression.

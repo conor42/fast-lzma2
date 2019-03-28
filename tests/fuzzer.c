@@ -370,7 +370,7 @@ static int basicUnitTests(unsigned nbThreads, U32 seed, double compressibility)
     {   FL2_CCtx* cctx = FL2_createCCtxMt(0);
         if (cctx == NULL) goto _output_error;
         CHECK(FL2_compressCCtx(cctx, compressedBuffer, compressedBufferSize, CNBuffer, CNBuffSize, 2));
-        FL2_CCtx_setParameter(cctx, FL2_p_bufferLog, (unsigned)FL2_CCtx_getParameter(cctx, FL2_p_bufferLog) + 1);
+        FL2_CCtx_setParameter(cctx, FL2_p_bufferResize, (unsigned)FL2_CCtx_getParameter(cctx, FL2_p_bufferResize) + 1);
         CHECK(FL2_compressCCtx(cctx, compressedBuffer, compressedBufferSize, CNBuffer, CNBuffSize, 0));
         FL2_freeCCtx(cctx);
         CHECK(FL2_decompress(decodedBuffer, CNBuffSize, compressedBuffer, compressedBufferSize));

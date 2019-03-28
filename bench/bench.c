@@ -191,7 +191,7 @@ static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
             FL2_CCtx_setParameter(fcs, FL2_p_resetInterval, value);
         }
         else if (strcmp(param, "b") == 0) {
-            FL2_CCtx_setParameter(fcs, FL2_p_bufferLog, value);
+            FL2_CCtx_setParameter(fcs, FL2_p_bufferResize, value);
         }
         else if (strcmp(param, "a") == 0) {
             FL2_CCtx_setParameter(fcs, FL2_p_strategy, value);

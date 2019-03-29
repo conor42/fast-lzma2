@@ -7,7 +7,6 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 add_library(flzma2
   dict_buffer.c
-  error_private.c
   fl2_compress.c
   lzma2_dec.c
   fl2_pool.c

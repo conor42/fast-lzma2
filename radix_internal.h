@@ -54,14 +54,14 @@ typedef struct
 } RMF_tableHead;
 
 union src_data_u {
-	BYTE chars[4];
-	U32 u32;
+    BYTE chars[4];
+    U32 u32;
 };
 
 typedef struct
 {
     U32 from;
-	union src_data_u src;
+    union src_data_u src;
     U32 next;
 } RMF_buildMatch;
 
@@ -105,14 +105,14 @@ struct FL2_matchTable_s
     U32 table[1];
 };
 
-size_t RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
-size_t RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
+void RMF_bitpackInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
+void RMF_structuredInit(struct FL2_matchTable_s* const tbl, const void* data, size_t const end);
 void RMF_bitpackBuildTable(struct FL2_matchTable_s* const tbl,
-	size_t const job,
+    size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block);
 void RMF_structuredBuildTable(struct FL2_matchTable_s* const tbl,
-	size_t const job,
+    size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block);
 void RMF_recurseListChunk(RMF_builder* const tbl,

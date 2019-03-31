@@ -103,7 +103,7 @@ static void RMF_initReference(FL2_matchTable* const tbl, const void* const data,
 }
 #endif
 
-size_t
+void
 #ifdef RMF_BITPACK
 RMF_bitpackInit
 #else
@@ -115,12 +115,12 @@ RMF_structuredInit
         for (size_t i = 0; i < end; ++i)
             SetNull(i);
         tbl->end_index = 0;
-        return 0;
+        return;
     }
 #ifdef RMF_REFERENCE
     if (tbl->params.use_ref_mf) {
         RMF_initReference(tbl, data, end);
-        return 0;
+        return;
     }
 #endif
 
@@ -136,7 +136,6 @@ RMF_structuredInit
 
     radix_16 = ((size_t)((BYTE)radix_16) << 8) | data_block[2];
 
-    ptrdiff_t rpt_total = 0;
     ptrdiff_t i = 1;
     ptrdiff_t const block_size = end - 2;
     for (; i < block_size; ++i) {
@@ -170,8 +169,6 @@ RMF_structuredInit
     SetNull(end - 1);
 
     tbl->end_index = (U32)st_index;
-
-    return rpt_total;
 }
 
 /* Copy the list into a buffer and recurse it there. This decreases cache misses and allows */
@@ -927,7 +924,7 @@ RMF_bitpackBuildTable
 RMF_structuredBuildTable
 #endif
 (FL2_matchTable* const tbl,
-	size_t const job,
+    size_t const job,
     unsigned const multi_thread,
     FL2_dataBlock const block)
 {

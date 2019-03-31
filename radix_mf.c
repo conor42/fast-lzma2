@@ -274,16 +274,16 @@ void RMF_initProgress(FL2_matchTable * const tbl)
         tbl->progress = 0;
 }
 
-size_t RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const end)
+void RMF_initTable(FL2_matchTable* const tbl, const void* const data, size_t const end)
 {
     DEBUGLOG(5, "RMF_initTable : size %u", (U32)end);
 
     tbl->st_index = ATOMIC_INITIAL_VALUE;
 
     if (tbl->is_struct)
-        return RMF_structuredInit(tbl, data, end);
+        RMF_structuredInit(tbl, data, end);
     else
-        return RMF_bitpackInit(tbl, data, end);
+        RMF_bitpackInit(tbl, data, end);
 }
 
 static void RMF_handleRepeat(RMF_buildMatch* const match_buffer,

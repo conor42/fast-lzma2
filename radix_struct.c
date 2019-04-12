@@ -13,8 +13,6 @@
 #include "fl2_internal.h"
 #include "radix_internal.h"
 
-typedef struct FL2_matchTable_s FL2_matchTable;
-
 #undef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 

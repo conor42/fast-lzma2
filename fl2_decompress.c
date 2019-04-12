@@ -49,7 +49,7 @@ typedef struct
     ELzmaFinishMode finish;
 } BlockDecMt;
 
-typedef struct FL2_DCtx_s
+struct FL2_DCtx_s
 {
     LZMA2_DCtx dec;
 #ifndef FL2_SINGLETHREAD
@@ -58,7 +58,7 @@ typedef struct FL2_DCtx_s
     size_t nbThreads;
 #endif
     BYTE lzma2prop;
-} FL2_DCtx;
+};
 
 FL2LIB_API size_t FL2LIB_CALL FL2_decompress(void* dst, size_t dstCapacity,
     const void* src, size_t compressedSize)

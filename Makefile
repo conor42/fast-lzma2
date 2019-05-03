@@ -49,6 +49,11 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/include/fast-lzma2.h
 	rm -f $(DESTDIR)$(PREFIX)/include/fl2_errors.h
 
+.PHONY: test
+test:
+	cd test && make
+	test/file_test radix_engine.h
+
 .PHONY: clean
 clean:
 	rm -f $(REAL_NAME) $(OBJ) $(DEP)

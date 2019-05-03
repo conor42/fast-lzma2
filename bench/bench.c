@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../fast-lzma2.h"
-#include "../tests/datagen.h"
+#include "../fuzzer/datagen.h"
 #include "../mem.h"
 #include "../util.h"
 

@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 cleanup:
     fclose(fout);
     fclose(fin);
-    _unlink(out_name);
+    remove(out_name);
     FL2_freeCStream(fcs);
     FL2_freeDStream(fds);
     return ret;

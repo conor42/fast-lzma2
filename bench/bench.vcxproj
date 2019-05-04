@@ -19,14 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\tests\datagen.c" />
+    <ClCompile Include="..\fuzzer\datagen.c" />
     <ClCompile Include="..\util.c" />
     <ClCompile Include="bench.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\fast-lzma2.h" />
     <ClInclude Include="..\fl2_errors.h" />
-    <ClInclude Include="..\tests\datagen.h" />
+    <ClInclude Include="..\fuzzer\datagen.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{E49A84FD-DE73-4A88-8968-F3B1C328B238}</ProjectGuid>

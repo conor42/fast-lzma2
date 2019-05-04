@@ -78,6 +78,7 @@ endif
 test:
 	cd test && make
 	test/file_test radix_engine.h
+	@echo "Test file compressed and decompressed ok.\n"
 
 .PHONY: clean
 clean:

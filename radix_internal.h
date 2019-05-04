@@ -122,21 +122,21 @@ void RMF_recurseListChunk(RMF_builder* const tbl,
     U32 const max_depth,
     U32 const list_count,
     size_t const stack_base);
-int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned max_depth);
-int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t index, size_t const end, unsigned max_depth);
-void RMF_bitpackLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
-void RMF_structuredLimitLengths(struct FL2_matchTable_s* const tbl, size_t const index);
-BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const index);
-BYTE* RMF_structuredAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const index);
+int RMF_bitpackIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t pos, size_t const end, unsigned max_depth);
+int RMF_structuredIntegrityCheck(const struct FL2_matchTable_s* const tbl, const BYTE* const data, size_t pos, size_t const end, unsigned max_depth);
+void RMF_bitpackLimitLengths(struct FL2_matchTable_s* const tbl, size_t const pos);
+void RMF_structuredLimitLengths(struct FL2_matchTable_s* const tbl, size_t const pos);
+BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const pos);
+BYTE* RMF_structuredAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const pos);
 size_t RMF_bitpackGetMatch(const struct FL2_matchTable_s* const tbl,
     const BYTE* const data,
-    size_t const index,
+    size_t const pos,
     size_t const limit,
     unsigned const max_depth,
     size_t* const offset_ptr);
 size_t RMF_structuredGetMatch(const struct FL2_matchTable_s* const tbl,
     const BYTE* const data,
-    size_t const index,
+    size_t const pos,
     size_t const limit,
     unsigned const max_depth,
     size_t* const offset_ptr);

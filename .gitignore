@@ -302,3 +302,4 @@ __pycache__/
 *.xsd.cs
 
 *.map
+*.d

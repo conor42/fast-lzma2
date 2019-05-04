@@ -125,24 +125,6 @@ static void benchmark(FL2_CCtx* fcs, FL2_DCtx* dctx, char* srcBuffer, size_t src
     }
 }
 
-#define kHash3Bits 14
-#define GET_HASH_3(data) (((data << 8) * 506832829U) >> (32 - kHash3Bits))
-
-int hash_test(void)
-{
-    for (U32 i = 0; i < 0xFFFF; ++i) {
-        BYTE flags[1 << kHash3Bits];
-        memset(flags, 0, sizeof(flags));
-        for (U32 j = 0; j <= 0xFF; ++j) {
-            U32 hash = GET_HASH_3(j | (i << 8));
-            if (flags[hash])
-                return 0;
-            flags[hash] = 1;
-        }
-    }
-    return 1;
-}
-
 static int parse_params(FL2_CCtx* fcs, int argc, char** argv)
 {
     for (int i = 2; i < argc; ++i) {

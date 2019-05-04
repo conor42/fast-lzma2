@@ -1,4 +1,4 @@
-The __Fast LZMA2 Library__ is a lossless high-ratio data compression library based on the LZMA2 codec in 7-zip.
+The __Fast LZMA2 Library__ is a lossless high-ratio data compression library based on Igor Pavlov's LZMA2 codec from 7-zip.
 
 Binaries of 7-Zip forks which use the algorithm are available in the [7-Zip-FL2 project] and the [7-Zip-zstd project]. The library
 is also embedded in a fork of XZ Utils, named [FXZ Utils].
@@ -31,15 +31,26 @@ Compression data rate vs ratio
 ------------------------------
 ![Compression data rate vs ratio](doc/images/bench_mt2.png "Compression data rate vs ratio")
 
-### Build
+## Build
 
-Build methods are not yet comprehensive for all systems. There are VS 2015 projects for building a benchmark program, fuzz tester,
-and a DLL. Makefiles for gcc are included for the benchmark, fuzzer and DLL, and Evan Nemerson has contributed a CMake file, which
-currently does not enable the assembler-optimized decoder. If anyone would like to help improve the build methods, please do so.
-On POSIX systems, FXZ Utils provides a derivative of liblzma from XZ Utils as a wrapper for Fast LZMA2. It is built using GNU
-autotools.
+### Windows
 
-### Status
+The build\VS folder contains a solution for VS2017. It includes projects for a benchmark program, fuzz tester, file compression
+tester, and a DLL.
+
+### POSIX
+
+Run `make` in the root directory to build the shared library, then `make install` to allow other programs to use the headers and
+libfast-lzma2. Use `make test` to build the file compression tester and run it on a test file.
+
+The bench, fuzzer and test directories have makefiles for these programs. The CMake file present in earlier releases does not
+have an installation script so is not currently included.
+
+If a build fails on any system please open an issue on github.
+
+[FXZ Utils] provides a derivative of liblzma from XZ Utils as a wrapper for Fast LZMA2. It is built using GNU autotools.
+
+## Status
 
 The library has passed a large amount of fuzz testing, and testing on file sets selected at random in the Radyx file archiver. An
 earlier version was released in the 7-Zip forks linked above. The library is considered suitable for production environments.
@@ -58,7 +69,7 @@ Changes in v1.0.0:
 - Replaced the callbacks for writing and progress with timeouts and new functions to gain direct access to the dictionary buffer and
   the compressed data buffers.
 - Added Igor Pavlov's assembler-optimized decoder.
-- Multithreaded decompression.
+- Multi-threaded decompression.
 
 
 Changes in v0.9.2:
@@ -72,6 +83,6 @@ Changes in v0.9.1:
 - Added an incompressibility checker which processes high-entropy (e.g. encrypted or already compressed) data about twice as fast
   as before.
 
-### License
+## License
 
 Fast LZMA2 is dual-licensed under [BSD](LICENSE) and [GPLv2](COPYING).

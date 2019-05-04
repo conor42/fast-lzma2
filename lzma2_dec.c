@@ -25,8 +25,8 @@ Modified for FL2 by Conor McCarthy */
 #define NORMALIZE if (range < kTopValue) { range <<= 8; code = (code << 8) | (*buf++); }
 
 #define IF_BIT_0(p) ttt = *(p); NORMALIZE; bound = (range >> kNumBitModelTotalBits) * ttt; if (code < bound)
-#define UPDATE_0(p) range = bound; *(p) = (Probability)(ttt + ((kBitModelTotal - ttt) >> kNumMoveBits));
-#define UPDATE_1(p) range -= bound; code -= bound; *(p) = (Probability)(ttt - (ttt >> kNumMoveBits));
+#define UPDATE_0(p) range = bound; *(p) = (LZMA2_prob)(ttt + ((kBitModelTotal - ttt) >> kNumMoveBits));
+#define UPDATE_1(p) range -= bound; code -= bound; *(p) = (LZMA2_prob)(ttt - (ttt >> kNumMoveBits));
 #define GET_BIT2(p, i, A0, A1) IF_BIT_0(p) \
     { UPDATE_0(p); i = (i + i); A0; } else \
     { UPDATE_1(p); i = (i + i) + 1; A1; }
@@ -38,10 +38,10 @@ Modified for FL2 by Conor McCarthy */
 #define PREP_BIT(p) ttt = *(p); NORMALIZE; bound = (range >> kNumBitModelTotalBits) * ttt
 #define UPDATE_PREP_0 U32 r0 = bound; unsigned p0 = (ttt + ((kBitModelTotal - ttt) >> kNumMoveBits))
 #define UPDATE_PREP_1 U32 r1 = range - bound; unsigned p1 = (ttt - (ttt >> kNumMoveBits))
-#define UPDATE_COND(p) range=(code < bound) ? r0 : r1; *p = (Probability)((code < bound) ? p0 : p1)
+#define UPDATE_COND(p) range=(code < bound) ? r0 : r1; *p = (LZMA2_prob)((code < bound) ? p0 : p1)
 #define UPDATE_CODE code = code - ((code < bound) ? 0 : bound)
 
-#define TREE_GET_BIT(probs, i) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
+#define TREE_GET_BIT(probs, i) { LZMA2_prob *pp = (probs)+(i); PREP_BIT(pp); \
     UPDATE_PREP_0; unsigned i0 = (i + i); \
     UPDATE_PREP_1; unsigned i1 = (i + i) + 1; \
     UPDATE_COND(pp); \
@@ -49,7 +49,7 @@ Modified for FL2 by Conor McCarthy */
     UPDATE_CODE; \
 }
 
-#define REV_BIT_VAR(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
+#define REV_BIT_VAR(probs, i, m) { LZMA2_prob *pp = (probs)+(i); PREP_BIT(pp); \
     UPDATE_PREP_0; U32 i0 = i + m; U32 m2 = m + m; \
     UPDATE_PREP_1; U32 i1 = i + m2; \
     UPDATE_COND(pp); \
@@ -57,14 +57,14 @@ Modified for FL2 by Conor McCarthy */
     m = m2; \
     UPDATE_CODE; \
 }
-#define REV_BIT_CONST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
+#define REV_BIT_CONST(probs, i, m) { LZMA2_prob *pp = (probs)+(i); PREP_BIT(pp); \
     UPDATE_PREP_0; \
     UPDATE_PREP_1; \
     UPDATE_COND(pp); \
     i += m + (code < bound ? 0 : m); \
     UPDATE_CODE; \
 }
-#define REV_BIT_LAST(probs, i, m) { Probability *pp = (probs)+(i); PREP_BIT(pp); \
+#define REV_BIT_LAST(probs, i, m) { LZMA2_prob *pp = (probs)+(i); PREP_BIT(pp); \
     UPDATE_PREP_0; \
     UPDATE_PREP_1; \
     UPDATE_COND(pp); \
@@ -175,18 +175,18 @@ typedef enum
     LZMA2_STATE_DATA,
     LZMA2_STATE_FINISHED,
     LZMA2_STATE_ERROR
-} ELzma2State;
+} LZMA2_state;
 
 #define LZMA_DIC_MIN (1 << 12)
 
 static BYTE LZMA_tryDummy(const LZMA2_DCtx *const p)
 {
-    const Probability *probs = GET_PROBS;
+    const LZMA2_prob *probs = GET_PROBS;
 	unsigned state = p->state;
 	U32 range = p->range;
 	U32 code = p->code;
 
-    const Probability *prob;
+    const LZMA2_prob *prob;
     U32 bound;
     unsigned ttt;
     unsigned pos_state = CALC_POS_STATE(p->processed_pos, (1 << p->prop.pb) - 1);
@@ -216,7 +216,7 @@ static BYTE LZMA_tryDummy(const LZMA2_DCtx *const p)
             do
             {
                 unsigned bit;
-                const Probability *prob_lit;
+                const LZMA2_prob *prob_lit;
                 match_byte += match_byte;
                 bit = offs;
                 offs &= match_byte;
@@ -283,7 +283,7 @@ static BYTE LZMA_tryDummy(const LZMA2_DCtx *const p)
         }
         {
             unsigned limit, offset;
-            const Probability *prob_len = prob + LenChoice;
+            const LZMA2_prob *prob_len = prob + LenChoice;
             IF_BIT_0_CHECK(prob_len)
             {
                 UPDATE_0_CHECK;
@@ -373,7 +373,7 @@ int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit);
 
 static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
 {
-    Probability *const probs = GET_PROBS;
+    LZMA2_prob *const probs = GET_PROBS;
 
     unsigned state = p->state;
     U32 rep0 = p->reps[0], rep1 = p->reps[1], rep2 = p->reps[2], rep3 = p->reps[3];
@@ -395,7 +395,7 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
 
     do
     {
-        Probability *prob;
+        LZMA2_prob *prob;
         U32 bound;
         unsigned ttt;
         unsigned pos_state = CALC_POS_STATE(processed_pos, pb_mask);
@@ -437,13 +437,13 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
                 do
                 {
                     unsigned bit;
-                    Probability *prob_lit;
+                    LZMA2_prob *prob_lit;
                     MATCHED_LITER_DEC
                 } while (symbol < 0x100);
 #else
                 {
                     unsigned bit;
-                    Probability *prob_lit;
+                    LZMA2_prob *prob_lit;
                     MATCHED_LITER_DEC
                     MATCHED_LITER_DEC
                     MATCHED_LITER_DEC
@@ -538,7 +538,7 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
 
 #ifdef LZMA_SIZE_OPT
         unsigned lim, offset;
-        Probability *prob_len = prob + LenChoice;
+        LZMA2_prob *prob_len = prob + LenChoice;
         IF_BIT_0(prob_len)
         {
               UPDATE_0(prob_len);
@@ -568,7 +568,7 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
         TREE_DECODE(prob_len, lim, len);
         len += offset;
 #else
-        Probability *prob_len = prob + LenChoice;
+        LZMA2_prob *prob_len = prob + LenChoice;
         IF_BIT_0(prob_len)
         {
               UPDATE_0(prob_len);
@@ -815,7 +815,7 @@ static void LZMA_init(LZMA2_DCtx *const p)
 static void LZMA_initStateReal(LZMA2_DCtx *const p)
 {
     size_t const num_probs = LzmaProps_GetNumProbs(&p->prop);
-    Probability *probs = p->probs;
+    LZMA2_prob *probs = p->probs;
     for (size_t i = 0; i < num_probs; i++)
         probs[i] = kBitModelTotal >> 1;
     p->reps[0] = p->reps[1] = p->reps[2] = p->reps[3] = 1;
@@ -824,7 +824,7 @@ static void LZMA_initStateReal(LZMA2_DCtx *const p)
 }
 
 static size_t LZMA_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit, const BYTE *src, size_t *const src_len,
-    ELzmaFinishMode finish_mode)
+    LZMA2_finishMode finish_mode)
 {
     size_t in_size = *src_len;
     (*src_len) = 0;
@@ -1025,7 +1025,7 @@ static unsigned LZMA2_nextChunkInfo(BYTE *const control,
 }
 
 static size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit,
-    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+    const BYTE *src, size_t *const src_len, LZMA2_finishMode const finish_mode)
 {
     if (p->state2 == LZMA2_STATE_FINISHED)
         return LZMA_STATUS_FINISHED;
@@ -1095,7 +1095,7 @@ static size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit
         }
         else
         {
-            ELzmaFinishMode cur_finish_mode = LZMA_FINISH_END;
+            LZMA2_finishMode cur_finish_mode = LZMA_FINISH_END;
             if (in_cur < p->pack_size) {
                 if (in_cur < LZMA_REQUIRED_INPUT_MAX)
                     return LZMA_STATUS_NEEDS_MORE_INPUT;
@@ -1135,7 +1135,7 @@ static size_t LZMA2_decodeChunkToDic(LZMA2_DCtx *const p, size_t const dic_limit
 }
 
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
-    const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+    const BYTE *const src, size_t *const src_len, LZMA2_finishMode const finish_mode)
 {
     if (p->state2 == LZMA2_STATE_ERROR)
         return FL2_ERROR(corruption_detected);
@@ -1162,7 +1162,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
 
 #if 0
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
-    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+    const BYTE *src, size_t *const src_len, LZMA2_finishMode const finish_mode)
 {
     size_t const in_size = *src_len;
     size_t res = FL2_error_no_error;
@@ -1196,7 +1196,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
 
         size_t in_cur = in_size - *src_len;
         size_t out_cur = dic_limit - dic_pos;
-        ELzmaFinishMode cur_finish_mode = LZMA_FINISH_ANY;
+        LZMA2_finishMode cur_finish_mode = LZMA_FINISH_ANY;
 
         if (out_cur >= p->unpack_size)
         {
@@ -1293,7 +1293,7 @@ size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
 }
 #endif
 
-size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len, const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode)
+size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len, const BYTE *src, size_t *const src_len, LZMA2_finishMode const finish_mode)
 {
     size_t out_size = *dest_len, in_size = *src_len;
     *src_len = *dest_len = 0;
@@ -1304,7 +1304,7 @@ size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len
             p->dic_pos = 0;
 
         size_t const dic_pos = p->dic_pos;
-        ELzmaFinishMode cur_finish_mode = LZMA_FINISH_ANY;
+        LZMA2_finishMode cur_finish_mode = LZMA_FINISH_ANY;
         size_t out_cur = p->dic_buf_size - dic_pos;
 
         if (out_cur >= out_size) {

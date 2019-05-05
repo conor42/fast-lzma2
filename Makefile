@@ -56,7 +56,7 @@ else
 	cp $(REAL_NAME) $(LIBDIR)/$(REAL_NAME)
 	strip -g $(LIBDIR)/$(REAL_NAME)
 	chmod 0755 $(LIBDIR)/$(REAL_NAME)
-	ln -s $(LIBDIR)/$(REAL_NAME) $(LIBDIR)/$(LINKER_NAME)
+	ln -sf $(LIBDIR)/$(REAL_NAME) $(LIBDIR)/$(LINKER_NAME)
 	ldconfig -n $(LIBDIR)
 	mkdir -p $(DESTDIR)$(PREFIX)/include
 	cp fast-lzma2.h $(DESTDIR)$(PREFIX)/include/

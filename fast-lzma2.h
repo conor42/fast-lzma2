@@ -136,19 +136,20 @@ FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maxim
 *  Explicit memory management
 ***************************************/
 
-/*! FL2_setAllocFree() :
- *  Custom allocator/deallocator functions passed here will be used for all allocations
+/*! FL2_setAllocator() :
+ *  Custom allocator/deallocator functions passed to this function will be used for all allocations
  *  and deallocations. This call must occur before any functions which allocate memory are called,
  *  to ensure that the correct deallocator is called for all blocks. The setting persists until the
- *  caller detaches from the DLL. Calling FL2_setAllocFree() again will have no effect. */
-FL2LIB_API size_t FL2LIB_CALL FL2_setAllocFree(void* (*allocFunction)(size_t size),
+ *  caller detaches from the DLL. Calling FL2_setAllocator() again will have no effect and will
+ *  return an error code. If FL2_setAllocator() is not called, malloc() and free() will be used. */
+FL2LIB_API size_t FL2LIB_CALL FL2_setAllocator(void* (*allocFunction)(size_t size),
     void (*freeFunction)(void* address));
 
-/*! FL2_setLargeAllocFree() :
- *  Custom allocator/deallocator functions passed here will be used for all large allocations,
- *  i.e. dictionary and match tables. This setting persists until the caller detaches from the DLL.
- *  Calling FL2_setLargeAllocFree() again will have no effect. */
-FL2LIB_API size_t FL2LIB_CALL FL2_setLargeAllocFree(void* (*allocFunction)(size_t size),
+/*! FL2_setLargeAllocator() :
+ *  Same as FL2_setAllocator() but sets functions for large allocations, i.e. dictionary and
+ *  match tables. If this function is not called, large allocations will use the settings from
+ *  FL2_setAllocator(), if present. */
+FL2LIB_API size_t FL2LIB_CALL FL2_setLargeAllocator(void* (*allocFunction)(size_t size),
     void(*freeFunction)(void* address));
 
 /*= Compression context

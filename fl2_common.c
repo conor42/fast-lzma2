@@ -66,7 +66,7 @@ void *FL2_large_malloc(size_t size)
 {
     FL2_g_alloc_called = 1;
     DEBUGLOG(3, "FL2_large_malloc: %lu bytes", (long)size);
-    return (FL2_g_large_alloc != NULL) ? FL2_g_large_alloc(size) : malloc(size);
+    return (FL2_g_large_alloc != NULL) ? FL2_g_large_alloc(size) : FL2_malloc(size);
 }
 
 void FL2_large_free(void *address)
@@ -74,10 +74,10 @@ void FL2_large_free(void *address)
     if (FL2_g_large_free != NULL)
         FL2_g_large_free(address);
     else
-        free(address);
+        FL2_free(address);
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_setAllocFree(void* (*allocFunction)(size_t size),
+FL2LIB_API size_t FL2LIB_CALL FL2_setAllocator(void* (*allocFunction)(size_t size),
     void(*freeFunction)(void* address))
 {
     if (FL2_g_alloc_called)
@@ -87,7 +87,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setAllocFree(void* (*allocFunction)(size_t siz
     return FL2_error_no_error;
 }
 
-FL2LIB_API size_t FL2LIB_CALL FL2_setLargeAllocFree(void* (*allocFunction)(size_t size),
+FL2LIB_API size_t FL2LIB_CALL FL2_setLargeAllocator(void* (*allocFunction)(size_t size),
     void(*freeFunction)(void* address))
 {
     if (FL2_g_alloc_called)

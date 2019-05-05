@@ -1,67 +1,45 @@
-objects = \
-../dict_buffer.o \
-../fl2_common.o \
-../fl2_compress.o \
-../fl2_decompress.o \
-../fl2_pool.o \
-../fl2_threading.o \
-../lzma2_dec.o \
-../lzma2_enc.o \
-../radix_bitpack.o \
-../radix_mf.o \
-../radix_struct.o \
-../range_enc.o \
-../util.o \
-../xxhash.o \
-../tests/datagen.o \
-bench.o
+SRC = $(wildcard ../*.c) ../fuzzer/datagen.c bench.c
+OBJ = $(SRC:.c=.o)
+DEP = $(OBJ:.o=.d)
 
-CFLAGS := -Wall -O3 -pthread
-CC := gcc
+CFLAGS:=-Wall -O2 -pthread
+CC:=gcc
 
-ASFLAGS :=
+ASFLAGS:=
 
-x86_64 := 0
-
-exe_ext :=
+x86_64:=0
+EXT:=
 
 ifeq ($(OS),Windows_NT)
-	exe_ext :=.exe
+	CFLAGS+=-DFL2_DLL_EXPORT=1
+	EXT:=.exe
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-    ASFLAGS += -D MS_x64_CALL=1
-	x86_64 := 1
+	ASFLAGS+=-DMS_x64_CALL=1
+	x86_64:=1
 endif
 else
-	UNAME_P := $(shell uname -p)
-ifeq ($(UNAME_P),x86_64)
-    ASFLAGS += -D MS_x64_CALL=0
-	x86_64 := 1
+	PROC_ARCH:=$(shell uname -p)
+ifneq ($(PROC_ARCH),x86_64)
+	PROC_ARCH:=$(shell uname -m)
+endif
+ifeq ($(PROC_ARCH),x86_64)
+	ASFLAGS+=-DMS_x64_CALL=0
+	x86_64:=1
 endif
 endif
 
 ifeq ($(x86_64),1)
-	CFLAGS += -DLZMA2_DEC_OPT
-	objects += ../lzma_dec_x86_64.o
+	CFLAGS+=-DLZMA2_DEC_OPT
+	OBJ+=../lzma_dec_x86_64.o
 endif
 
-bench : $(objects)
-	$(CC) -pthread -o bench$(exe_ext) $(objects)
+bench : $(OBJ)
+	$(CC) -pthread -o bench$(EXT) $(OBJ)
 
-dict_buffer.o : ../dict_buffer.h ../fl2_internal.h ../mem.h ../data_block.h
-fl2_common.o : ../fast-lzma2.h ../fl2_errors.h ../fl2_internal.h
-fl2_compress.o : ../dict_buffer.h ../fast-lzma2.h ../fl2_internal.h ../mem.h ../util.h ../fl2_compress_internal.h ../fl2_threading.h ../fl2_pool.h ../radix_mf.h ../lzma2_enc.h
-fl2_decompress.o : ../fast-lzma2.h ../fl2_internal.h ../mem.h ../util.h ../lzma2_dec.h ../xxhash.h
-fl2_pool.o : ../fl2_pool.h ../fl2_internal.h
-fl2_threading.o : ../fl2_threading.h
-lzma2_dec.o : ../lzma2_dec.h ../fl2_internal.h
-lzma2_enc.o : ../fl2_internal.h ../mem.h ../lzma2_enc.h ../fl2_compress_internal.h ../radix_get.h ../radix_mf.h ../range_enc.h ../count.h
-radix_bitpack.o : ../fast-lzma2.h ../mem.h ../fl2_threading.h ../fl2_internal.h ../radix_internal.h ../radix_engine.h
-radix_mf.o : ../fast-lzma2.h ../mem.h ../fl2_internal.h ../radix_internal.h
-radix_struct.o : ../fast-lzma2.h ../mem.h ../fl2_threading.h ../fl2_internal.h ../radix_internal.h ../radix_engine.h
-range_enc.o : ../fl2_internal.h ../mem.h ../range_enc.h
-util.o : ../util.h
-xxhash.o : ../xxhash.h
-bench.o : ../fast-lzma2.h ../mem.h ../util.h ../tests/datagen.h
+-include $(DEP)
+
+%.d: %.c
+	@$(CC) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 clean:
-	rm bench$(exe_ext) $(objects)
+	rm -f bench$(EXT) $(OBJ) $(DEP)

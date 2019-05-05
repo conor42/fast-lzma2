@@ -19,13 +19,16 @@ ifeq ($(OS),Windows_NT)
 	SONAME:=$(LINKER_NAME)
 	REAL_NAME:=$(LINKER_NAME)
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-    ASFLAGS+=-DMS_x64_CALL=1
+	ASFLAGS+=-DMS_x64_CALL=1
 	x86_64:=1
 endif
 else
-	UNAME_P:=$(shell uname -p)
-ifeq ($(UNAME_P),x86_64)
-    ASFLAGS+=-DMS_x64_CALL=0
+	PROC_ARCH:=$(shell uname -p)
+ifneq ($(PROC_ARCH),x86_64)
+	PROC_ARCH:=$(shell uname -m)
+endif
+ifeq ($(PROC_ARCH),x86_64)
+	ASFLAGS+=-DMS_x64_CALL=0
 	x86_64:=1
 endif
 endif
@@ -56,8 +59,8 @@ else
 	cp $(REAL_NAME) $(LIBDIR)/$(REAL_NAME)
 	strip -g $(LIBDIR)/$(REAL_NAME)
 	chmod 0755 $(LIBDIR)/$(REAL_NAME)
-	ln -s $(LIBDIR)/$(REAL_NAME) $(LIBDIR)/$(LINKER_NAME)
-	ldconfig -n $(LIBDIR)
+	cd $(LIBDIR) && ln -sf $(REAL_NAME) $(LINKER_NAME)
+	ldconfig $(LIBDIR)
 	mkdir -p $(DESTDIR)$(PREFIX)/include
 	cp fast-lzma2.h $(DESTDIR)$(PREFIX)/include/
 	cp fl2_errors.h $(DESTDIR)$(PREFIX)/include/
@@ -68,8 +71,9 @@ uninstall:
 ifeq ($(OS),Windows_NT)
 	rm -f libfast-lzma2.dll
 else
+	rm -f $(LIBDIR)/$(LINKER_NAME)
 	rm -f $(LIBDIR)/$(REAL_NAME)
-	ldconfig -n $(LIBDIR)
+	ldconfig $(LIBDIR)
 	rm -f $(DESTDIR)$(PREFIX)/include/fast-lzma2.h
 	rm -f $(DESTDIR)$(PREFIX)/include/fl2_errors.h
 endif
@@ -78,7 +82,7 @@ endif
 test:
 	cd test && make
 	test/file_test radix_engine.h
-	@echo "Test file compressed and decompressed ok.\n"
+	@echo "Test file compressed and decompressed ok."
 
 .PHONY: clean
 clean:

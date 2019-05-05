@@ -156,11 +156,13 @@ static inline void FL2_CCtx_zero_timeout(FL2_CCtx *cctx)
 
 static inline size_t FL2_mf_threadCount(FL2_CCtx *cctx)
 {
+    (void)cctx;
     return 1;
 }
 
 static inline size_t FL2_enc_threadCount(FL2_CCtx *cctx)
 {
+    (void)cctx;
     return 1;
 }
 
@@ -176,8 +178,21 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream *fcs, unsigned t
     return FL2_error_no_error;
 }
 
+static inline int FL2_CStream_waitAll(FL2_CStream *fcs)
+{
+    (void)fcs;
+    return 0;
+}
+
 static inline FL2POOL_ctx *FL2_CCtx_asyncThread(FL2_CCtx *cctx)
 {
+    (void)cctx;
+    return NULL;
+}
+
+static inline FL2POOL_ctx *FL2_CCtx_pool(FL2_CCtx *cctx)
+{
+    (void)cctx;
     return NULL;
 }
 
@@ -186,8 +201,8 @@ static inline FL2POOL_ctx *FL2_CCtx_asyncThread(FL2_CCtx *cctx)
 static int FL2_createCCtx_threads(FL2_CCtx *cctx, int const dualBuffer)
 {
     cctx->compressThread = NULL;
-    cctx->factory = FL2POOL_create(cctx->jobCount - 1);
-    if (cctx->jobCount > 1 && cctx->factory == NULL)
+    cctx->pool = FL2POOL_create(cctx->jobCount - 1);
+    if (cctx->jobCount > 1 && cctx->pool == NULL)
         return -1;
 
     if (dualBuffer) {
@@ -200,7 +215,7 @@ static int FL2_createCCtx_threads(FL2_CCtx *cctx, int const dualBuffer)
 
 static inline void FL2_freeCCtx_threads(FL2_CCtx *cctx)
 {
-    FL2POOL_free(cctx->factory);
+    FL2POOL_free(cctx->pool);
     FL2POOL_free(cctx->compressThread);
 }
 
@@ -255,12 +270,22 @@ FL2LIB_API size_t FL2LIB_CALL FL2_setCStreamTimeout(FL2_CStream * fcs, unsigned 
     return FL2_error_no_error;
 }
 
+static inline int FL2_CStream_waitAll(FL2_CStream *fcs)
+{
+    return FL2POOL_waitAll(fcs->compressThread, fcs->timeout);
+}
+
 static inline FL2POOL_ctx *FL2_CCtx_asyncThread(FL2_CCtx *cctx)
 {
     return cctx->compressThread;
 }
 
-#endif
+static inline FL2POOL_ctx *FL2_CCtx_pool(FL2_CCtx *cctx)
+{
+    return cctx->pool;
+}
+
+#endif /* FL2_SINGLETHREAD */
 
 static FL2_CCtx *FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffer)
 {
@@ -321,7 +346,7 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx *cctx)
 
     DEBUGLOG(3, "FL2_freeCCtx : %u threads", cctx->jobCount);
 
-    DICT_destruct(&cctx->buf);
+    DICT_free(&cctx->buf);
 
     for (unsigned u = 0; u < cctx->jobCount; ++u) {
         LZMA2_freeECtx(cctx->jobs[u].enc);
@@ -410,11 +435,11 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx *const cctx, int const stre
     }
 
     size_t mfThreads = FL2_mf_threadCount(cctx);
-    FL2POOL_addRange(cctx->factory, FL2_buildRadixTable, cctx, 1, mfThreads);
+    FL2POOL_addRange(FL2_CCtx_pool(cctx), FL2_buildRadixTable, cctx, 1, mfThreads);
 
     int err = RMF_buildTable(cctx->matchTable, 0, mfThreads > 1, cctx->curBlock);
 
-    FL2POOL_waitAll(cctx->factory, 0);
+    FL2POOL_waitAll(FL2_CCtx_pool(cctx), 0);
 
     if (err)
         return FL2_ERROR(canceled);
@@ -425,14 +450,14 @@ static size_t FL2_compressCurBlock_blocking(FL2_CCtx *const cctx, int const stre
         return FL2_ERROR(internal);
 #endif
 
-    FL2POOL_addRange(cctx->factory, FL2_compressRadixChunk, cctx, 1, nbThreads);
+    FL2POOL_addRange(FL2_CCtx_pool(cctx), FL2_compressRadixChunk, cctx, 1, nbThreads);
 
     cctx->jobs[0].cSize = LZMA2_encode(cctx->jobs[0].enc, cctx->matchTable,
         cctx->jobs[0].block,
         &cctx->params.cParams, streamProp,
         &cctx->progressIn, &cctx->progressOut, &cctx->canceled);
 
-    FL2POOL_waitAll(cctx->factory, 0);
+    FL2POOL_waitAll(FL2_CCtx_pool(cctx), 0);
 
     for (size_t u = 0; u < nbThreads; ++u)
         if (FL2_isError(cctx->jobs[u].cSize))
@@ -946,7 +971,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_initCStream(FL2_CStream* fcs, int compressionL
 
     /* Free unsuitable objects before reallocating anything new */
     if (DICT_size(buf) < dictSize)
-        DICT_destruct(buf);
+        DICT_free(buf);
 
     FL2_preBeginFrame(fcs, 0);
 
@@ -1150,7 +1175,7 @@ FL2LIB_API unsigned long long FL2LIB_CALL FL2_getCStreamProgress(const FL2_CStre
 
 FL2LIB_API size_t FL2LIB_CALL FL2_waitCStream(FL2_CStream * fcs)
 {
-    if (FL2POOL_waitAll(fcs->compressThread, fcs->timeout) != 0)
+    if (FL2_CStream_waitAll(fcs) != 0)
         return FL2_ERROR(timedOut);
     CHECK_F(fcs->asyncRes);
     return fcs->outThread < fcs->threadCount;

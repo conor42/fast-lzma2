@@ -306,6 +306,7 @@ static FL2_CCtx *FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
 #endif
 
     cctx->matchTable = NULL;
+    DICT_construct(&cctx->buf, dualBuffer);
 
     if(FL2_createCCtx_threads(cctx, dualBuffer)) {
         free(cctx);
@@ -320,8 +321,6 @@ static FL2_CCtx *FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
         }
         cctx->jobs[u].cctx = cctx;
     }
-
-    DICT_construct(&cctx->buf, dualBuffer);
 
     FL2_CCtx_setParameter(cctx, FL2_p_compressionLevel, FL2_CLEVEL_DEFAULT);
     cctx->params.cParams.reset_interval = 4;

@@ -654,6 +654,7 @@ static FL2_decMt *FL2_lzma2DecMt_create(unsigned maxThreads)
 
     decmt->memTotal = 0;
     decmt->memLimit = (size_t)1 << 29;
+    decmt->maxThreads = 0;
 
     /* The head always exists and is only freed on deallocation */
     decmt->head = FL2_createInbufNode(decmt, NULL);

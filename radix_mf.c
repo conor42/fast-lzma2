@@ -9,7 +9,6 @@
 */
 
 #include <stddef.h>     /* size_t, ptrdiff_t */
-#include <stdlib.h>     /* malloc, free */
 #include "fast-lzma2.h"
 #include "fl2_errors.h"
 #include "mem.h"          /* U32, U64, MEM_64bits */
@@ -45,7 +44,7 @@ static RMF_builder* RMF_createBuilder(size_t match_buffer_size)
     match_buffer_size = MIN(match_buffer_size, MAX_MATCH_BUFFER_SIZE);
     match_buffer_size = MAX(match_buffer_size, MIN_MATCH_BUFFER_SIZE);
 
-    RMF_builder* const builder = malloc(
+    RMF_builder* const builder = FL2_malloc(
         sizeof(RMF_builder) + (match_buffer_size - 1) * sizeof(RMF_buildMatch));
 
     if (builder == NULL)
@@ -65,9 +64,9 @@ static void RMF_freeBuilderTable(RMF_builder** const builders, unsigned const si
         return;
 
     for (unsigned i = 0; i < size; ++i)
-        free(builders[i]);
+        FL2_free(builders[i]);
 
-    free(builders);
+    FL2_free(builders);
 }
 
 /* RMF_createBuilderTable() : 
@@ -79,7 +78,7 @@ static RMF_builder** RMF_createBuilderTable(U32* const match_table, size_t const
 {
     DEBUGLOG(3, "RMF_createBuilderTable : match_buffer_size %u, builders %u", (U32)match_buffer_size, size);
 
-    RMF_builder** const builders = malloc(size * sizeof(RMF_builder*));
+    RMF_builder** const builders = FL2_malloc(size * sizeof(RMF_builder*));
 
     if (builders == NULL)
         return NULL;
@@ -217,7 +216,7 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
 
     size_t const table_bytes = is_struct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
         : dictionary_size * sizeof(U32);
-    FL2_matchTable* const tbl = malloc(sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
+    FL2_matchTable* const tbl = FL2_large_malloc(sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
     if (tbl == NULL)
         return NULL;
 
@@ -245,7 +244,7 @@ void RMF_freeMatchTable(FL2_matchTable* const tbl)
     DEBUGLOG(3, "RMF_freeMatchTable");
 
     RMF_freeBuilderTable(tbl->builders, tbl->thread_count);
-    free(tbl);
+    FL2_large_free(tbl);
 }
 
 BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_parameters * const p, size_t const dict_reduce)

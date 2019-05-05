@@ -240,7 +240,7 @@ struct LZMA2_ECtx_s
 
 LZMA2_ECtx* LZMA2_createECtx(void)
 {
-    LZMA2_ECtx *const enc = malloc(sizeof(LZMA2_ECtx));
+    LZMA2_ECtx *const enc = FL2_malloc(sizeof(LZMA2_ECtx));
     DEBUGLOG(3, "LZMA2_createECtx");
     if (enc == NULL)
         return NULL;
@@ -268,8 +268,8 @@ void LZMA2_freeECtx(LZMA2_ECtx *const enc)
 {
     if (enc == NULL)
         return;
-    free(enc->hash_buf);
-    free(enc);
+    FL2_free(enc->hash_buf);
+    FL2_free(enc);
 }
 
 #define LITERAL_PROBS(enc, pos, prev_symbol) (enc->states.literal_probs + ((((pos) & enc->lit_pos_mask) << enc->lc) + ((prev_symbol) >> (8 - enc->lc))) * kNumLiterals * kNumLitTables)
@@ -847,10 +847,10 @@ static int LZMA_hashCreate(LZMA2_ECtx *const enc, unsigned const dictionary_bits
     DEBUGLOG(3, "Create hash chain : dict bits %u", dictionary_bits_3);
 
     if (enc->hash_buf)
-        free(enc->hash_buf);
+        FL2_free(enc->hash_buf);
 
     enc->hash_alloc_3 = (ptrdiff_t)1 << dictionary_bits_3;
-    enc->hash_buf = malloc(sizeof(LZMA2_hc3) + (enc->hash_alloc_3 - 1) * sizeof(S32));
+    enc->hash_buf = FL2_malloc(sizeof(LZMA2_hc3) + (enc->hash_alloc_3 - 1) * sizeof(S32));
 
     if (enc->hash_buf == NULL)
         return 1;

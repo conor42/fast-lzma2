@@ -293,7 +293,7 @@ static FL2_CCtx *FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
 
     DEBUGLOG(3, "FL2_createCCtxMt : %u threads", nbThreads);
 
-    FL2_CCtx *const cctx = calloc(1, sizeof(FL2_CCtx) + (nbThreads - 1) * sizeof(FL2_job));
+    FL2_CCtx *const cctx = FL2_calloc(1, sizeof(FL2_CCtx) + (nbThreads - 1) * sizeof(FL2_job));
     if (cctx == NULL)
         return NULL;
 
@@ -309,7 +309,7 @@ static FL2_CCtx *FL2_createCCtx_internal(unsigned nbThreads, int const dualBuffe
     DICT_construct(&cctx->buf, dualBuffer);
 
     if(FL2_createCCtx_threads(cctx, dualBuffer)) {
-        free(cctx);
+        FL2_free(cctx);
         return NULL;
     }
 
@@ -354,7 +354,7 @@ FL2LIB_API void FL2LIB_CALL FL2_freeCCtx(FL2_CCtx *cctx)
     FL2_freeCCtx_threads(cctx);
 
     RMF_freeMatchTable(cctx->matchTable);
-    free(cctx);
+    FL2_free(cctx);
 }
 
 FL2LIB_API unsigned FL2LIB_CALL FL2_getCCtxThreadCount(const FL2_CCtx *cctx)

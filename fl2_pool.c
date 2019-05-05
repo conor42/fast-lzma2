@@ -12,7 +12,6 @@
 
 /* ======   Dependencies   ======= */
 #include <stddef.h>  /* size_t */
-#include <stdlib.h>  /* malloc, calloc */
 #include "fl2_pool.h"
 #include "fl2_internal.h"
 
@@ -92,7 +91,7 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads)
     /* Check the parameters */
     if (!numThreads) { return NULL; }
     /* Allocate the context and zero initialize */
-    ctx = calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(FL2_pthread_t));
+    ctx = FL2_calloc(1, sizeof(FL2POOL_ctx) + (numThreads - 1) * sizeof(FL2_pthread_t));
     if (!ctx) { return NULL; }
     /* Initialize the busy count and jobs range */
     ctx->numThreadsBusy = 0;
@@ -139,7 +138,7 @@ void FL2POOL_free(FL2POOL_ctx *ctx)
     FL2_pthread_mutex_destroy(&ctx->queueMutex);
     FL2_pthread_cond_destroy(&ctx->busyCond);
     FL2_pthread_cond_destroy(&ctx->newJobsCond);
-    free(ctx);
+    FL2_free(ctx);
 }
 
 size_t FL2POOL_sizeof(FL2POOL_ctx *ctx)
@@ -209,7 +208,7 @@ FL2POOL_ctx* FL2POOL_create(size_t numThreads)
 
 void FL2POOL_free(FL2POOL_ctx *ctx)
 {
-    free(ctx);
+    FL2_free(ctx);
 }
 
 size_t FL2POOL_sizeof(FL2POOL_ctx *ctx)

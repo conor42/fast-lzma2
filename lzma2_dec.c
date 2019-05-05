@@ -894,7 +894,7 @@ void LZMA_constructDCtx(LZMA2_DCtx *p)
 static void LZMA_freeDict(LZMA2_DCtx *const p)
 {
     if (!p->ext_dic) {
-        free(p->dic);
+        FL2_large_free(p->dic);
     }
     p->dic = NULL;
 }
@@ -944,7 +944,7 @@ size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const 
 
         if (p->dic == NULL || dic_buf_size != p->dic_buf_size) {
             LZMA_freeDict(p);
-            p->dic = malloc(dic_buf_size);
+            p->dic = FL2_large_malloc(dic_buf_size);
             if (p->dic == NULL)
                 return FL2_ERROR(memory_allocation);
             p->ext_dic = 0;

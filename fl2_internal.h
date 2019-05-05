@@ -26,6 +26,16 @@ extern "C" {
 
 
 /*-****************************************
+*  Custom allocator handlers
+******************************************/
+void *FL2_malloc(size_t size);
+void *FL2_calloc(size_t count, size_t size);
+void FL2_free(void *address);
+void *FL2_large_malloc(size_t size);
+void FL2_large_free(void *address);
+
+
+/*-****************************************
 *  Error codes handling
 ******************************************/
 #define PREFIX(name) FL2_error_##name

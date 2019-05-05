@@ -54,8 +54,8 @@ Introduction
 
 /*------   Version   ------*/
 #define FL2_VERSION_MAJOR    1
-#define FL2_VERSION_MINOR    0
-#define FL2_VERSION_RELEASE  1
+#define FL2_VERSION_MINOR    1
+#define FL2_VERSION_RELEASE  0
 
 #define FL2_VERSION_NUMBER  (FL2_VERSION_MAJOR *100*100 + FL2_VERSION_MINOR *100 + FL2_VERSION_RELEASE)
 FL2LIB_API unsigned FL2LIB_CALL FL2_versionNumber(void);   /**< useful to check dll version */
@@ -135,6 +135,21 @@ FL2LIB_API int         FL2LIB_CALL FL2_maxHighCLevel(void);           /*!< maxim
 /***************************************
 *  Explicit memory management
 ***************************************/
+
+/*! FL2_setAllocFree() :
+ *  Custom allocator/deallocator functions passed here will be used for all allocations
+ *  and deallocations. This call must occur before any functions which allocate memory are called,
+ *  to ensure that the correct deallocator is called for all blocks. The setting persists until the
+ *  caller detaches from the DLL. Calling FL2_setAllocFree() again will have no effect. */
+FL2LIB_API size_t FL2LIB_CALL FL2_setAllocFree(void* (*allocFunction)(size_t size),
+    void (*freeFunction)(void* address));
+
+/*! FL2_setLargeAllocFree() :
+ *  Custom allocator/deallocator functions passed here will be used for all large allocations,
+ *  i.e. dictionary and match tables. This setting persists until the caller detaches from the DLL.
+ *  Calling FL2_setLargeAllocFree() again will have no effect. */
+FL2LIB_API size_t FL2LIB_CALL FL2_setLargeAllocFree(void* (*allocFunction)(size_t size),
+    void(*freeFunction)(void* address));
 
 /*= Compression context
  *  When compressing many times, it is recommended to allocate a context just once,

@@ -14,20 +14,23 @@ ifeq ($(OS),Windows_NT)
 	CFLAGS+=-DFL2_DLL_EXPORT=1
 	EXT:=.exe
 ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-    ASFLAGS+=-D MS_x64_CALL=1
+	ASFLAGS+=-DMS_x64_CALL=1
 	x86_64:=1
 endif
 else
-	UNAME_P:=$(shell uname -p)
-ifeq ($(UNAME_P),x86_64)
-    ASFLAGS+=-D MS_x64_CALL=0
+	PROC_ARCH:=$(shell uname -p)
+ifneq ($(PROC_ARCH),x86_64)
+	PROC_ARCH:=$(shell uname -m)
+endif
+ifeq ($(PROC_ARCH),x86_64)
+	ASFLAGS+=-DMS_x64_CALL=0
 	x86_64:=1
 endif
 endif
 
 ifeq ($(x86_64),1)
 	CFLAGS+=-DLZMA2_DEC_OPT
-	OBJ+=../lzma_dec_x86_64.o
+	OBJ+=lzma_dec_x86_64.o
 endif
 
 fuzzer : $(OBJ)
@@ -39,4 +42,4 @@ fuzzer : $(OBJ)
 	@$(CC) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 clean:
-	rm -f fuzzer $(OBJ) ($DEP)
+	rm -f fuzzer$(EXT) $(OBJ) $(DEP)

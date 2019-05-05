@@ -30,7 +30,7 @@ endif
 
 ifeq ($(x86_64),1)
 	CFLAGS+=-DLZMA2_DEC_OPT
-	OBJ+=lzma_dec_x86_64.o
+	OBJ+=../lzma_dec_x86_64.o
 endif
 
 fuzzer : $(OBJ)

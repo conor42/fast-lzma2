@@ -46,7 +46,7 @@ int DICT_construct(DICT_buffer *const buf, int const async);
 
 int DICT_init(DICT_buffer *const buf, size_t const dict_size, size_t const overlap, unsigned const reset_multiplier, int const do_hash);
 
-void DICT_destruct(DICT_buffer *const buf);
+void DICT_free(DICT_buffer *const buf);
 
 size_t DICT_size(const DICT_buffer *const buf);
 

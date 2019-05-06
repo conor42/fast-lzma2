@@ -16,9 +16,9 @@ extern "C" {
    but memory usage for LZMA2_DCtx::probs will be doubled in that case */
 
 #ifdef LZMA_DEC_PROB16
-#define Probability U16
+typedef U16 LZMA2_prob;
 #else
-#define Probability U32
+typedef U32 LZMA2_prob;
 #endif
 
 
@@ -137,7 +137,7 @@ typedef struct
 	size_t dic_pos;
 	size_t dic_buf_size;
 	const BYTE *buf;
-	Probability *probs_1664;
+	LZMA2_prob *probs_1664;
 	U32 range;
 	U32 code;
     U32 processed_pos;
@@ -156,7 +156,7 @@ typedef struct
 	BYTE need_flush;
 	BYTE ext_dic;
 	BYTE pad_;
-    Probability probs[NUM_BASE_PROBS + ((U32)kLzmaLitSize << kLzma2LcLpMax)];
+    LZMA2_prob probs[NUM_BASE_PROBS + ((U32)kLzmaLitSize << kLzma2LcLpMax)];
 } LZMA2_DCtx;
 
 void LZMA_constructDCtx(LZMA2_DCtx *p);
@@ -165,34 +165,16 @@ typedef enum
 {
   LZMA_FINISH_ANY,   /* finish at any point */
   LZMA_FINISH_END    /* block must be finished at the end */
-} ELzmaFinishMode;
-
-/* ELzmaFinishMode has meaning only if the decoding reaches output limit !!!
-
-   You must use LZMA_FINISH_END, when you know that current output buffer
-   covers last bytes of block. In other cases you must use LZMA_FINISH_ANY.
-
-   If LZMA decoder sees end marker before reaching output limit, it returns SZ_OK,
-   and output value of dest_len will be less than output buffer size limit.
-   You can check status result also.
-
-   You can use multiple checks to test data integrity after full decompression:
-     1) Check Result and "status" variable.
-     2) Check that output(dest_len) = uncompressed_size, if you know real uncompressed_size.
-     3) Check that output(src_len) = compressed_size, if you know real compressed_size.
-        You must use correct finish mode in that case. */
+} LZMA2_finishMode;
 
 typedef enum
 {
-  LZMA_STATUS_NOT_SPECIFIED,     /* use main error code instead */
-  LZMA_STATUS_FINISHED,          /* stream was finished */
-  LZMA_STATUS_NOT_FINISHED,      /* stream was not finished */
-  LZMA_STATUS_NEEDS_MORE_INPUT,  /* you must provide more input bytes */
-  LZMA_STATUS_OUTPUT_FULL        /* not finished; output buffer is full */
-} ELzmaStatus;
-
-/* ELzmaStatus is used only as output value for function call */
-
+    LZMA_STATUS_NOT_SPECIFIED,     /* use main error code instead */
+    LZMA_STATUS_FINISHED,          /* stream was finished */
+    LZMA_STATUS_NOT_FINISHED,      /* stream was not finished */
+    LZMA_STATUS_NEEDS_MORE_INPUT,  /* you must provide more input bytes */
+    LZMA_STATUS_OUTPUT_FULL        /* not finished; output buffer is full */
+} LZMA2_status;
 
 void LZMA_destructDCtx(LZMA2_DCtx *const p);
 
@@ -207,10 +189,10 @@ size_t LZMA2_decMemoryUsage(size_t const dict_size);
 size_t LZMA2_initDecoder(LZMA2_DCtx *const p, BYTE const dict_prop, BYTE *const dic, size_t dic_buf_size);
 
 size_t LZMA2_decodeToDic(LZMA2_DCtx *const p, size_t const dic_limit,
-    const BYTE *const src, size_t *const src_len, ELzmaFinishMode const finish_mode);
+    const BYTE *const src, size_t *const src_len, LZMA2_finishMode const finish_mode);
 
 size_t LZMA2_decodeToBuf(LZMA2_DCtx *const p, BYTE *dest, size_t *const dest_len,
-    const BYTE *src, size_t *const src_len, ELzmaFinishMode const finish_mode);
+    const BYTE *src, size_t *const src_len, LZMA2_finishMode const finish_mode);
 
 typedef enum
 {

@@ -46,14 +46,14 @@ typedef struct
     size_t unpackPos;
     size_t unpackSize;
     size_t res;
-    ELzmaFinishMode finish;
-} BlockDecMt;
+    LZMA2_finishMode finish;
+} FL2_blockDecMt;
 
 struct FL2_DCtx_s
 {
     LZMA2_DCtx dec;
 #ifndef FL2_SINGLETHREAD
-    BlockDecMt *blocks;
+    FL2_blockDecMt *blocks;
     FL2POOL_ctx *factory;
     size_t nbThreads;
 #endif
@@ -109,7 +109,7 @@ FL2LIB_API FL2_DCtx *FL2LIB_CALL FL2_createDCtxMt(unsigned nbThreads)
     dctx->factory = NULL;
 
     if (nbThreads > 1) {
-        dctx->blocks = malloc(nbThreads * sizeof(BlockDecMt));
+        dctx->blocks = malloc(nbThreads * sizeof(FL2_blockDecMt));
         dctx->factory = FL2POOL_create(nbThreads - 1);
 
         if (dctx->blocks == NULL || dctx->factory == NULL) {
@@ -168,7 +168,7 @@ FL2LIB_API unsigned FL2LIB_CALL FL2_getDCtxThreadCount(const FL2_DCtx * dctx)
 /* FL2_decompressCtxBlock() : FL2POOL_function type */
 static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n)
 {
-    BlockDecMt* const blocks = (BlockDecMt*)jobDescription;
+    FL2_blockDecMt* const blocks = (FL2_blockDecMt*)jobDescription;
     size_t srcLen = blocks[n].packSize;
 
     DEBUGLOG(4, "Thread %u: decoding block of input size %u, output size %u", (unsigned)n, (unsigned)srcLen, (unsigned)blocks[n].unpackSize);
@@ -182,7 +182,7 @@ static void FL2_decompressCtxBlock(void* const jobDescription, ptrdiff_t const n
 
 static size_t FL2_decompressCtxBlocksMt(FL2_DCtx* const dctx, const BYTE *const src, BYTE *const dst, size_t const dstCapacity, size_t const nbThreads)
 {
-    BlockDecMt* const blocks = dctx->blocks;
+    FL2_blockDecMt* const blocks = dctx->blocks;
 
     /* Initial check for block 0. The others are uncalculated */
     if (dstCapacity < blocks[0].unpackSize)
@@ -241,7 +241,7 @@ static size_t FL2_decompressDCtxMt(FL2_DCtx* const dctx,
     FL2_resetMtBlocks(dctx);
 
     size_t unpackSize = 0;
-    BlockDecMt* const blocks = dctx->blocks;
+    FL2_blockDecMt* const blocks = dctx->blocks;
     size_t thread = 0;
     size_t pos = 0;
     while (pos < srcSize) {
@@ -652,6 +652,7 @@ static FL2_decMt *FL2_lzma2DecMt_create(unsigned maxThreads)
 
     decmt->memTotal = 0;
     decmt->memLimit = (size_t)1 << 29;
+    decmt->maxThreads = 0;
 
     /* The head always exists and is only freed on deallocation */
     decmt->head = FL2_createInbufNode(decmt, NULL);
@@ -897,9 +898,9 @@ static size_t FL2_loadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
                 if (end != 0) {
                     inBlock = &decmt->threads[decmt->numThreads - 1].inBlock;
                     /* rewind input in case data beyond terminator was read. Required for xxhash and container formats */
-                    size_t rewind = MIN(input->pos, inBlock->last->length - inBlock->endPos);
-                    input->pos -= rewind;
-                    inBlock->last->length -= rewind;
+                    size_t back = MIN(input->pos, inBlock->last->length - inBlock->endPos);
+                    input->pos -= back;
+                    inBlock->last->length -= back;
                     return end;
                 }
                 inBlock = &decmt->threads[decmt->numThreads].inBlock;
@@ -910,9 +911,9 @@ static size_t FL2_loadInputMt(FL2_decMt *const decmt, FL2_inBuffer* const input)
             FL2_decInbuf *const next = FL2_createInbufNode(decmt, inBlock->last);
             if (next == NULL) {
                 if (inBlock->endPos < inBlock->last->length) {
-                    ptrdiff_t rewind = MIN(input->pos, inBlock->last->length - inBlock->endPos);
-                    input->pos -= rewind;
-                    inBlock->last->length -= rewind;
+                    size_t back = MIN(input->pos, inBlock->last->length - inBlock->endPos);
+                    input->pos -= back;
+                    inBlock->last->length -= back;
                 }
                 return FL2_ERROR(memory_allocation);
             }
@@ -1315,7 +1316,7 @@ FL2LIB_API size_t FL2LIB_CALL FL2_estimateDCtxSize(unsigned nbThreads)
 {
     nbThreads = FL2_checkNbThreads(nbThreads);
     if (nbThreads > 1)
-        return nbThreads * (sizeof(BlockDecMt) + sizeof(FL2_DCtx));
+        return nbThreads * (sizeof(FL2_blockDecMt) + sizeof(FL2_DCtx));
 
     return sizeof(FL2_DCtx);
 }

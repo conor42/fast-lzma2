@@ -1,4 +1,4 @@
-SRC = $(wildcard ../*.c) ../fuzzer/datagen.c bench.c
+SRC = $(wildcard ../*.c) datagen.c fuzzer.c
 OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
@@ -33,8 +33,8 @@ ifeq ($(x86_64),1)
 	OBJ+=../lzma_dec_x86_64.o
 endif
 
-bench : $(OBJ)
-	$(CC) -pthread -o bench$(EXT) $(OBJ)
+fuzzer : $(OBJ)
+	$(CC) -pthread -o fuzzer$(EXT) $(OBJ)
 
 -include $(DEP)
 
@@ -42,4 +42,4 @@ bench : $(OBJ)
 	@$(CC) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 clean:
-	rm -f bench$(EXT) $(OBJ) $(DEP)
+	rm -f fuzzer$(EXT) $(OBJ) $(DEP)

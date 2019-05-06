@@ -8,9 +8,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bench", "..\..\bench\bench.
 		{3B412B92-EC84-49A6-9C20-9BCFD9E34851} = {3B412B92-EC84-49A6-9C20-9BCFD9E34851}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libflzma2-dll", "..\..\dll\libflzma2-dll.vcxproj", "{3B412B92-EC84-49A6-9C20-9BCFD9E34851}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fast-lzma2", "..\..\dll\fast-lzma2.vcxproj", "{3B412B92-EC84-49A6-9C20-9BCFD9E34851}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fuzzer", "..\..\tests\fuzzer.vcxproj", "{A236F110-80EE-4502-A67C-C1BD0CCFAB15}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fuzzer", "..\..\fuzzer\fuzzer.vcxproj", "{A236F110-80EE-4502-A67C-C1BD0CCFAB15}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3B412B92-EC84-49A6-9C20-9BCFD9E34851} = {3B412B92-EC84-49A6-9C20-9BCFD9E34851}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "file_test", "..\..\test\file_test.vcxproj", "{0809DF55-8AA5-421A-834D-656B3D053D23}"
 	ProjectSection(ProjectDependencies) = postProject
 		{3B412B92-EC84-49A6-9C20-9BCFD9E34851} = {3B412B92-EC84-49A6-9C20-9BCFD9E34851}
 	EndProjectSection
@@ -47,6 +52,14 @@ Global
 		{A236F110-80EE-4502-A67C-C1BD0CCFAB15}.Release|x64.Build.0 = Release|x64
 		{A236F110-80EE-4502-A67C-C1BD0CCFAB15}.Release|x86.ActiveCfg = Release|Win32
 		{A236F110-80EE-4502-A67C-C1BD0CCFAB15}.Release|x86.Build.0 = Release|Win32
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Debug|x64.ActiveCfg = Debug|x64
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Debug|x64.Build.0 = Debug|x64
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Debug|x86.ActiveCfg = Debug|Win32
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Debug|x86.Build.0 = Debug|Win32
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Release|x64.ActiveCfg = Release|x64
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Release|x64.Build.0 = Release|x64
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Release|x86.ActiveCfg = Release|Win32
+		{0809DF55-8AA5-421A-834D-656B3D053D23}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

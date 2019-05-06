@@ -2,7 +2,8 @@ SRC = $(wildcard ../*.c) datagen.c fuzzer.c
 OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
-CFLAGS:=-Wall -O2 -pthread
+# Use -fPIC for obj compatibility with shared lib build
+CFLAGS:=-Wall -O2 -pthread -fPIC
 CC:=gcc
 
 ASFLAGS:=

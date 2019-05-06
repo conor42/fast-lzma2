@@ -1126,8 +1126,8 @@ static int fuzzerTests(unsigned nbThreads, U32 seed, U32 nbTests, unsigned start
             do {
                 if (in.pos == in.size) {
                     in.src = (BYTE*)in.src + in.pos;
-                    if ((FUZ_rand(&seed) & 0xF) == 0xF) { /* test unusual case where new input < LZMA_REQUIRED_INPUT_MAX before stream end */
-                        ptrdiff_t size = 1 + FUZ_rand(&seed) % 19;
+                    if ((FUZ_rand(&lseed) & 0xF) == 0xF) { /* test unusual case where new input < LZMA_REQUIRED_INPUT_MAX before stream end */
+                        ptrdiff_t size = 1 + FUZ_rand(&lseed) % 19;
                         in.size = MIN(size, iend - (BYTE*)in.src);
                     }
                     else {

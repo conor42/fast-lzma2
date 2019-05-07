@@ -75,11 +75,20 @@ int FL2_pthread_join(FL2_pthread_t thread, void **value_ptr)
     }
 }
 
-#endif   /* FL2_SINGLETHREAD */
+#endif   /* !FL2_SINGLETHREAD && _WIN32 */
+
+#ifdef FL2_SINGLETHREAD
 
 unsigned FL2_checkNbThreads(unsigned nbThreads)
 {
-#ifndef FL2_SINGLETHREAD
+    nbThreads = 1;
+    return nbThreads;
+}
+
+#else
+
+unsigned FL2_checkNbThreads(unsigned nbThreads)
+{
     if (nbThreads == 0) {
         nbThreads = UTIL_countPhysicalCores();
         nbThreads += !nbThreads;
@@ -87,9 +96,7 @@ unsigned FL2_checkNbThreads(unsigned nbThreads)
     if (nbThreads > FL2_MAXTHREADS) {
         nbThreads = FL2_MAXTHREADS;
     }
-#else
-    nbThreads = 1;
-#endif
     return nbThreads;
 }
 
+#endif /* FL2_SINGLETHREAD */

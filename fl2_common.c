@@ -41,8 +41,9 @@ unsigned char FL2_g_alloc_called;
 void *FL2_malloc(size_t size)
 {
     FL2_g_alloc_called = 1;
-    DEBUGLOG(3, "FL2_malloc: %lu bytes", (long)size);
-    return (FL2_g_alloc != NULL) ? FL2_g_alloc(size) : malloc(size);
+    char *address = (FL2_g_alloc != NULL) ? FL2_g_alloc(size) : malloc(size);
+    DEBUGLOG(3, "FL2_malloc: %lu bytes at 0x%lX", (long)size, (long)(address - (char*)0));
+    return address;
 }
 
 void *FL2_calloc(size_t count, size_t size)
@@ -56,6 +57,7 @@ void *FL2_calloc(size_t count, size_t size)
 
 void FL2_free(void *address)
 {
+    DEBUGLOG(3, "FL2_free: 0x%lX", (long)((char*)address - (char*)0));
     if (FL2_g_free != NULL)
         FL2_g_free(address);
     else
@@ -65,12 +67,14 @@ void FL2_free(void *address)
 void *FL2_large_malloc(size_t size)
 {
     FL2_g_alloc_called = 1;
-    DEBUGLOG(3, "FL2_large_malloc: %lu bytes", (long)size);
-    return (FL2_g_large_alloc != NULL) ? FL2_g_large_alloc(size) : FL2_malloc(size);
+    char *address = (FL2_g_large_alloc != NULL) ? FL2_g_large_alloc(size) : FL2_malloc(size);
+    DEBUGLOG(3, "FL2_large_malloc: %lu bytes at 0x%lX", (long)size, (long)(address - (char*)0));
+    return address;
 }
 
 void FL2_large_free(void *address)
 {
+    DEBUGLOG(3, "FL2_large_free: 0x%lX", (long)((char*)address - (char*)0));
     if (FL2_g_large_free != NULL)
         FL2_g_large_free(address);
     else

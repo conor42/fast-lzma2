@@ -124,7 +124,7 @@ static RMF_parameters RMF_clampParams(RMF_parameters params)
 #   undef CLAMP
 }
 
-static size_t RMF_calBufSize(size_t dictionary_size, unsigned buffer_resize)
+static size_t RMF_calcBufSize(size_t dictionary_size, unsigned buffer_resize)
 {
     size_t buffer_size = dictionary_size >> MATCH_BUFFER_SHIFT;
     if (buffer_size > MATCH_BUFFER_ELBOW) {
@@ -158,7 +158,7 @@ static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_
         || (params->dictionary_size == tbl->params.dictionary_size && is_struct > tbl->alloc_struct))
         return FL2_ERROR(parameter_unsupported);
 
-    size_t const match_buffer_size = RMF_calBufSize(tbl->unreduced_dict_size, params->match_buffer_resize);
+    size_t const match_buffer_size = RMF_calcBufSize(tbl->unreduced_dict_size, params->match_buffer_resize);
     tbl->params = *params;
     tbl->params.dictionary_size = dictionary_size;
     tbl->is_struct = is_struct;
@@ -729,7 +729,7 @@ BYTE* RMF_getTableAsOutputBuffer(FL2_matchTable* const tbl, size_t const pos)
 size_t RMF_memoryUsage(size_t const dict_size, unsigned const buffer_resize, unsigned const thread_count)
 {
     size_t size = (size_t)(4U + RMF_isStruct(dict_size)) * dict_size;
-    size_t const buf_size = RMF_calBufSize(dict_size, buffer_resize);
+    size_t const buf_size = RMF_calcBufSize(dict_size, buffer_resize);
     size += ((buf_size - 1) * sizeof(RMF_buildMatch) + sizeof(RMF_builder)) * thread_count;
     return size;
 }

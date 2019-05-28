@@ -21,7 +21,7 @@
 #  pragma warning(disable : 4701) /* warning: 'rpt_head_next' may be used uninitialized in this function */
 #endif
 
-#define MATCH_BUFFER_SHIFT 8;
+#define MATCH_BUFFER_SHIFT 8
 #define MATCH_BUFFER_ELBOW_BITS 17
 #define MATCH_BUFFER_ELBOW (1UL << MATCH_BUFFER_ELBOW_BITS)
 #define MIN_MATCH_BUFFER_SIZE 256U /* min buffer size at least FL2_SEARCH_DEPTH_MAX + 2 for bounded build */
@@ -143,6 +143,12 @@ static size_t RMF_calcBufSize(size_t dictionary_size, unsigned buffer_resize)
     return buffer_size;
 }
 
+static size_t RMF_allocationSize(size_t dictionary_size, int is_struct)
+{
+    return is_struct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
+        : dictionary_size * sizeof(U32);
+}
+
 /* RMF_applyParameters_internal() :
  * Set parameters to those specified.
  * Create a builder table if none exists. Free an existing one if incompatible.
@@ -152,15 +158,12 @@ static size_t RMF_calcBufSize(size_t dictionary_size, unsigned buffer_resize)
 static size_t RMF_applyParameters_internal(FL2_matchTable* const tbl, const RMF_parameters* const params)
 {
     int const is_struct = RMF_isStruct(params->dictionary_size);
-    size_t const dictionary_size = tbl->params.dictionary_size;
-    /* dictionary is allocated with the struct and is immutable */
-    if (params->dictionary_size > tbl->params.dictionary_size
-        || (params->dictionary_size == tbl->params.dictionary_size && is_struct > tbl->alloc_struct))
+    /* table is allocated with the struct and is immutable */
+    if (RMF_allocationSize(params->dictionary_size, is_struct) > tbl->allocation_size)
         return FL2_ERROR(parameter_unsupported);
 
     size_t const match_buffer_size = RMF_calcBufSize(tbl->unreduced_dict_size, params->match_buffer_resize);
     tbl->params = *params;
-    tbl->params.dictionary_size = dictionary_size;
     tbl->is_struct = is_struct;
     if (tbl->builders == NULL
         || match_buffer_size > tbl->builders[0]->match_buffer_size)
@@ -210,18 +213,16 @@ FL2_matchTable* RMF_createMatchTable(const RMF_parameters* const p, size_t const
     RMF_reduceDict(&params, dict_reduce);
 
     int const is_struct = RMF_isStruct(params.dictionary_size);
-    size_t dictionary_size = params.dictionary_size;
 
-    DEBUGLOG(3, "RMF_createMatchTable : is_struct %d, dict %u", is_struct, (U32)dictionary_size);
+    DEBUGLOG(3, "RMF_createMatchTable : is_struct %d, dict %u", is_struct, (U32)params.dictionary_size);
 
-    size_t const table_bytes = is_struct ? ((dictionary_size + 3U) / 4U) * sizeof(RMF_unit)
-        : dictionary_size * sizeof(U32);
+    size_t const table_bytes = RMF_allocationSize(params.dictionary_size, is_struct);
     FL2_matchTable* const tbl = FL2_large_malloc(sizeof(FL2_matchTable) + table_bytes - sizeof(U32));
     if (tbl == NULL)
         return NULL;
 
+    tbl->allocation_size = table_bytes;
     tbl->is_struct = is_struct;
-    tbl->alloc_struct = is_struct;
     tbl->thread_count = thread_count + !thread_count;
     tbl->params = params;
     tbl->unreduced_dict_size = unreduced_dict_size;
@@ -251,8 +252,7 @@ BYTE RMF_compatibleParameters(const FL2_matchTable* const tbl, const RMF_paramet
 {
     RMF_parameters params = RMF_clampParams(*p);
     RMF_reduceDict(&params, dict_reduce);
-    return tbl->params.dictionary_size > params.dictionary_size
-        || (tbl->params.dictionary_size == params.dictionary_size && tbl->alloc_struct >= RMF_isStruct(params.dictionary_size));
+    return tbl->allocation_size >= RMF_allocationSize(params.dictionary_size, RMF_isStruct(params.dictionary_size));
 }
 
 size_t RMF_applyParameters(FL2_matchTable* const tbl, const RMF_parameters* const p, size_t const dict_reduce)

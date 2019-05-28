@@ -94,8 +94,8 @@ struct FL2_matchTable_s
     FL2_atomic st_index;
     long end_index;
     int is_struct;
-    int alloc_struct;
     unsigned thread_count;
+    size_t allocation_size;
     size_t unreduced_dict_size;
     size_t progress;
     RMF_parameters params;
@@ -128,18 +128,6 @@ void RMF_bitpackLimitLengths(struct FL2_matchTable_s* const tbl, size_t const po
 void RMF_structuredLimitLengths(struct FL2_matchTable_s* const tbl, size_t const pos);
 BYTE* RMF_bitpackAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const pos);
 BYTE* RMF_structuredAsOutputBuffer(struct FL2_matchTable_s* const tbl, size_t const pos);
-size_t RMF_bitpackGetMatch(const struct FL2_matchTable_s* const tbl,
-    const BYTE* const data,
-    size_t const pos,
-    size_t const limit,
-    unsigned const max_depth,
-    size_t* const offset_ptr);
-size_t RMF_structuredGetMatch(const struct FL2_matchTable_s* const tbl,
-    const BYTE* const data,
-    size_t const pos,
-    size_t const limit,
-    unsigned const max_depth,
-    size_t* const offset_ptr);
 
 #if defined (__cplusplus)
 }

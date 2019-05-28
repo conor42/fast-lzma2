@@ -40,7 +40,7 @@ typedef struct
 {
 	BYTE *out_buffer;
 	size_t out_index;
-	U64 cache_size;
+	size_t cache_size;
 	U64 low;
 	U32 range;
 	BYTE cache;
@@ -115,38 +115,6 @@ void RC_encodeBit(RC_encoder* const rc, LZMA2_prob *const rprob, unsigned const 
 #define GET_PRICE_1(prob) price_table[1][(prob) >> kNumMoveReducingBits]
 
 #define kMinLitPrice 8U
-
-HINT_INLINE
-unsigned RC_getTreePrice(const LZMA2_prob* const prob_table, unsigned bit_count, size_t symbol)
-{
-	unsigned price = 0;
-    symbol |= ((size_t)1 << bit_count);
-    do {
-		size_t const next_symbol = symbol >> 1;
-		unsigned prob = prob_table[next_symbol];
-        size_t bit = symbol & 1;
-		price += GET_PRICE(prob, bit);
-		symbol = next_symbol;
-    } while (symbol != 1);
-	return price;
-}
-
-HINT_INLINE
-unsigned RC_getReverseTreePrice(const LZMA2_prob* const prob_table, unsigned bit_count, size_t symbol)
-{
-    unsigned prob = prob_table[1];
-    size_t bit = symbol & 1;
-    unsigned price = GET_PRICE(prob, bit);
-    size_t m = 1;
-    while (--bit_count != 0) {
-        m = (m << 1) | bit;
-        symbol >>= 1;
-        prob = prob_table[m];
-        bit = symbol & 1;
-        price += GET_PRICE(prob, bit);
-    }
-    return price;
-}
 
 HINT_INLINE
 void RC_flush(RC_encoder* const rc)

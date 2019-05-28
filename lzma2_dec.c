@@ -418,13 +418,13 @@ static int LZMA_decodeReal_3(LZMA2_DCtx *p, size_t limit, const BYTE *buf_limit)
                 do { NORMAL_LITER_DEC } while (symbol < 0x100);
 #else
                 NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
-                    NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
+                NORMAL_LITER_DEC
 #endif
             }
             else

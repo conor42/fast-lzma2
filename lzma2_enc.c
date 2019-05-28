@@ -228,7 +228,6 @@ struct LZMA2_ECtx_s
     LZMA2_node opt_buf[kOptimizerBufferSize];
 
     LZMA2_hc3* hash_buf;
-    ptrdiff_t chain_mask_2;
     ptrdiff_t chain_mask_3;
     ptrdiff_t hash_dict_3;
     ptrdiff_t hash_prev_index;
@@ -250,7 +249,7 @@ LZMA2_ECtx* LZMA2_createECtx(void)
     enc->pb = 2;
     enc->fast_length = 48;
     enc->len_end_max = kOptimizerBufferSize - 1;
-    enc->lit_pos_mask = (1 << enc->lp) - 1;
+    enc->lit_pos_mask = ((size_t)0x100 << enc->lp) - ((size_t)0x100 >> enc->lc);
     enc->pos_mask = (1 << enc->pb) - 1;
     enc->match_cycles = 1;
     enc->strategy = FL2_ultra;
@@ -272,7 +271,8 @@ void LZMA2_freeECtx(LZMA2_ECtx *const enc)
     FL2_free(enc);
 }
 
-#define LITERAL_PROBS(enc, pos, prev_symbol) (enc->states.literal_probs + ((((pos) & enc->lit_pos_mask) << enc->lc) + ((prev_symbol) >> (8 - enc->lc))) * kNumLiterals * kNumLitTables)
+#define LITERAL_PROBS(enc, pos, prev_symbol) (enc->states.literal_probs + \
+    (size_t)kNumLitTables * (((((pos) << 8) + (prev_symbol)) & enc->lit_pos_mask) << enc->lc))
 
 #define LEN_TO_DIST_STATE(len) (((len) < kNumLenToPosStates + 1) ? (len) - 2 : kNumLenToPosStates - 1)
 
@@ -1763,12 +1763,12 @@ BYTE LZMA2_getDictSizeProp(size_t const dictionary_size)
 
 size_t LZMA2_compressBound(size_t src_size)
 {
-	/* Minimum average uncompressed size. An average size of half kChunkSize should be assumed
-	 * to account for thread_count incomplete end chunks per block. LZMA expansion is < 2% so 1/16
-	 * is a safe overestimate. */
-	static const unsigned chunk_min_avg = (kChunkSize - (kChunkSize / 16U)) / 2U;
-	/* Maximum size of data stored in a sequence of uncompressed chunks */
-	return src_size + ((src_size + chunk_min_avg - 1) / chunk_min_avg) * 3 + 6;
+    /* Minimum average uncompressed size. An average size of half kChunkSize should be assumed
+     * to account for thread_count incomplete end chunks per block. LZMA expansion is < 2% so 1/16
+     * is a safe overestimate. */
+    static const unsigned chunk_min_avg = (kChunkSize - (kChunkSize / 16U)) / 2U;
+    /* Maximum size of data stored in a sequence of uncompressed chunks */
+    return src_size + ((src_size + chunk_min_avg - 1) / chunk_min_avg) * 3 + 6;
 }
 
 size_t LZMA2_encMemoryUsage(unsigned const chain_log, FL2_strategy const strategy, unsigned const thread_count)
@@ -1785,7 +1785,7 @@ static void LZMA2_reset(LZMA2_ECtx *const enc, size_t const max_distance)
     RC_reset(&enc->rc);
     LZMA_encoderStates_Reset(&enc->states, enc->lc, enc->lp, enc->fast_length);
     enc->pos_mask = (1 << enc->pb) - 1;
-    enc->lit_pos_mask = (1 << enc->lp) - 1;
+    enc->lit_pos_mask = ((size_t)0x100 << enc->lp) - ((size_t)0x100 >> enc->lc);
     U32 i = 0;
     for (; max_distance > (size_t)1 << i; ++i) {
     }
@@ -1819,34 +1819,34 @@ static U32 LZMA2_isqrt(U32 op)
 
 static BYTE LZMA2_isChunkIncompressible(const FL2_matchTable* const tbl,
     FL2_dataBlock const block, size_t const start,
-	unsigned const strategy)
+    unsigned const strategy)
 {
-	if (block.end - start >= kMinTestChunkSize) {
-		static const size_t max_dist_table[][5] = {
-			{ 0, 0, 0, 1U << 6, 1U << 14 }, /* fast */
-			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 }, /* opt */
-			{ 0, 0, 1U << 6, 1U << 14, 1U << 22 } }; /* ultra */
-		static const size_t margin_divisor[3] = { 60U, 45U, 120U };
-		static const U32 dev_table[3] = { 24, 24, 20};
+    if (block.end - start >= kMinTestChunkSize) {
+        static const size_t max_dist_table[][5] = {
+            { 0, 0, 0, 1U << 6, 1U << 14 }, /* fast */
+            { 0, 0, 1U << 6, 1U << 14, 1U << 22 }, /* opt */
+            { 0, 0, 1U << 6, 1U << 14, 1U << 22 } }; /* ultra */
+        static const size_t margin_divisor[3] = { 60U, 45U, 120U };
+        static const U32 dev_table[3] = { 24, 24, 20};
 
-		size_t const end = MIN(start + kChunkSize, block.end);
-		size_t const chunk_size = end - start;
-		size_t count = 0;
-		size_t const margin = chunk_size / margin_divisor[strategy];
-		size_t const terminator = start + margin;
+        size_t const end = MIN(start + kChunkSize, block.end);
+        size_t const chunk_size = end - start;
+        size_t count = 0;
+        size_t const margin = chunk_size / margin_divisor[strategy];
+        size_t const terminator = start + margin;
 
-		if (tbl->is_struct) {
-			size_t prev_dist = 0;
-			for (size_t pos = start; pos < end; ) {
-				U32 const link = GetMatchLink(tbl->table, pos);
-				if (link == RADIX_NULL_LINK) {
-					++pos;
-					++count;
-					prev_dist = 0;
-				}
-				else {
-					size_t const length = GetMatchLength(tbl->table, pos);
-					size_t const dist = pos - GetMatchLink(tbl->table, pos);
+        if (tbl->is_struct) {
+            size_t prev_dist = 0;
+            for (size_t pos = start; pos < end; ) {
+                U32 const link = GetMatchLink(tbl->table, pos);
+                if (link == RADIX_NULL_LINK) {
+                    ++pos;
+                    ++count;
+                    prev_dist = 0;
+                }
+                else {
+                    size_t const length = GetMatchLength(tbl->table, pos);
+                    size_t const dist = pos - GetMatchLink(tbl->table, pos);
                     if (length > 4) {
                         /* Increase the cost if it's not the same match */
                         count += dist != prev_dist;
@@ -1855,36 +1855,36 @@ static BYTE LZMA2_isChunkIncompressible(const FL2_matchTable* const tbl,
                         /* Increment the cost for a short match. The cost is the entire length if it's too far */
                         count += (dist < max_dist_table[strategy][length]) ? 1 : length;
                     }
-					pos += length;
-					prev_dist = dist;
-				}
-				if (count + terminator <= pos)
-					return 0;
-			}
-		}
-		else {
-			size_t prev_dist = 0;
-			for (size_t pos = start; pos < end; ) {
-				U32 const link = tbl->table[pos];
-				if (link == RADIX_NULL_LINK) {
-					++pos;
-					++count;
-					prev_dist = 0;
-				}
-				else {
-					size_t const length = link >> RADIX_LINK_BITS;
-					size_t const dist = pos - (link & RADIX_LINK_MASK);
-					if (length > 4)
-						count += dist != prev_dist;
-					else
-						count += (dist < max_dist_table[strategy][length]) ? 1 : length;
-					pos += length;
-					prev_dist = dist;
-				}
-				if (count + terminator <= pos)
-					return 0;
-			}
-		}
+                    pos += length;
+                    prev_dist = dist;
+                }
+                if (count + terminator <= pos)
+                    return 0;
+            }
+        }
+        else {
+            size_t prev_dist = 0;
+            for (size_t pos = start; pos < end; ) {
+                U32 const link = tbl->table[pos];
+                if (link == RADIX_NULL_LINK) {
+                    ++pos;
+                    ++count;
+                    prev_dist = 0;
+                }
+                else {
+                    size_t const length = link >> RADIX_LINK_BITS;
+                    size_t const dist = pos - (link & RADIX_LINK_MASK);
+                    if (length > 4)
+                        count += dist != prev_dist;
+                    else
+                        count += (dist < max_dist_table[strategy][length]) ? 1 : length;
+                    pos += length;
+                    prev_dist = dist;
+                }
+                if (count + terminator <= pos)
+                    return 0;
+            }
+        }
 
         U32 char_count[256];
         U32 char_total = 0;
@@ -1902,8 +1902,8 @@ static BYTE LZMA2_isChunkIncompressible(const FL2_matchTable* const tbl,
         U32 sqrt_chunk = (chunk_size == kChunkSize) ? kSqrtChunkSize : LZMA2_isqrt((U32)chunk_size);
         /* Result base on character count std dev */
         return LZMA2_isqrt(char_total) / sqrt_chunk <= dev_table[strategy];
-	}
-	return 0;
+    }
+    return 0;
 }
 
 static size_t LZMA2_encodeChunk(LZMA2_ECtx *const enc,
@@ -1951,8 +1951,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
     enc->chunk_limit = kTempBufferSize - kMaxMatchEncodeSize * 2;
 
     /* Each encoder writes a properties byte because the upstream encoder(s) could */
-	/* write only uncompressed chunks with no properties. */
-	BYTE encode_properties = 1;
+    /* write only uncompressed chunks with no properties. */
+    BYTE encode_properties = 1;
     BYTE incompressible = 0;
 
     if (block.end <= block.start)
@@ -2013,8 +2013,8 @@ size_t LZMA2_encode(LZMA2_ECtx *const enc,
                 /* compressed data will never catch up with the table position being read. */
                 cur = LZMA2_encodeChunk(enc, tbl, block, cur, end);
 
-				if (header_size + enc->rc.out_index > kTempBufferSize)
-					return FL2_ERROR(internal);
+                if (header_size + enc->rc.out_index > kTempBufferSize)
+                    return FL2_ERROR(internal);
 
                 /* Switch to the match table as output buffer */
                 out_dest = RMF_getTableAsOutputBuffer(tbl, start);

@@ -31,10 +31,12 @@ static int compress_file(FL2_CStream *fcs)
     FL2_inBuffer in_buf = { in_buffer, sizeof(in_buffer), sizeof(in_buffer) };
     FL2_outBuffer out_buf = { out_buffer, sizeof(out_buffer), 0 };
     size_t res = 0;
-
+    size_t in_size = 0;
+    size_t out_size = 0;
     do {
         if (in_buf.pos == in_buf.size) {
             in_buf.size = fread(in_buffer, 1, sizeof(in_buffer), fin);
+            in_size += in_buf.size;
             in_buf.pos = 0;
         }
         res = FL2_compressStream(fcs, &out_buf, &in_buf);
@@ -42,6 +44,7 @@ static int compress_file(FL2_CStream *fcs)
             goto error_out;
 
         fwrite(out_buf.dst, 1, out_buf.pos, fout);
+        out_size += out_buf.pos;
         out_buf.pos = 0;
 
     } while (in_buf.size == sizeof(in_buffer));
@@ -51,9 +54,11 @@ static int compress_file(FL2_CStream *fcs)
             goto error_out;
 
         fwrite(out_buf.dst, 1, out_buf.pos, fout);
+        out_size += out_buf.pos;
         out_buf.pos = 0;
     } while (res);
-
+    fprintf(stdout, "\t%ld -> %ld\n", in_size, out_size);
+    
     return 0;
 
 error_out:
@@ -68,18 +73,24 @@ static int decompress_file(FL2_DStream *fds)
     FL2_inBuffer in_buf = { in_buffer, sizeof(in_buffer), sizeof(in_buffer) };
     FL2_outBuffer out_buf = { out_buffer, sizeof(out_buffer), 0 };
     size_t res;
-
+    size_t in_size = 0;
+    size_t out_size = 0;
     do {
         if (in_buf.pos == in_buf.size) {
             in_buf.size = fread(in_buffer, 1, sizeof(in_buffer), fout);
+            in_size += in_buf.size;
             in_buf.pos = 0;
         }
         res = FL2_decompressStream(fds, &out_buf, &in_buf);
         if (FL2_isError(res))
             goto error_out;
         /* Discard the output. XXhash will verify the integrity. */
+        out_size += out_buf.pos;
         out_buf.pos = 0;
     } while (res && in_buf.size);
+    
+    fprintf(stdout, "\t%ld -> %ld\n", in_size, out_size);
+    
     return 0;
 
 error_out:
@@ -144,13 +155,17 @@ int main(int argc, char **argv)
 
     create_init_fl2_streams(preset);
     open_files(name);
-
+    fprintf(stdout, "Compress %s to %s:\n", name, out_name);
+    
     if (compress_file(fcs))
         goto cleanup;
 
     fseek(fout, 0, SEEK_SET);
+    fprintf(stdout, "Decompress %s (Discard the output. XXhash will verify the integrity.):\n", out_name);
     ret = decompress_file(fds);
-
+    if(ret == 0){
+        fprintf(stdout, "Compress & Decompress SUCCESS！\n");
+    }
 cleanup:
     fclose(fout);
     fclose(fin);

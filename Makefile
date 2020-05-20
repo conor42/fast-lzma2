@@ -4,12 +4,15 @@ DEP = $(OBJ:.o=.d)
 
 CFLAGS:=-Wall -O2 -pthread -fPIC
 CC:=gcc
+AR:=ar -rcs
+RM:=rm -rf
 
 ASFLAGS :=
 
 SONAME:=libfast-lzma2.so.1
 REAL_NAME:=libfast-lzma2.so.1.0
 LINKER_NAME=libfast-lzma2.so
+STATIC_LIBNAME=libfast-lzma2.a
 
 x86_64:=0
 
@@ -39,8 +42,11 @@ ifeq ($(x86_64),1)
 endif
 
 libfast-lzma2 : $(OBJ)
+	@echo "Build static & dynamic library!"
 	$(CC) -shared -pthread -Wl,-soname,$(SONAME) -o $(REAL_NAME) $(OBJ)
-
+	$(AR) $(STATIC_LIBNAME) $(OBJ)
+	@echo "Library build SUCCESS！"
+	
 -include $(DEP)
 
 %.d: %.c
@@ -79,11 +85,12 @@ else
 endif
 
 .PHONY: test
-test:
-	cd test && make
+test:libfast-lzma2
+	$(MAKE) -C ./test file_test
 	test/file_test radix_engine.h
 	@echo "Test file compressed and decompressed ok."
 
 .PHONY: clean
 clean:
-	rm -f $(REAL_NAME) $(OBJ) $(DEP)
+	$(RM) $(REAL_NAME) $(STATIC_LIBNAME) $(OBJ) $(DEP)
+	$(MAKE) -C ./test clean

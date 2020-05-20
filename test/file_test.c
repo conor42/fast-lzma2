@@ -164,7 +164,7 @@ int main(int argc, char **argv)
     fprintf(stdout, "Decompress %s (Discard the output. XXhash will verify the integrity.):\n", out_name);
     ret = decompress_file(fds);
     if(ret == 0){
-        fprintf(stdout, "Compress & Decompress SUCCESS！\n");
+        fprintf(stdout, "Compress & decompress SUCCESS.\n");
     }
 cleanup:
     fclose(fout);

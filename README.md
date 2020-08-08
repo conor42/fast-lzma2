@@ -1,10 +1,11 @@
 The __Fast LZMA2 Library__ is a lossless high-ratio data compression library based on Igor Pavlov's LZMA2 codec from 7-zip.
 
-Binaries of 7-Zip forks which use the algorithm are available in the [7-Zip-FL2 project] and the [7-Zip-zstd project]. The library
+Binaries of 7-Zip forks which use the algorithm are available in the [7-Zip-FL2 project], the [7-Zip-zstd project], and the active fork of [p7zip]. The library
 is also embedded in a fork of XZ Utils, named [FXZ Utils].
 
 [7-Zip-FL2 project]: https://github.com/conor42/7-Zip-FL2/releases/
 [7-Zip-zstd project]: https://github.com/mcmilk/7-Zip-zstd/releases/
+[p7zip]: https://github.com/szcnick/p7zip/releases/
 [FXZ Utils]: https://github.com/conor42/fxz
 
 The library uses a parallel buffered radix match-finder and some optimizations from Zstandard to achieve a 20% to 100%

@@ -1,0 +1,203 @@
+name: Build Native Binaries Matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux-glibc:
+    name: glibc-${{ matrix.rid }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            cc: gcc
+            cflags: -Wall -O2 -pthread -fPIC
+            x86_64: "1"
+            packages: ""
+          - rid: linux-x86
+            cc: gcc -m32
+            cflags: -Wall -O2 -pthread -fPIC -m32
+            x86_64: "0"
+            packages: gcc-multilib libc6-dev-i386
+          - rid: linux-arm64
+            cc: aarch64-linux-gnu-gcc
+            cflags: -Wall -O2 -pthread -fPIC
+            x86_64: "0"
+            packages: gcc-aarch64-linux-gnu
+          - rid: linux-arm
+            cc: arm-linux-gnueabihf-gcc
+            cflags: -Wall -O2 -pthread -fPIC
+            x86_64: "0"
+            packages: gcc-arm-linux-gnueabihf
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install cross toolchains
+        if: matrix.packages != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Build shared library
+        run: |
+          make clean
+          make \
+            CC="${{ matrix.cc }}" \
+            CFLAGS="${{ matrix.cflags }}" \
+            x86_64=${{ matrix.x86_64 }}
+
+      - name: Prepare RID layout
+        run: |
+          set -e
+          out="dist/${{ matrix.rid }}/runtimes/${{ matrix.rid }}/native"
+          mkdir -p "$out"
+
+          cp libfast-lzma2.so.1.0 "$out/libfast-lzma2.so.1.0"
+          ln -sf libfast-lzma2.so.1.0 "$out/libfast-lzma2.so.1"
+          ln -sf libfast-lzma2.so.1.0 "$out/libfast-lzma2.so"
+
+          mkdir -p "dist/${{ matrix.rid }}/include"
+          cp fast-lzma2.h fl2_errors.h "dist/${{ matrix.rid }}/include/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: fast-lzma2-${{ matrix.rid }}
+          path: dist/${{ matrix.rid }}
+          if-no-files-found: error
+
+  build-linux-musl:
+    name: musl-${{ matrix.rid }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-musl-x64
+            target: x86_64-linux-musl
+          - rid: linux-musl-arm64
+            target: aarch64-linux-musl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Build shared library (musl)
+        run: |
+          rm -rf dist
+          rm -f *.o *.d libfast-lzma2.so.1.0 libfast-lzma2.a
+
+          SOURCES="dict_buffer.c fl2_common.c fl2_compress.c fl2_decompress.c fl2_pool.c fl2_threading.c lzma2_dec.c lzma2_enc.c radix_bitpack.c radix_mf.c radix_struct.c range_enc.c util.c xxhash.c"
+
+          zig cc \
+            -target ${{ matrix.target }} \
+            -shared \
+            -O2 \
+            -fPIC \
+            -D_GNU_SOURCE \
+            -o libfast-lzma2.so.1.0 \
+            $SOURCES
+
+      - name: Prepare RID layout
+        run: |
+          set -e
+          out="dist/${{ matrix.rid }}/runtimes/${{ matrix.rid }}/native"
+          mkdir -p "$out"
+
+          cp libfast-lzma2.so.1.0 "$out/libfast-lzma2.so.1.0"
+          ln -sf libfast-lzma2.so.1.0 "$out/libfast-lzma2.so.1"
+          ln -sf libfast-lzma2.so.1.0 "$out/libfast-lzma2.so"
+
+          mkdir -p "dist/${{ matrix.rid }}/include"
+          cp fast-lzma2.h fl2_errors.h "dist/${{ matrix.rid }}/include/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: fast-lzma2-${{ matrix.rid }}
+          path: dist/${{ matrix.rid }}
+          if-no-files-found: error
+
+  build-windows:
+    name: windows-${{ matrix.rid }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            platform: x64
+          - rid: win-x86
+            platform: Win32
+          - rid: win-arm64
+            platform: ARM64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Build DLL (MSVC)
+        run: |
+          msbuild dll/fast-lzma2.vcxproj /m /p:Configuration=Release /p:Platform=${{ matrix.platform }} /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /p:OutDir="${{ github.workspace }}\out\${{ matrix.rid }}\" /p:IntDir="${{ github.workspace }}\obj\${{ matrix.rid }}\"
+        shell: pwsh
+
+      - name: Prepare RID layout
+        run: |
+          $out = "dist/${{ matrix.rid }}/runtimes/${{ matrix.rid }}/native"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "out/${{ matrix.rid }}/fast-lzma2.dll" "$out/fast-lzma2.dll" -Force
+
+          New-Item -ItemType Directory -Force -Path "dist/${{ matrix.rid }}/include" | Out-Null
+          Copy-Item "fast-lzma2.h" "dist/${{ matrix.rid }}/include/fast-lzma2.h" -Force
+          Copy-Item "fl2_errors.h" "dist/${{ matrix.rid }}/include/fl2_errors.h" -Force
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: fast-lzma2-${{ matrix.rid }}
+          path: dist/${{ matrix.rid }}
+          if-no-files-found: error
+
+  package-all-artifacts:
+    name: package-all-artifacts
+    runs-on: ubuntu-24.04
+    needs:
+      - build-linux-glibc
+      - build-linux-musl
+      - build-windows
+
+    steps:
+      - name: Download all per-RID artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: fast-lzma2-*
+          path: merged
+          merge-multiple: true
+
+      - name: Create single zip bundle
+        run: |
+          cd merged
+          zip -r ../fast-lzma2-all-rids.zip .
+
+      - name: Upload single bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: fast-lzma2-all-rids
+          path: fast-lzma2-all-rids.zip
+          if-no-files-found: error

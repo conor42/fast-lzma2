@@ -30,6 +30,7 @@
 #define FL2_STATIC_LINKING_ONLY  /* FL2_compressContinue, FL2_compressBlock */
 #include "../fast-lzma2.h"         /* FL2_VERSION_STRING */
 #include "../fl2_errors.h"  /* FL2_getErrorCode */
+#include "../fl2_threading.h"  /* FL2_checkNbThreads */
 #include "datagen.h"      /* RDG_genBuffer */
 #include "../mem.h"
 #include "../xxhash.h"
@@ -1243,6 +1244,8 @@ static int FUZ_usage(const char* programName)
     DISPLAY( " -i#    : Nb of tests (default:%u) \n", nbTestsDefault);
     DISPLAY( " -s#    : Select seed (default:prompt user)\n");
     DISPLAY( " -t#    : Select starting test number (default:0)\n");
+    DISPLAY( " -m#    : Nb of threads (default:0, meaning one per core)\n");
+    DISPLAY( " -T#[smn]: Run for a duration instead of a number of tests\n");
     DISPLAY( " -P#    : Select compressibility in %% (default:%u%%)\n", FUZ_compressibility_default);
     DISPLAY( " -d     : Perform streaming decompression tests\n");
     DISPLAY( " -v     : verbose\n");
@@ -1380,6 +1383,11 @@ int main(int argc, const char** argv)
                 default:
                     return (FUZ_usage(programName), 1);
     }   }   }   }   /* for (argNb=1; argNb<argc; argNb++) */
+
+    /* Resolve the thread count the library will actually use. nbThreads is 0 by
+     * default, meaning "one per core", and the tests below both display it and
+     * use it as a divisor, which divided by zero. */
+    nbThreads = FL2_checkNbThreads(nbThreads);
 
     /* Get Seed */
     DISPLAY("Starting fast-lzma2 tester (%i-bits, %s)\n", (int)(sizeof(size_t)*8), FL2_VERSION_STRING);
